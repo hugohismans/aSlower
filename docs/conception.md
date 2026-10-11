@@ -1,4 +1,4 @@
-# Coursier de la lumière lente — plan et arborescence
+# Le Coursier relativiste — plan et arborescence
 
 > Contrat entre modules (signatures, repères, attributs, imports permis) : [`docs/interfaces.md`](interfaces.md). En cas de désaccord sur une signature, c'est le contrat qui fait foi ; ce document donne le pourquoi.
 

@@ -1,6 +1,6 @@
 # Avis de tiers
 
-« Coursier de la lumière lente » (https://github.com/hugohismans/aSlower) est un projet
+« Le Coursier relativiste » (https://github.com/hugohismans/aSlower) est un projet
 indépendant de Hugo Hismans. Il n'est ni affilié au MIT (Massachusetts Institute of
 Technology) ni au MIT Game Lab, ni approuvé par eux. Aucune ressource du jeu
 « A Slower Speed of Light » (modèles, textures, sons, musiques, niveaux, images, textes)

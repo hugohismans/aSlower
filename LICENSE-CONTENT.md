@@ -2,7 +2,7 @@
 
 Copyright (c) 2026 Hugo Hismans
 
-Sauf mention contraire, les **contenus** du jeu « Coursier de la lumière lente »
+Sauf mention contraire, les **contenus** du jeu « Le Coursier relativiste »
 sont mis à disposition selon les termes de la licence
 **Creative Commons Attribution 4.0 International** (CC BY 4.0) :
 
@@ -35,7 +35,7 @@ Le **code** est sous licence MIT (voir [`LICENSE`](LICENSE)).
 Pour réutiliser un contenu, indiquez le titre, l'auteur, la source, la licence et,
 le cas échéant, que vous l'avez modifié. Par exemple :
 
-> « Coursier de la lumière lente » — Hugo Hismans —
+> « Le Coursier relativiste » — Hugo Hismans —
 > <https://github.com/hugohismans/aSlower> — licence CC BY 4.0
 > (<https://creativecommons.org/licenses/by/4.0/>). Niveaux modifiés.
 

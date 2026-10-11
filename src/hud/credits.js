@@ -19,7 +19,7 @@ function template(base) {
         <button type="submit" class="btn btn-close" autofocus>Fermer</button>
       </form>
     </header>
-    <p class="credits-lead"><strong>Coursier de la lumière lente</strong>, un jeu de Hugo Hismans.
+    <p class="credits-lead"><strong>Le Coursier relativiste</strong>, un jeu de Hugo Hismans.
       Code sous licence MIT&#8239;; contenus (données JSON, textes) sous licence CC&nbsp;BY&nbsp;4.0.</p>
 
     <h3>Inspiration et code adapté</h3>

@@ -18,7 +18,7 @@ function pngSize(path) {
 
 describe('manifeste', () => {
   it('nom, portée et départ sous /aSlower/ (GitHub Pages), plein écran en paysage', () => {
-    expect(manifest.name).toBe('Coursier de la lumière lente');
+    expect(manifest.name).toBe('Le Coursier relativiste');
     expect(manifest.short_name).toBe('Coursier');
     expect(manifest.start_url).toBe('/aSlower/');
     expect(manifest.scope).toBe('/aSlower/');

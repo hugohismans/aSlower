@@ -1,4 +1,4 @@
-# Coursier de la lumière lente
+# Le Coursier relativiste
 
 Livre des colis dans une ville où la lumière ne va qu'à **30 m/s** (≈ 108 km/h) — ou à la
 vitesse que tu choisis, de 10 à 100 m/s.
