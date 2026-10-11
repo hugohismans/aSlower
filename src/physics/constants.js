@@ -33,8 +33,9 @@ export const SUBSTEP_MAX_DIST = 1;
 /**
  * Conduite « arcade » (choix de l'auteur) : la route fournit la force latérale,
  * hors du budget du moteur. Le virage fait tourner la vitesse propre u à |u|
- * constant, au taux dθ/dτ = steer·TURN_RATE (rad par seconde de temps propre).
- * Rayon dans la ville : r = |u|/TURN_RATE (98 m à 76 m/s, 172 m à 90 m/s).
+ * constant, au taux dθ/dτ = −steer·TURN_RATE (rad par seconde de temps propre ; steer > 0 :
+ * à droite, θ diminue). Rayon dans la ville, volant à fond : r = |u|/TURN_RATE
+ * (117 m à 76 m/s, 206 m à 90 m/s).
  */
 export const TURN_RATE = 1.0;
 /** Taux de pivot à l'arrêt (rad/s), pour se réorienter sans avancer. */

@@ -1,0 +1,92 @@
+/*! Inspiré d'OpenRelativity (MIT Game Lab) — https://github.com/MITGameLab/OpenRelativity @35b806a1, skybox.shader — Copyright (c) 2013 Massachusetts Institute of Technology — SPDX-License-Identifier: MIT — voir THIRD_PARTY_NOTICES.md — Modifications (c) 2026 Hugo Hismans */
+// Passe d'environnement : ciel, sol et brouillard, pour chaque pixel non couvert.
+//
+// OpenRelativity (skybox.shader) décale en fréquence la texture du ciel sans l'aberrer.
+// Ici, pour chaque pixel :
+// 1. direction apparente n' (référentiel du joueur), puis aberration INVERSE exacte vers la
+//    direction monde n : D = 1/(γ(1 − β·n')), n = (n' + (γ²/(γ+1)(β·n') − γ)β)·D ;
+// 2. intersection analytique avec le sol (Three : y = 0, œil à uEyeHeight), SANS branchement
+//    avant la lecture de texture, puis carte des rues (repère du jeu, uStreetBounds) ;
+// 3. ciel en dégradé (horizon : ligne de LUT uSkyRow ; zénith : bleu de Rayleigh), disque
+//    solaire, brume à l'horizon ; brouillard du sol en distance monde, mélangé avant le Doppler ;
+// 4. même fin de chaîne que les façades (LUT, gamut, projecteur, tone mapping, sRGB).
+// Miroir JS : physics/relativity.js (aberrateInverse), vérifié par tests/render-math.test.js.
+#include <rel_fog>
+#include <rel_doppler>
+
+uniform highp float uEyeHeight;   // hauteur de l'œil au-dessus de la chaussée (m)
+uniform sampler2D uStreetMap;     // carte des rues (sRGB, décodée en linéaire par le GPU)
+uniform highp vec4 uStreetBounds; // (xmin, ymin, xmax, ymax) du jeu couverts par la carte
+uniform highp vec3 uSunDir;       // direction du soleil (monde, repère Three, unitaire)
+uniform float uSkyRow;            // ligne de LUT de la lumière du ciel (corps noir)
+uniform vec2 uGroundIrUv;         // réflectances ir, uv du sol, en fraction de sa luminance
+
+varying highp vec3 vRay;
+
+// Ciel dégagé, en dégradé de l'horizon au zénith :
+// - près de l'horizon, lumière diffuse blanche (longs trajets, diffusion multiple) : corps noir
+//   de la ligne uSkyRow (6 500 K), luminance SKY_HORIZON ;
+// - vers le zénith, diffusion de Rayleigh du soleil (∝ λ⁻⁴) : réflectances moyennes de λ⁻⁴ sur
+//   chaque bande (b ≈ 3,0 ; g ≈ 1,1 ; r ≈ 0,40 ; ir ≈ 0,04 ; uv ≈ 4,5, coupé vers 280 nm),
+//   mises à l'échelle pour une luminance ≈ 0,19 du blanc éclairé ; décalées par M(D).
+const float SKY_HORIZON = 0.55;
+const vec3 RAYLEIGH_RGB = vec3(0.067, 0.188, 0.515);
+const vec2 RAYLEIGH_IR_UV = vec2(0.007, 0.77);
+const float ZENITH_HEIGHT = 0.6;     // le bleu de Rayleigh domine au-dessus de ≈ 37°
+const float HAZE_HEIGHT = 0.12;      // le ciel sort de la brume sur ≈ 7° au-dessus de l'horizon
+const float SUN_COS_OUTER = 0.99990; // disque solaire : bord flou entre ≈ 0,5° et 0,8°
+const float SUN_COS_INNER = 0.99996;
+const float SUN_INTENSITY = 30.0;    // disque (le tone mapping le ramène au blanc)
+const float SUN_HALO = 0.35;         // halo autour du disque
+
+// Aberration inverse : direction monde de ce qu'on voit dans la direction apparente nApp.
+highp vec3 relAberrateInverse(highp vec3 nApp, out highp float D) {
+#ifdef REL_CLASSIC
+  D = 1.0;
+  return nApp;
+#else
+  highp float bn = dot(uBeta, nApp);
+  D = 1.0 / (uGamma * (1.0 - bn));
+  return (nApp + (uG2 * bn - uGamma) * uBeta) * D;
+#endif
+}
+
+void main() {
+  highp float D;
+  highp vec3 n = relAberrateInverse(normalize(vRay), D);
+
+  // --- Sol (y = 0). La distance est bornée à uFogFar : au-delà le brouillard est opaque,
+  // et les rayons montants tombent sur le même cercle, si bien que les coordonnées de
+  // texture (et leurs dérivées) restent continues à travers l'horizon.
+  highp float down = -n.y;
+  highp float dist = min(uEyeHeight / max(down, 1e-6), uFogFar);
+  highp vec2 hitXZ = cameraPosition.xz + n.xz * dist;
+  highp vec2 hitGame = vec2(hitXZ.x, -hitXZ.y); // repère du jeu : y = −Z
+  highp vec2 uv = (hitGame - uStreetBounds.xy) / (uStreetBounds.zw - uStreetBounds.xy);
+  vec3 ground = texture(uStreetMap, uv).rgb;
+  float fog = relFogFactor(dist);
+  vec3 groundRgb = mix(ground, uFogSpec, fog);
+  vec2 groundIrUv = mix(uGroundIrUv * dot(ground, REL_LUMA), uFogIrUv, fog);
+
+  // --- Ciel : brume près de l'horizon, puis ciel dégagé en dégradé (blanc → bleu de Rayleigh).
+  float isGround = step(0.0, down);
+  float up = max(n.y, 0.0);
+  float clearSky = (1.0 - isGround) * smoothstep(0.0, HAZE_HEIGHT, up); // 0 : brume, 1 : dégagé
+  float zenith = smoothstep(0.0, ZENITH_HEIGHT, up);                   // 0 : horizon, 1 : zénith
+  vec3 skyRgb = uFogSpec * (1.0 - clearSky) + RAYLEIGH_RGB * (clearSky * zenith);
+  vec2 skyIrUv = uFogIrUv * (1.0 - clearSky) + RAYLEIGH_IR_UV * (clearSky * zenith);
+
+  // Soleil (corps noir à la température du soleil) : réflectance 1 dans les 5 bandes,
+  // c'est-à-dire exactement le spectre solaire, décalé par M(D) comme le reste.
+  float cosSun = dot(n, uSunDir);
+  float sun = (1.0 - isGround) * (SUN_INTENSITY * smoothstep(SUN_COS_OUTER, SUN_COS_INNER, cosSun)
+    + SUN_HALO * pow(max(cosSun, 0.0), 256.0));
+
+  vec3 rho = mix(skyRgb, groundRgb, isGround) + vec3(sun);
+  vec2 rhoIrUv = mix(skyIrUv, groundIrUv, isGround) + vec2(sun);
+  vec3 c = relSurfaceColor(rho, rhoIrUv, D);
+  c += (clearSky * (1.0 - zenith) * SKY_HORIZON) * relLutRow(D, uSkyRow);
+
+  gl_FragColor = vec4(relFinish(c, D), 1.0);
+  #include <colorspace_fragment>
+}

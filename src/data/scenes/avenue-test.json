@@ -1,0 +1,65 @@
+{
+  "schema": "coursier-scene/1",
+  "id": "avenue-test",
+  "titre": "Avenue de test",
+  "description": "Avenue droite nord-sud de 4 km bordee de facades arc-en-ciel, lampadaires corps noir tous les 40 m, panneaux infrarouges et ultraviolets, place et butee au bout. 1,5 km pour atteindre gamma = 2,5, autant pour freiner, 1 km de marge.",
+  "graine": 20261011,
+  "limites": { "min": [-160, -100], "max": [160, 4060] },
+  "visibilite": { "lite": 400, "defaut": 600 },
+  "depart": { "pos": [0, 20], "capDegres": 90 },
+  "rues": [
+    { "id": "avenue", "nom": "Avenue de la Lumiere", "de": [0, -40], "a": [0, 3920], "largeur": 18 },
+    { "id": "place", "nom": "Place Romer", "de": [0, 3920], "a": [0, 4000], "largeur": 130 },
+    {
+      "id": "transversales",
+      "nom": "Rues transversales",
+      "de": [-160, 68],
+      "a": [160, 68],
+      "largeur": 18,
+      "repeter": { "nombre": 49, "pas": [0, 80] }
+    }
+  ],
+  "rangees": [
+    {
+      "id": "ouest",
+      "coin": [-68, 0],
+      "ilot": [56, 56],
+      "nombre": 49,
+      "pas": [0, 80],
+      "facades": ["est"],
+      "largeurs": [15, 26],
+      "profondeurs": [14, 22],
+      "hauteurs": [8, 30],
+      "couleurs": ["rouge", "orange", "jaune", "vert", "cyan", "bleu", "violet"],
+      "ordreCouleurs": "suite"
+    },
+    {
+      "id": "est",
+      "coin": [12, 0],
+      "ilot": [56, 56],
+      "nombre": 49,
+      "pas": [0, 80],
+      "facades": ["ouest"],
+      "largeurs": [15, 26],
+      "profondeurs": [14, 22],
+      "hauteurs": [8, 30],
+      "couleurs": ["rouge", "orange", "jaune", "vert", "cyan", "bleu", "violet"],
+      "ordreCouleurs": "suite"
+    }
+  ],
+  "batiments": [
+    { "id": "depot", "nom": "Depot Photon Express", "pos": [0, -60], "taille": [136, 40], "hauteur": 12, "couleur": "creme" },
+    { "id": "butee", "nom": "Hotel de ville", "pos": [0, 4020], "taille": [136, 40], "hauteur": 24, "couleur": "gris" },
+    { "id": "panneau-ir-1", "pos": [-10.25, 720], "taille": [2.5, 0.5], "hauteur": 6, "couleur": "panneau-ir" },
+    { "id": "panneau-ir-2", "pos": [10.25, 1520], "taille": [2.5, 0.5], "hauteur": 6, "couleur": "panneau-ir" },
+    { "id": "panneau-ir-3", "pos": [-10.25, 2320], "taille": [2.5, 0.5], "hauteur": 6, "couleur": "panneau-ir" },
+    { "id": "panneau-ir-4", "pos": [10.25, 3120], "taille": [2.5, 0.5], "hauteur": 6, "couleur": "panneau-ir" },
+    { "id": "panneau-uv-1", "pos": [10, 1120], "taille": [0.5, 6], "hauteur": 5, "couleur": "panneau-uv" },
+    { "id": "panneau-uv-2", "pos": [-10, 1920], "taille": [0.5, 6], "hauteur": 5, "couleur": "panneau-uv" },
+    { "id": "panneau-uv-3", "pos": [10, 2720], "taille": [0.5, 6], "hauteur": 5, "couleur": "panneau-uv" }
+  ],
+  "lampadaires": [
+    { "rue": "avenue", "pas": 40, "depart": 20, "hauteur": 6, "temperature": 2700, "intensite": 1, "retrait": 1.5 },
+    { "rue": "place", "pas": 40, "depart": 20, "hauteur": 6, "temperature": 2700, "intensite": 1, "retrait": 1.5 }
+  ]
+}

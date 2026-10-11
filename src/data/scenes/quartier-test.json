@@ -1,0 +1,49 @@
+{
+  "schema": "coursier-scene/1",
+  "id": "quartier-test",
+  "titre": "Quartier de test",
+  "description": "Grille de 16 x 16 ilots de 56 m bordes de batiments sur leurs quatre cotes, rues de 24 m, environ 1,3 x 1,3 km : contient tout le disque de 600 m de visibilite autour du depart, pour mesurer les appels de dessin a beta impose.",
+  "graine": 1300,
+  "limites": { "min": [-660, -660], "max": [660, 660] },
+  "visibilite": { "lite": 400, "defaut": 600 },
+  "depart": { "pos": [0, 0], "capDegres": 90 },
+  "rues": [
+    {
+      "id": "nord-sud",
+      "nom": "Rues nord-sud",
+      "de": [-640, -652],
+      "a": [-640, 652],
+      "largeur": 18,
+      "repeter": { "nombre": 17, "pas": [80, 0] }
+    },
+    {
+      "id": "est-ouest",
+      "nom": "Rues est-ouest",
+      "de": [-652, -640],
+      "a": [652, -640],
+      "largeur": 18,
+      "repeter": { "nombre": 17, "pas": [0, 80] }
+    }
+  ],
+  "rangees": [
+    {
+      "id": "quartier",
+      "coin": [-628, -628],
+      "ilot": [56, 56],
+      "nombre": 16,
+      "pas": [80, 0],
+      "rangs": { "nombre": 16, "pas": [0, 80] },
+      "facades": ["sud", "nord", "ouest", "est"],
+      "largeurs": [18, 28],
+      "profondeurs": [12, 18],
+      "hauteurs": [8, 30],
+      "couleurs": ["rouge", "orange", "jaune", "vert", "cyan", "bleu", "violet", "creme", "gris"],
+      "ordreCouleurs": "hasard"
+    }
+  ],
+  "batiments": [],
+  "lampadaires": [
+    { "rue": "nord-sud", "pas": 40, "depart": 32, "hauteur": 6, "temperature": 2700, "intensite": 1, "retrait": 1.5 },
+    { "rue": "est-ouest", "pas": 40, "depart": 32, "hauteur": 6, "temperature": 2700, "intensite": 1, "retrait": 1.5 }
+  ]
+}

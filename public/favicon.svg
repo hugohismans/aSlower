@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Coursier de la lumière lente : un colis et une onde lumineuse décalée vers le bleu. -->
+  <defs>
+    <linearGradient id="spectre" x1="7" y1="0" x2="57" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ff3b30"/>
+      <stop offset="0.35" stop-color="#ffcc00"/>
+      <stop offset="0.6" stop-color="#34c759"/>
+      <stop offset="0.8" stop-color="#0a84ff"/>
+      <stop offset="1" stop-color="#bf5af2"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="#14163a"/>
+  <!-- Colis en perspective : dessus, côté, face, ruban adhésif. -->
+  <path d="M12 33 L21 25 L52 25 L43 33 Z" fill="#ffc94d"/>
+  <path d="M43 33 L52 25 L52 49 L43 57 Z" fill="#c96a00"/>
+  <rect x="12" y="33" width="31" height="24" fill="#ff9f0a"/>
+  <path d="M25 33 L34 25 L38 25 L29 33 Z" fill="#7a3d00"/>
+  <rect x="25" y="33" width="4" height="24" fill="#7a3d00"/>
+  <!-- Onde lumineuse : sa longueur d'onde raccourcit de gauche à droite. -->
+  <path d="M7 12.0L8 10.6L9 9.3L10 8.3L11 7.7L12 7.5L13 8.0L14 9.0L15 10.5L16 12.2L17 14.0L18 15.5L19 16.4L20 16.4L21 15.6L22 14.0L23 11.9L24 9.8L25 8.2L26 7.5L27 8.0L28 9.5L29 11.8L30 14.2L31 16.0L32 16.5L33 15.5L34 13.4L35 10.7L36 8.4L37 7.5L38 8.3L39 10.7L40 13.6L41 15.9L42 16.4L43 15.0L44 12.1L45 9.1L46 7.5L47 8.3L48 11.0L49 14.3L50 16.4L51 15.9L52 13.1L53 9.6L54 7.6L55 8.4L56 11.6L57 15.1" fill="none" stroke="url(#spectre)" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

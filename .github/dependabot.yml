@@ -1,0 +1,20 @@
+# Mises à jour proposées par Dependabot (pull requests), une fois par mois.
+# cooldown : une version n'est proposée qu'après 14 jours de publication (règle du projet :
+# laisser le temps aux correctifs et aux retraits de paquets compromis).
+version: 2
+updates:
+  # Dépendances npm (three, vite, vitest, @types/three), épinglées exactement.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: monthly
+    cooldown:
+      default-days: 14
+
+  # Actions du workflow de déploiement, épinglées par SHA.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    cooldown:
+      default-days: 14

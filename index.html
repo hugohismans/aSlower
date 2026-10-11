@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+    <meta name="theme-color" content="#0a0d14" />
+    <meta name="color-scheme" content="dark" />
+    <meta
+      name="description"
+      content="Jeu web relativiste : livre des colis dans une ville où la lumière ne va qu'à 100 m/s."
+    />
+    <title>Coursier de la lumière lente</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <!-- Styles liés ici (et non importés en JS) : src/hud/ n'importe que physics et storage. -->
+    <link rel="stylesheet" href="/src/styles/base.css" />
+    <link rel="stylesheet" href="/src/hud/hud.css" />
+  </head>
+  <body>
+    <!-- Vue 3D (WebGL2) -->
+    <canvas id="jeu" role="img" aria-label="Vue du coursier, à hauteur d'yeux, dans la ville"></canvas>
+
+    <!-- Commandes tactiles, mode glisser (src/input/touch.js) -->
+    <div id="controls" class="controls" hidden>
+      <div class="zone zone-steer" data-control="steer"></div>
+      <div class="zone zone-thrust" data-control="thrust"></div>
+      <button type="button" class="pad pad-brake" data-control="brake" tabindex="-1">Frein</button>
+      <button
+        type="button"
+        class="pad pad-classic"
+        data-control="classic"
+        tabindex="-1"
+        aria-label="Vision classique (maintenir)"
+        title="Vision classique (maintenir)"
+      >
+        👁
+      </button>
+      <div class="steer-knob" data-steer-knob aria-hidden="true"><i class="steer-dot" data-steer-dot></i></div>
+    </div>
+
+    <!-- HUD, rempli par src/hud/hud.js ; ne capte aucun toucher -->
+    <div id="hud" class="hud" hidden></div>
+
+    <!-- Écran titre -->
+    <section id="title" class="title-screen" aria-labelledby="title-heading">
+      <div class="title-card">
+        <h1 id="title-heading">Coursier de la lumière lente</h1>
+        <p class="title-sub">Livre tes colis dans une ville où la lumière ne va qu'à 100&nbsp;m/s.</p>
+        <div class="title-actions">
+          <button type="button" id="play" class="btn btn-primary">Jouer</button>
+          <button type="button" id="open-credits" class="btn">Crédits</button>
+        </div>
+        <p class="title-help title-help-touch">
+          Maintiens à droite pour accélérer · Frein en bas · Glisse à gauche pour tourner · 👁 vision classique
+        </p>
+        <p class="title-help title-help-keys">
+          Clavier&nbsp;: ↑ accélérer · ← → tourner · Espace freiner · C vision classique · Échap pause
+        </p>
+      </div>
+    </section>
+
+    <!-- Pause, affichage interrompu (perte du contexte WebGL), erreurs : rempli par src/main.js -->
+    <section id="notice" class="title-screen" hidden aria-labelledby="notice-title">
+      <div class="title-card">
+        <h2 id="notice-title" class="notice-title"></h2>
+        <p id="notice-text" class="title-sub"></p>
+        <div id="notice-actions" class="title-actions"></div>
+      </div>
+    </section>
+
+    <!-- Paysage strictement imposé sur appareil tactile : ce panneau masque le jeu en portrait -->
+    <div id="rotate" class="rotate" role="alert">
+      <div class="rotate-icon" aria-hidden="true"></div>
+      <p class="rotate-title">Tourne ton GSM</p>
+      <p class="rotate-text">
+        Le jeu se joue en paysage&nbsp;: il faut un champ de vision large pour voir la ville se resserrer devant toi.
+      </p>
+    </div>
+
+    <!-- Diagnostic (?diag ou ?bench), rempli par src/hud/diag.js -->
+    <div id="diag" class="diag" hidden></div>
+
+    <!-- Crédits et licences, rempli par src/hud/credits.js -->
+    <dialog id="credits" class="credits"></dialog>
+
+    <noscript><p style="padding: 24px">Ce jeu a besoin de JavaScript et de WebGL2.</p></noscript>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

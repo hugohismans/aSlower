@@ -1,0 +1,300 @@
+/*
+ * HUD (horloges, pastille d'écart, phrase γ, jauge de vitesse) et panneau #diag.
+ * Jetons de couleur et marges : src/styles/base.css.
+ *
+ * Mise en page stable : chiffres tabulaires et largeurs minimales (les textes
+ * changent à 12 Hz sans faire bouger le reste) ; `contain` sur les panneaux ;
+ * la jauge ne bouge que par `transform`. Le HUD ne capte aucun toucher.
+ */
+
+.hud {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-hud);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: var(--sa-top) var(--sa-right) var(--sa-bottom) var(--sa-left);
+  pointer-events: none;
+  touch-action: none;
+}
+
+.hud-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  justify-content: center;
+  gap: 8px 10px;
+  max-width: 100%;
+}
+
+.hud-panel {
+  padding: 6px 12px 7px;
+  border-radius: 12px;
+  background: var(--panel);
+  contain: layout paint;
+}
+
+.hud-label {
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+/* --- Horloges ------------------------------------------------------------ */
+
+.hud-clocks {
+  display: grid;
+  grid-template-columns: auto auto auto;
+  align-items: center;
+  column-gap: 12px;
+}
+
+.hud-clock {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.hud-value {
+  min-width: 6ch;
+  font-size: clamp(22px, 7.5vh, 34px);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+  text-align: center;
+}
+
+/* Pastille d'écart t − τ : grise, rouge pleine avec ▲ quand l'écart se creuse. */
+.hud-gap {
+  align-self: end;
+  min-width: 8ch;
+  margin-bottom: 3px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--neutral);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.hud-gap[data-state='zero'] {
+  color: var(--muted);
+}
+
+.hud-gap[data-state='growing'] {
+  background: var(--alert);
+}
+
+/* Symbole en plus de la couleur (daltonisme). */
+.hud-gap[data-state='growing']::before {
+  content: '▲\00a0';
+}
+
+.hud-gamma {
+  grid-column: 1 / -1;
+  margin: 3px 0 0;
+  font-size: 15px;
+  font-weight: 600;
+  text-align: center;
+  white-space: nowrap;
+}
+
+/* --- Vitesse et jauge ------------------------------------------------------ */
+
+.hud-speed {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+  width: clamp(210px, 28vw, 300px);
+}
+
+.hud-speed-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.hud-speed-value {
+  min-width: 8ch;
+  font-size: 22px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* Taille fixe : contain strict isole la jauge du reste de la page. La marge gauche
+   garde l'aiguille entière à v = 0. */
+.gauge {
+  display: flex;
+  width: 100%;
+  height: 20px;
+  padding-left: 3px;
+  contain: strict;
+}
+
+/* Piste de 0 à c (porte la barre et le rail de l'aiguille). */
+.gauge-track {
+  position: relative;
+  flex: 1;
+}
+
+/* Barre : dégradé fixe, recouvert d'un cache décalé par translateX (rogné ici seulement). */
+.gauge-bar {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: 5px 0 0 5px;
+  background: #1b2230;
+}
+
+.gauge-fill {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, #4fc3f7 0%, #b3e5fc 60%, #ffffff 100%);
+}
+
+.gauge-cover {
+  position: absolute;
+  inset: 0;
+  background: #1b2230;
+  will-change: transform;
+}
+
+.gauge-tick {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  margin-left: -1px;
+  background: #7d8796;
+}
+
+/* L'aiguille glisse de f × largeur de la piste (translateX en % de sa propre largeur). */
+.gauge-rail {
+  position: absolute;
+  inset: 0;
+  will-change: transform;
+}
+
+.gauge-needle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -2px;
+  width: 4px;
+  background: var(--accent);
+  box-shadow: 0 0 0 1px var(--bg);
+}
+
+/* Mur hachuré à c = 100 m/s : la vitesse ne l'atteint jamais. */
+.gauge-wall {
+  position: relative;
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  border-radius: 0 5px 5px 0;
+  background: repeating-linear-gradient(135deg, #e6e9ef 0 3px, #2a3242 3px 7px);
+}
+
+.gauge-wall span {
+  padding: 0 3px;
+  border-radius: 3px;
+  background: #fff;
+  color: var(--bg);
+  font-size: 14px;
+  font-style: italic;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+/* --- Badge vision classique, i/s ------------------------------------------- */
+
+.hud-badge {
+  margin-top: 8px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.hud-fps {
+  position: absolute;
+  top: var(--sa-top);
+  right: var(--sa-right);
+  padding: 2px 8px;
+  border-radius: 8px;
+  background: var(--panel);
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Panneau de diagnostic (#diag, ?diag ou ?bench) ------------------------ */
+
+.diag {
+  position: fixed;
+  top: 30%;
+  right: var(--sa-right);
+  z-index: var(--z-diag);
+  max-width: calc(50vw - var(--sa-right));
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgb(0 0 0 / 0.82);
+  color: #e6e9ef;
+  pointer-events: none;
+}
+
+/* Écran tactile : le panneau (et sa case à cocher, qui capte les touchers) reste à droite de
+   la pédale de frein, dont le bord droit est à 50 % + 112 px (base.css). */
+@media (any-pointer: coarse) {
+  .diag {
+    max-width: calc(50vw - 120px - var(--sa-right));
+  }
+}
+
+/* Fin de ?bench (main.js) : le HUD est masqué ; le panneau monte en haut, sur toute la largeur,
+   pour que les résultats tiennent sur un écran de GSM en paysage. */
+.diag.diag-results {
+  top: var(--sa-top);
+  left: var(--sa-left);
+  max-width: none;
+}
+
+.diag-text {
+  margin: 0;
+  font: 12px/1.4 ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  white-space: pre-wrap;
+}
+
+.diag-toggles {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  pointer-events: auto;
+}
+
+.diag-toggles:not(:empty) {
+  margin-top: 6px;
+}
+
+.diag-toggles label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  font-size: 14px;
+}

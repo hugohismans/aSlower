@@ -203,8 +203,12 @@ isChunkVisible(chunk, camera {x, y, z}, visibilityFar) // coupe à la distance d
 - `streetMap.js` : `createStreetMap(streets, bounds)` → CanvasTexture (plan et ombres).
 - `cockpit.js` : `createCockpit()` → Object3D attaché à la caméra (renderOrder −1).
 - `scene.js` : assemble tout pour une scène de `src/data/scenes/` ;
-  `createWorld(renderer, sceneJson, palette)` → `{update(snapshot, k, dtReal), render(camera),
-  stats(), dispose()}`.
+  `createWorld(renderer, sceneJson, palette, {tier = 'default', lodSteps} = {})` →
+  `{update(snapshot, k, dtReal), render(camera), stats(), dispose()}`, plus
+  `scene`, `start`, `bounds`, `streets`, `visibilityFar`, `warmup(camera)` (préchauffage, variantes
+  « vision classique » comprises) et `setEnvironmentEnabled(on)` (diagnostic). `update` choisit
+  les variantes `REL_CLASSIC` quand k = 0 ; `stats()` → `{calls, triangles, chunks,
+  visibleChunks, lodCounts, generated, generationMs, renderMs}`.
 
 ## `src/input/` (DOM)
 
@@ -255,6 +259,11 @@ export const session               // idem pour sessionStorage
 
 - `main.js` : écran titre (Jouer, Crédits), panneau « Tourne ton GSM » en portrait
   (appareils tactiles, strictement imposé), création du monde, des commandes et du HUD.
-- `loop.js` : `createLoop(frame)` → rAF ; `dtReal` mesuré, pause sur `visibilitychange`
-  (la boucle s'arrête et l'horloge est réinitialisée à la reprise).
-- Paramètres d'URL : `?scene=avenue-test|quartier-test`, `?diag`, `?bench`, `?dpr=`.
+- `loop.js` : `createLoop(frame)` → `{start(), stop(), running, dispose()}` ; rAF,
+  `frame(dtReal, dt, now)` avec `dtReal` mesuré (s) et `dt = clampFrameDt(dtReal)` ; pause sur
+  `visibilitychange` (la boucle s'arrête et l'horloge est réinitialisée à la reprise).
+- Paramètres d'URL : `?scene=avenue-test|quartier-test` (défaut : avenue-test), `?diag`,
+  `?bench` (résultat dans `window.__benchResult`), `?sansciel` (avec `?diag` ou `?bench` : passe
+  ciel/sol coupée dès le départ), `?dpr=`. Avec `?diag` ou `?bench`,
+  `window.__coursier` donne l'état en lecture seule (`mode`, `k`, `snapshot()`, `stats()`)
+  pour les tests automatisés.
