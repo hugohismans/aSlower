@@ -61,13 +61,16 @@ clavier AZERTY et sur un clavier QWERTY.
 
 - **Maintiens la moitié droite** de l'écran pour accélérer.
 - **Pédale de frein** en bas de la moitié droite (le frein l'emporte sur l'accélérateur).
+  Tu peux y glisser le pouce depuis l'accélérateur : il freine tant qu'il est sur la pédale.
 - **Glisse le pouce dans la moitié gauche** pour tourner : le volant naît là où tu poses
   le doigt.
 - **Bouton 👁** à mi-hauteur à gauche : vision classique, tant que tu le maintiens.
 
 **Le paysage est obligatoire** sur un appareil tactile : en portrait, le panneau « Tourne
 ton GSM » masque le jeu. Il faut le champ de vision horizontal de 90° du paysage pour voir
-la ville se resserrer devant soi.
+la ville se resserrer devant soi. Sur une tablette déjà en paysage dont la fenêtre du jeu
+est plus haute que large (écran partagé, Slide Over), le panneau demande d'agrandir la
+fenêtre. Le zoom par pincement est désactivé (il rendait le jeu injouable sur iOS).
 
 Quand tu lâches tout, le véhicule garde sa vitesse (pas de frottement) : pour s'arrêter,
 il faut freiner, et cela prend de la place (543 m depuis 76 m/s). Le frein arrête
@@ -78,8 +81,9 @@ récent avec WebGL 2 (Safari iOS 15.4 ou plus, Chrome, Firefox, Edge).
 
 ## Développement
 
-Prérequis : [Node.js](https://nodejs.org) 22.12 ou plus récent, ou 24 (version du fichier
-`.nvmrc`), et npm.
+Prérequis : [Node.js](https://nodejs.org) 22 (22.12 ou plus), 24 (version de `.nvmrc`,
+utilisée par la CI) ou 26 et plus, avec npm. Les versions impaires 23 et 25 sont refusées
+(`engine-strict`).
 
 ```sh
 npm ci            # installe les versions exactes de package-lock.json
@@ -104,10 +108,14 @@ Paramètres d'URL (combinables, par exemple `?scene=quartier-test&bench&dpr=1`) 
 `npm run build` (qui vérifie les licences dans `dist/`), puis publication sur GitHub Pages
 (réglage du dépôt : Settings → Pages → Source « GitHub Actions »). Les dépendances sont
 épinglées à la version exacte ; Dependabot propose leurs mises à jour chaque mois, avec
-14 jours de recul.
+14 jours de recul. Chaque pull request (celles de Dependabot comprises) passe par
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml) : `npm ci`, `npm test`,
+`npm run build`, sans publication. Réglage du dépôt conseillé : rendre ce contrôle
+(« Tests / test ») obligatoire sur `main` (Settings → Branches → règle de protection).
 
 **Conventions** : identifiants en anglais ; commentaires, documentation et textes du jeu
-en français ; données JSON en français sans accents ; types en JSDoc (`checkJs`). Le
+en français ; données JSON en français sans accents ; types en JSDoc (`checkJs` sur `src/`,
+vérifiables avec `npx -p typescript tsc --noEmit -p jsconfig.json`, en option). Le
 contrat entre modules (signatures, repères, imports permis) est dans
 [`docs/interfaces.md`](docs/interfaces.md) ; les règles d'imports sont vérifiées par
 `tests/purity.test.js`.
@@ -138,7 +146,7 @@ docs/                   conception (plan, décisions, glossaire) et contrat d'in
 - **Physique exacte.** L'état du véhicule est sa position, sa vitesse propre u = γv et
   ses deux horloges, en double précision. Sous poussée constante, chaque pas suit la
   solution exacte (mouvement hyperbolique) : le résultat ne dépend pas du nombre d'images
-  par seconde. Test de référence : 10 s de poussée depuis l'arrêt donnent
+  par seconde (en virage avec poussée, à moins d'un millimètre près). Test de référence : 10 s de poussée depuis l'arrêt donnent
   v = 100·tanh 1 = 76,159 m/s, t = 10·sinh 1 = 11,752 s et x = 1 000·(cosh 1 − 1) =
   543,081 m.
 - **Conduite « arcade ».** La route fournit la force latérale, hors du budget du moteur :
@@ -150,8 +158,8 @@ docs/                   conception (plan, décisions, glossaire) et contrat d'in
 - **Couleurs par pixel.** Chaque surface a cinq canaux de réflectance (rouge, vert, bleu,
   infrarouge, ultraviolet) éclairés par un soleil à 5 800 K ; une table précalculée à
   partir des fonctions colorimétriques de Wyman et al. donne la couleur vue pour chaque
-  facteur Doppler D. S'y ajoutent l'effet projecteur en D⁴ (borné) et une compression qui
-  garde la teinte.
+  facteur Doppler D. S'y ajoutent l'effet projecteur en D⁴ (exact jusqu'à D = 8), une
+  adaptation de l'exposition, comme celle de l'œil, et une compression qui garde la teinte.
 - **Ciel, sol et brouillard** : une passe plein écran avec l'aberration inverse exacte.
 
 Détails et justifications : [`docs/conception.md`](docs/conception.md).

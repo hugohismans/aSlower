@@ -9,8 +9,8 @@
  *   les premières images affichées. S'il est encore là au démarrage suivant, la page a
  *   planté pendant le démarrage :
  *   - 1er plantage : profil « lite » (DPR 0,75, sans MSAA), mémorisé dans `gl-tier` ;
- *   - 2e plantage d'affilée : isWebglUnstable() → écran « WebGL instable » avec un bouton
- *     Réessayer. Jamais de coupure définitive : un jeu n'a pas de repli sans WebGL.
+ *   - 2e plantage d'affilée : quality.unstable (crashes ≥ 2) → écran « WebGL instable » avec
+ *     un bouton Réessayer. Jamais de coupure définitive : un jeu n'a pas de repli sans WebGL.
  */
 import { local, session } from '../storage.js';
 
@@ -102,11 +102,6 @@ export function startBootGuard() {
 export function confirmBoot() {
   clearBootFlag();
   local.set(KEY_CRASH, 0);
-}
-
-/** Deux plantages au démarrage d'affilée (ou plus) : afficher « WebGL instable » et Réessayer. */
-export function isWebglUnstable() {
-  return (Number(local.get(KEY_CRASH, 0)) || 0) >= 2;
 }
 
 /**

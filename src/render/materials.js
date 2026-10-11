@@ -25,6 +25,7 @@ import {
   Vector2,
   UnsignedByteType,
 } from 'three';
+import { adaptationExposure } from '../physics/spectrum.js';
 import { REL } from './uniforms.js';
 import { createDopplerLutTexture } from './dopplerLut.js';
 import { SHADERS } from './shaders/index.js';
@@ -42,6 +43,8 @@ function ensureSharedTextures() {
     const { width, height, log2Range } = lut.userData.lut;
     REL.uLut.value = lut;
     REL.uLutParams.value.set(width, log2Range, height, 0);
+    // Table d'adaptation (≈ 30 ms) construite au chargement, pas à la première accélération.
+    adaptationExposure(2);
   }
   if (!REL.uStreetMap.value) {
     const ground = new DataTexture(new Uint8Array([110, 108, 104, 255]), 1, 1, RGBAFormat, UnsignedByteType);
@@ -76,7 +79,7 @@ function relMaterial(name, shader, ownUniforms = {}, options = {}) {
  * `aSpec` (ir, uv, ombrage). Faces avant seulement : le maillage doit être orienté vers
  * l'extérieur (sens trigonométrique vu de dehors). L'aberration conserve l'orientation.
  * Les meshes doivent avoir `frustumCulled = false` (l'aberration ramène devant ce qui est
- * derrière) et `userData.r` (distance à l'œil) pour le tri.
+ * derrière) et `userData.r` (distance à l'œil en cm, entière) pour le tri.
  * @returns {ShaderMaterial}
  */
 export function createSurfaceMaterial() {

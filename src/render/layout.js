@@ -24,9 +24,9 @@
  *                 nombre, pas: [dx, dy], rangs?: {nombre, pas: [dx, dy]} (répète la rangée),
  *                 facades: ["sud" | "nord" | "ouest" | "est"] (côtés bâtis de l'îlot),
  *                 largeurs: [min, max] (le long de la façade), profondeurs: [min, max],
- *                 hauteurs: [min, max], couleurs: [noms de la palette],
+ *                 hauteurs: [min, max] (min ≥ MIN_BUILDING_HEIGHT), couleurs: [noms de la palette],
  *                 ordreCouleurs: "suite" (dans l'ordre, en boucle) | "hasard"}
- *   batiments[]  {id, nom?, pos: [x, y] (centre), taille: [lx, ly], hauteur, couleur,
+ *   batiments[]  {id, nom?, pos: [x, y] (centre), taille: [lx, ly], hauteur (≥ MIN_BUILDING_HEIGHT), couleur,
  *                 ir?, uv?, ilot? (regroupe plusieurs bâtiments isolés dans un même îlot)}
  *   lampadaires[] {rue (id d'une entrée de rues, répétitions comprises), pas, depart?,
  *                  hauteur? (6), temperature? (2700), intensite? (1), retrait? (1,5 m : distance
@@ -43,12 +43,20 @@
  * les bords communs de deux bâtiments mitoyens sont alors des valeurs identiques,
  * et centre ± demi-taille les redonne exactement en virgule flottante.
  */
-import { BLACKBODY_TEMPERATURES } from '../physics/constants.js';
+import { BLACKBODY_TEMPERATURES, EYE_HEIGHT } from '../physics/constants.js';
 
 export const SCENE_SCHEMA = 'coursier-scene/1';
 
 /** Pas d'arrondi des dimensions générées (m). */
 export const LAYOUT_GRID = 0.5;
+
+/**
+ * Hauteur minimale d'un bâtiment (m) : l'œil (EYE_HEIGHT) reste sous tous les toits, avec
+ * 1 m de marge, et la valeur est sur la grille. cityMesher ne subdivise les toits qu'au pas
+ * max(s, ROOF_STEP), sans les coupures des murs : un toit vu d'en haut ouvrirait des fissures
+ * sous aberration.
+ */
+export const MIN_BUILDING_HEIGHT = Math.ceil((EYE_HEIGHT + 1) / LAYOUT_GRID) * LAYOUT_GRID;
 
 /** Contenu IR et UV par défaut d'une couleur donnée en hexadécimal. */
 export const DEFAULT_IR = 0.3;
@@ -295,6 +303,7 @@ function expandRow(row, index, seed, palette, out) {
   for (const key of ['largeurs', 'profondeurs', 'hauteurs']) {
     need(isRange(row[key]), `${where}.${key} : [min, max] positifs attendus`);
   }
+  need(row.hauteurs[0] >= MIN_BUILDING_HEIGHT, `${where}.hauteurs : au moins ${MIN_BUILDING_HEIGHT} m (l'œil doit rester sous les toits)`);
   const sides = row.facades ?? SIDES;
   need(Array.isArray(sides) && sides.every((s) => SIDES.includes(s)), `${where}.facades : ${SIDES.join(', ')}`);
   const count = row.nombre ?? 1;
@@ -340,6 +349,7 @@ function expandStandalone(entry, index, palette, out) {
   need(isPair(entry.pos), `${where}.pos : [x, y] attendu`);
   need(isPair(entry.taille) && entry.taille[0] > 0 && entry.taille[1] > 0, `${where}.taille : [lx, ly] positifs attendus`);
   need(isNum(entry.hauteur) && entry.hauteur > 0, `${where}.hauteur : nombre positif attendu`);
+  need(entry.hauteur >= MIN_BUILDING_HEIGHT, `${where}.hauteur : au moins ${MIN_BUILDING_HEIGHT} m (l'œil doit rester sous les toits)`);
   const [cx, cy] = entry.pos;
   const [lx, ly] = entry.taille;
   const blockId = entry.ilot ?? entry.id ?? `batiment-${index}`;

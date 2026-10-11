@@ -16,13 +16,17 @@ import { resolvePixelRatio } from './quality.js';
 
 /**
  * Tri des opaques : renderOrder (cockpit −1, décor 0, environnement 1), puis distance r à
- * l'œil (`object.userData.r`, posée par le culling) d'avant en arrière, pour l'early-z.
- * Le z de three viendrait de la géométrie non aberrée : il serait faux ici.
+ * l'œil (`object.userData.r`, en cm, entière, posée par le culling) d'avant en arrière, pour
+ * l'early-z. Le z de three viendrait de la géométrie non aberrée : il serait faux ici.
+ * Résultat toujours −1, 0 ou 1 (pas de différence flottante, qui allouerait sous V8).
  * @param {{renderOrder: number, object: import('three').Object3D}} a
  * @param {{renderOrder: number, object: import('three').Object3D}} b
  */
 export function opaqueSort(a, b) {
-  return a.renderOrder - b.renderOrder || (a.object.userData.r ?? 0) - (b.object.userData.r ?? 0);
+  if (a.renderOrder !== b.renderOrder) return a.renderOrder < b.renderOrder ? -1 : 1;
+  const ra = a.object.userData.r ?? 0;
+  const rb = b.object.userData.r ?? 0;
+  return ra < rb ? -1 : ra > rb ? 1 : 0;
 }
 
 /**

@@ -100,15 +100,18 @@ export function composeVelocities(v, w) {
 /**
  * Segment de ligne d'univers sous poussée propre constante, en forme exacte.
  *
- * La poussée (ax, ay) (m/s²) est constante dans le référentiel comobile (axes du monde
- * boostés sans rotation) pendant le temps propre h. La ligne d'univers est une hyperbole :
+ * La poussée (ax, ay) (m/s²) est exprimée dans le référentiel comobile initial (boost pur
+ * de u₀) et y reste fixe pendant le temps propre h (transport de Fermi-Walker), ce qui
+ * diffère d'axes du monde reboostés à chaque instant (précession de Thomas). La ligne
+ * d'univers est une hyperbole :
  * avec η = |a|h/c, S = sinh η/η, K = (cosh η − 1)/η² et A = a + (a·u₀)u₀/(c²(γ₀ + 1)),
  *   u₁ = cosh η·u₀ + h·S·A
  *   Δx = h·S·u₀ + h²·K·A
  *   Δt = h·S·γ₀ + h²·K·(a·u₀)/c²
  * C'est exactement v₀ ⊕ c·tanh(η)·â (« Δv = a·Δτ » du cahier des charges, sous forme
- * exacte), avec en plus le déplacement et le temps de la ville exacts : le résultat ne
- * dépend pas du découpage en pas.
+ * exacte), avec en plus le déplacement et le temps de la ville exacts. Si a ∥ u₀ (cas du
+ * joueur), le résultat ne dépend pas du découpage en pas ; en poussée oblique, il en dépend
+ * (la direction de poussée est relue dans un autre référentiel comobile : rotation de Wigner).
  * @param {number} ux vitesse propre initiale (m/s)
  * @param {number} uy
  * @param {number} ax poussée propre (m/s²)

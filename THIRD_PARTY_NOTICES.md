@@ -54,7 +54,7 @@ réécrits ; « Inspiré » = idée ou logique reprise, code écrit à neuf.
 |---|---|---|
 | `src/physics/relativity.js` | `MovementScripts.cs:164-183 ; relativity.shader:122-224` | Adapté |
 | `src/physics/player.js` | `GameState.cs:220-246 ; MovementScripts.cs:114-183` | Inspiré |
-| `src/physics/spectrum.js` | `relativity.shader:27-47, 243-327` | Adapté |
+| `src/physics/spectrum.js` | `relativity.shader:27-47, 243-327, 356-371` | Adapté |
 | `src/physics/retarded.js` | `RelativisticObject.cs:316-328 ; relativity.shader:176-182` | Adapté |
 | `src/render/shaders/rel_vertex.glsl` | `relativity.shader:83-239` | Adapté |
 | `src/render/shaders/rel_doppler.glsl` | `relativity.shader:299-379` | Adapté |

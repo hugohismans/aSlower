@@ -126,7 +126,7 @@ Pause sur `visibilitychange`.
   - Δt = h·S·γ₀ + h²·K·(α·u₀)/c²
 
   C'est identique à v₀ ⊕ c·tanh(η)·n, à 4,5e-14 près. `relativity.js` expose aussi la composition vectorielle (ordre v_ancien ⊕ w, non commutative) pour la pédagogie et les tests.
-- **Exactitude** : exact en ligne droite et en virage pur. En virage avec poussée, schéma de Strang d'ordre 2 (0,33 mm d'écart à 60 Hz). La rotation de Thomas-Wigner n'est pas simulée, car aucune orientation propre n'est suivie ; c'est documenté.
+- **Exactitude** : exact en ligne droite et en virage pur. En virage avec poussée, schéma de Strang d'ordre 2 (0,39 mm d'écart après 10 s de poussée pleine, volant à mi-course, à 60 Hz). La rotation de Thomas-Wigner n'est pas simulée, car aucune orientation propre n'est suivie ; c'est documenté.
 
 ### Conduite (modèle « voiture arcade », décision 1)
 - **La route fournit la force latérale**, hors du budget du moteur : a = 10 m/s² (accélération propre) ne vaut que pour la poussée et le frein, tous deux le long du cap, donc colinéaires à u. Pas de cercle d'adhérence.
@@ -188,7 +188,8 @@ Port vectoriel du pipeline d'OpenRelativity, sans rotation ni acos. Pour le déc
 - Chaque surface porte 5 canaux de réflectance (r, g, b, IR, UV), qui **partitionnent l'unité** sur [0 ; ∞) : IR = 0 sous 830 nm et 1 au-delà jusqu'à l'infini ; UV = 1 sous 360 nm et 0 au-dessus.
 - On intègre les CMF de Wyman et al. (2013) sur [360 ; 830] nm, avec un éclairage solaire de 5 800 K.
 - M_k(D) = 𝐍·RGB(∫ CMF(λ)·D·E(Dλ)·ρ_k(Dλ) dλ), où 𝐍 est une **matrice 3×3** : l'inverse du bloc RGB de l'intégrale à D = 1, appliquée aux 5 colonnes. On obtient ainsi **M(1) = [I | 0]**. Au repos, IR et UV sont exactement invisibles, puisque leurs bases n'ont aucun support dans [360 ; 830] nm.
-- **Effet projecteur** : couleur = M(D)·ρ × min(D^p, borne). Avec cette convention, **p = 4 est le réglage physique, et c'est le réglage par défaut** (décision 3) : `BEAM_EXPONENT = 4`, borné par `BEAM_MAX = 8` (`constants.js`) ; le tone mapping absorbe ce qui dépasse.
+- **Effet projecteur** : couleur = M(D)·ρ × min(D^p, borne). Avec cette convention, **p = 4 est le réglage physique, et c'est le réglage par défaut** (décision 3) : `BEAM_EXPONENT = 4`, borné par `BEAM_MAX = 4096` (= 8⁴, `constants.js`). D⁴ est donc exact jusqu'à D = 8 (γ ≈ 4,1 de face), sur tous les niveaux prévus ; la borne reste (cahier des charges) et garde les valeurs loin du maximum half float (65 504). L'ancienne borne 8 coupait le projecteur dès 47,7 m/s de face : une façade vue de face s'assombrissait quand on accélérait.
+- **Adaptation de l'œil** : la luminosité d'ensemble est rendue par une exposition E = `adaptationExposure(D_avant)` = 1/G(D_avant), avec D_avant = e^φ (droit devant) et G le gain, projecteur compris, d'une façade de référence (`ADAPTATION_REFERENCE` : gris 0,6, ir 0,3, uv 0,15) vue de face. Cette façade garde sa luminance du repos ; les rapports de luminance dans l'image restent physiques. E = 1 à l'arrêt et en vision classique, 0,31 à 30 m/s, 0,093 à 76 m/s, 0,039 à 90 m/s ; `updateObserver` la pose dans `uExposure`. Le cockpit, comobile et éclairé par la lumière projetée vers l'avant, n'y est pas soumis. Le tone mapping (genou 0,75) ne fait plus que compresser les hautes lumières.
 - **Lampes à raie** : lineRGB(λ₀/D) × min(D^p, borne).
 - **Lampes corps noir** : XYZ(B(D·T))/D⁴ rapporté à XYZ(B(T)), × min(D^p, borne). On ne compte jamais deux fois les D⁴.
 - Tone mapping qui préserve la teinte (Reinhard sur le maximum), car la teinte porte l'information du jeu.
@@ -204,16 +205,16 @@ Port vectoriel du pipeline d'OpenRelativity, sans rotation ni acos. Pour le déc
 Varying highp `vRel` (position relative à l'œil, non aberrée), puis n = normalize(vRel), D = γ(1 + β·n) et LUT. Le calcul par sommet donnait des taches de teinte, jusqu'à ΔE 30 dès le LOD le plus fin. Repli si la mesure l'exige : un « mode palette » à une seule lecture par pixel. L'économie du profil lite vient du DPR, pas de la couleur.
 
 ### Gameplay
-**Le même module `spectrum.js` sert au gameplay.** `perceivedColor()` reprend toute la chaîne du shader (D par la géométrie réelle, projecteur, tone mapping). Les lampes de puzzle ne sont pas diffusées par le brouillard (atténuation seulement).
+**Le même module `spectrum.js` sert au gameplay.** `perceivedColor()` reprend toute la chaîne du shader (D par la géométrie réelle, projecteur, tone mapping), avec `{exposure: adaptationExposure(e^φ)}` pour suivre la même adaptation que l'écran. La fenêtre « vert » de la lampe à 640 nm du N3 n'en dépend pas (13,0–22,3 m/s) ; « noir » arrive dès 40,7 m/s au lieu de 44,6. Les lampes de puzzle ne sont pas diffusées par le brouillard (atténuation seulement).
 
-Test de lisibilité : une façade de la palette (ir ≥ 0,3), vue de face au **D réellement atteignable** dans le niveau, doit garder au moins 2 % de la luminance du blanc au repos, après projecteur. Ce D n'est pas e^{φ_max} : on prend γ_max = min(cosh φ_max ; 1 + L_droite/1 000 m), calculé par le validateur à partir de la plus longue ligne droite. Le test passe jusqu'à D ≈ 9 (γ ≈ 4,5). Au-delà de D ≈ 10, la luminance décroît en ≈ D⁻³ si le projecteur est borné. Parades : φ_max réduit dans le niveau, ou borne plus haute absorbée par le tone mapping.
+Test d'adaptation (il remplace l'ancien test de lisibilité « ≥ 2 % de la luminance du blanc », pensé pour un projecteur borné à 8 sans adaptation) : la façade de référence vue de face, multipliée par E, garde sa luminance du repos à 2e-3 près pour v ∈ {5, 20, 30, 50, 76, 90, 95} m/s ; E décroît strictement avec v et vaut 1 à l'arrêt ; les façades vues de face sont plus lumineuses à 90 m/s qu'à 47,7 m/s (`tests/spectrum.test.js`). Au-delà de D = 830/360 ≈ 2,31 (68 m/s de face), seule la base IR d'une surface est visible : les façades de la palette ont donc des réflectances proche IR **variées** (ir de 0,1 à 0,6, moyenne 0,31 ≈ la référence), comme les pigments réels (≈ 0,05 pour le noir de carbone, 0,6–0,85 pour les oxydes de fer ou le blanc de titane) ; à D = 3, leurs luminances diffèrent d'un facteur ≥ 3. Même avec l'ancienne borne 8, une façade d'ir 0,1 vue de face à γ = 4 garde 2,5 % de la luminance du blanc.
 
 ### Ciel, sol et brouillard
 Une passe plein écran après les opaques, à z = 1 (renderOrder 1, sans écriture de profondeur). Elle couvre environ 41 % de l'écran, soit environ 1 ms estimée sur un Mali-G52. Pour chaque pixel :
 - aberration inverse exacte ;
 - intersection analytique avec le plan du sol, calculée sans branchement avant la lecture de texture (`mix`/`step`) ;
 - marquages tracés analytiquement, carte Canvas2D pour le plan et les ombres ;
-- ciel procédural ;
+- ciel procédural : brume à l'horizon, lumière diffuse d'un corps noir à 6 500 K près de l'horizon, et vers le zénith un **ciel dégagé à spectre continu**, ρ ∝ (550/λ)⁴ + 0,35·(550/λ)^1,3 (Rayleigh + aérosols à 90° du soleil : τ_A ≈ 0,1, Ångström 1,3, Henyey-Greenstein g = 0,7), nul sous 295 nm (ozone), de luminance 0,186 au repos, tabulé dans la ligne `SKY_CLEAR_ROW` de la LUT. Décalé, il reste bleu et lisse (les anciennes réflectances en créneaux donnaient du violet et du cyan saturé). Coût : 8 lectures de texture par pixel de la passe au lieu de 7. Au repos, il est un peu plus pâle qu'avant, à cause des aérosols ;
 - brouillard en distance monde, mélangé avant le Doppler (correct pour un milieu immobile dans la ville), totalement opaque à `visibilite` ;
 - `visibilite` est fixée par niveau et par profil dans le JSON (300–400 m en lite, 600 m ailleurs, sauf exception du niveau).
 
@@ -233,7 +234,7 @@ L'aberration courbe les droites, mais seulement entre sommets.
 
 ### Culling et nombre d'appels de dessin (draw calls)
 - `frustumCulled = false` : le culling de Three passe avant le shader et ferait disparaître la moitié des chunks visibles à β = 0,76, puisque l'aberration ramène devant ce qui est derrière.
-- **J1** : coupe à `visibilite`, exacte puisque r est conservé et que le brouillard y est opaque ; au plus 42 chunks sur l'avenue.
+- **J1** : coupe à `visibilite`, exacte à ≤ 6/255 près sur quelques pixels au-dessus de l'horizon (le ciel brumeux n'a pas exactement la couleur de la brume ; nul à grande vitesse), puisque r est conservé et que le brouillard y est opaque ; au plus 42 chunks sur l'avenue.
 - **J3** : culling par « cône apparent » exact, environ 0,3 µs par chunk.
 - **Appels de dessin** : en quartier, 98 à 294 chunks sont visibles pour un brouillard à 600 m. D'où des super-chunks LOD2 de 256 m, ou un `BatchedMesh` piloté par notre culling (à mesurer en J1). Le budget d'appels de dessin est vérifié par niveau dans `levels.test.js`, qui peut importer le découpage en chunks de `render/`. Le validateur, lui, ne dépend que de physics.
 - **Ordre de rendu** : cockpit d'abord (écrit la profondeur), puis opaques triés par r, passe ciel/sol, transparents et fantômes. `setOpaqueSort` remplace tout le tri de three : notre comparateur trie donc d'abord par `renderOrder` (cockpit −1, opaques 0, ciel/sol 1), puis par r.
@@ -266,9 +267,9 @@ Position des objets à l'instant t de la **ville**, passée par la même aberrat
 
 ## 5. Contrôles et HUD
 
-**Orientation** : **paysage strictement imposé** sur appareil tactile (décision 4). Le champ horizontal est d'environ 90° en paysage contre 30 à 40° en portrait, alors que l'aberration a besoin d'un champ large. En portrait, le panneau « Tourne ton GSM » masque le jeu, **sans** bouton « Jouer quand même » ; dès le J1 (`main.js`, `index.html`).
+**Orientation** : **paysage strictement imposé** sur appareil tactile (décision 4). Le champ horizontal est d'environ 90° en paysage contre 30 à 40° en portrait, alors que l'aberration a besoin d'un champ large. En portrait, le panneau « Tourne ton GSM » masque le jeu, **sans** bouton « Jouer quand même » ; dès le J1 (`main.js`, `index.html`). La règle suit la forme de la fenêtre : si l'écran est déjà en paysage (`screen.orientation`, iPad en écran partagé ou Slide Over), le même panneau dit « Agrandis la fenêtre du jeu ». Pas de zoom par pincement : Safari iOS ignore `user-scalable=no`, d'où `touch-action: pan-x pan-y` sur `body` **et** sur chaque conteneur défilant (WebKit y repart de `auto`), plus `gesturestart` annulé sur le document.
 
-**Tactile** : cibles d'au moins 48 px, à au moins 24 px des bords. Pointer Events avec capture, `touch-action: none`.
+**Tactile** : cibles d'au moins 48 px, à au moins 24 px des bords. Pointer Events avec capture, `touch-action: none`. Un doigt de l'accélérateur qui glisse sur la pédale freine (la capture le garderait sinon sur l'accélérateur).
 
 | | Mode glisser (J1, et repli sans gyroscope) | Mode inclinaison (J2) |
 |---|---|---|
@@ -385,7 +386,7 @@ Position des objets à l'instant t de la **ville**, passée par la même aberrat
   |---|---|---|
   | `src/physics/relativity.js` | `MovementScripts.cs:164-183 ; relativity.shader:122-224` | Adapté |
   | `src/physics/player.js` | `GameState.cs:220-246 ; MovementScripts.cs:114-183` | Inspiré |
-  | `src/physics/spectrum.js` | `relativity.shader:27-47, 243-327` (préréglage OpenRelativity, pour comparaison) | Adapté |
+  | `src/physics/spectrum.js` | `relativity.shader:27-47, 243-327, 356-371` (préréglage OpenRelativity, pour comparaison) | Adapté |
   | `src/physics/retarded.js` | `RelativisticObject.cs:316-328 ; relativity.shader:176-182` | Adapté |
   | `src/render/shaders/rel_vertex.glsl` | `relativity.shader:83-239` | Adapté |
   | `src/render/shaders/rel_doppler.glsl` | `relativity.shader:299-379` | Adapté |
@@ -397,7 +398,7 @@ Position des objets à l'instant t de la **ville**, passée par la même aberrat
   Règle : tout fichier qui reprend une formule, une constante ou une logique d'OpenRelativity porte l'en-tête et figure dans le tableau des notices.
 - **Vérifications** :
   - `tests/licence.test.js` (sources seulement) : texte MIT d'OpenRelativity dans les notices, identique à la copie servie ; texte MIT de three.js identique au `LICENSE` du paquet ; en-tête de chaque fichier du tableau qui existe (nature et lignes d'origine comprises) ; tout fichier de `src/` qui porte l'en-tête figure dans le tableau ; `LICENSE` MIT et `LICENSE-CONTENT.md` CC BY 4.0 ;
-  - `scripts/check-dist.mjs` en `postbuild` : en-tête présent dans au moins un `dist/assets/*.js` (celui des shaders importés en `?raw` est dans une chaîne, ce qui convient), `dist/licences/openrelativity-MIT.txt` et `dist/licences/npm-dependencies.txt` (three, MIT). La CI échoue sinon.
+  - `scripts/check-dist.mjs` en `postbuild` : en-tête présent comme **commentaire légal** (`/*!` en début de ligne) dans au moins un `dist/assets/*.js`, ce qui exige `comments.legal` ; celui des shaders importés en `?raw`, pris dans une chaîne, ne compte pas. Aussi `dist/licences/openrelativity-MIT.txt` et `dist/licences/npm-dependencies.txt` (three, MIT). La CI échoue sinon (`tests/check-dist.test.js` vérifie le script lui-même).
 - **README et Crédits** : MIT Game Lab, *A Slower Speed of Light*, lien vers le dépôt, remerciements à Gerd Kortemeyer. Mention « projet indépendant, non affilié au MIT », sans aucune ressource du jeu d'origine. Citation de Wyman, Sloan et Shirley (JCGT 2013). Licences du projet (MIT et CC BY 4.0).
 
 ## 8. Arborescence
@@ -407,6 +408,7 @@ aSlower/
 ├── .github/
 │   ├── workflows/deploy.yml       # npm ci → npm test → npm run build (+ postbuild check-dist) → Pages
 │   │                              # actions épinglées par SHA ; contents:read ; pages/id-token sur deploy seul
+│   ├── workflows/ci.yml           # pull requests (Dependabot comprises) : npm ci → npm test → npm run build
 │   └── dependabot.yml             # npm + actions, mensuel, cooldown de 14 jours
 ├── .editorconfig  .gitignore  .npmrc (save-exact, engine-strict)  .nvmrc (24)  jsconfig.json
 ├── LICENSE                        # MIT, pour le code (décision 5)
@@ -478,7 +480,7 @@ aSlower/
 │   └── styles/base.css
 └── tests/
     ├── J1 : player  relativity  retarded  spectrum (LUT échantillonnée comme le GPU)
-    │        render-math  layout  lod  culling  format  storage  purity  licence
+    │        render-math  layout  lod  culling  format  storage  purity  licence  check-dist  loop
     ├── J2 : tiltMath  conditions
     ├── J3 : collisions  rules  levels (+ fixtures/levels-invalid/)  score  states  culling (cône apparent)
     └── J4 : living
@@ -493,7 +495,7 @@ aSlower/
   - three dans son propre fichier ;
   - GLSL en `?raw` ;
   - `build.license` et `comments.legal`.
-- **Lint et format** : pas d'ESLint ni de Prettier au départ (`.editorconfig` et `checkJs`). En option, `tsc --noEmit` en CI.
+- **Lint et format** : pas d'ESLint ni de Prettier au départ (`.editorconfig` et `checkJs`). En option, `tsc --noEmit -p jsconfig.json` en CI : `jsconfig.json` ne couvre que `src/` (0 erreur), les tests et scripts Node demanderaient `@types/node`.
 - **Sécurité** : passer `source-map-js` (dépendance de développement) à 1.2.2 à partir du 2026-10-14, quand le correctif aura 14 jours.
 
 ## 9. Jalons
@@ -570,7 +572,7 @@ Un seul jalon à valider. Chaque étape est publiée sur Pages et jouable sur le
 | Risque | Parade |
 |---|---|
 | Appels de dessin en quartier (98 à 294 chunks visibles à 600 m) | Mesure en J1d ; super-chunks ou BatchedMesh ; brouillard plus court en lite |
-| Lisibilité des couleurs à grande vitesse | IR en plateau infini ; corps noirs ; test de luminance par niveau ; projecteur physique p = 4 borné par BEAM_MAX, exposant réglable |
+| Lisibilité des couleurs à grande vitesse | IR en plateau infini et réflectances proche IR variées dans la palette ; corps noirs ; projecteur physique p = 4 (D⁴ exact jusqu'à D = 8, BEAM_MAX = 8⁴) et adaptation de l'exposition (`adaptationExposure`) ; exposant réglable |
 | Teintes hypersensibles (4 % sur D font passer du jaune au vert) | Règles de porte calculées par la même chaîne (`perceivedColor`) ; Doppler par fragment |
 | Courbes polygonales au-delà de γ ≈ 2,5 | LOD fin pour les îlots proches (J5) ou plafond visuel |
 | Mal des transports (FOV, aberration, anneau) | FOV réglable, plafond γ par niveau, `prefers-reduced-motion` |
@@ -586,7 +588,7 @@ Réponses aux neuf questions du plan. Elles priment sur toute version antérieur
 
 1. **Conduite : arcade**, plutôt que l'adhérence honnête à 10 m/s² d'abord proposée. La route fournit la force latérale, hors du budget du moteur : a = 10 m/s² ne vaut que pour la poussée et le frein. Le virage fait tourner u à |u| constant, dθ/dτ = −steer·TURN_RATE ; à l'arrêt, le cap pivote à PIVOT_RATE. Plus de cercle d'adhérence, plus de rail d'exception au niveau 6. L'échelle reste celle du §1.1 : 1 km pour atteindre γ = 2, autant pour freiner (§1.1, §3, §6).
 2. **Dilemme des horloges : choix délégué** (« je te laisse choisir la meilleure option »). Retenu : les fenêtres « pas avant », qui font du paradoxe des jumeaux la solution (§1.2). Le moteur qui consomme (optimum vers 50 m/s) n'est pas retenu : il brouillerait la règle simple « batterie = τ ».
-3. **Couleurs : le modèle le plus fidèle à la physique**, plutôt que la fidélité stricte à OpenRelativity (illisible au-delà d'environ 50 m/s). Réflectance × soleil à 5 800 K, bases infrarouge et ultraviolette, fonctions colorimétriques de Wyman et al. ; effet projecteur physique par défaut, `BEAM_EXPONENT = 4`, borné par `BEAM_MAX` (§4). Le modèle d'OpenRelativity reste un préréglage de comparaison.
+3. **Couleurs : le modèle le plus fidèle à la physique**, plutôt que la fidélité stricte à OpenRelativity (illisible au-delà d'environ 50 m/s). Réflectance × soleil à 5 800 K, bases infrarouge et ultraviolette, fonctions colorimétriques de Wyman et al. ; effet projecteur physique par défaut, `BEAM_EXPONENT = 4`, borné par `BEAM_MAX` (= 8⁴, D⁴ exact jusqu'à D = 8), avec adaptation de l'exposition de l'œil (§4). Le modèle d'OpenRelativity reste un préréglage de comparaison.
 4. **Orientation : paysage strictement imposé** sur appareil tactile : panneau « Tourne ton GSM » sans bouton « Jouer quand même », dès le J1 (§5).
 5. **Licence : MIT pour le code, CC BY 4.0 pour les contenus**, plutôt que MIT pour tout : `LICENSE` et `LICENSE-CONTENT.md` (§7).
 6. **Délais : un retard coûte seulement l'étoile « Ponctuel »**, au lieu de faire échouer le niveau. L'échec ne vient que de la batterie vide et du flash (§6) ; règles livrées au J3, flash avec le niveau 5.

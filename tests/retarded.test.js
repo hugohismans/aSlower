@@ -105,6 +105,7 @@ describe('retardedTime (Newton sécurisé)', () => {
           const reference = bisectionReference(obs, t, positionAt);
           for (const guess of [undefined, t]) {
             const res = retardedTime(obs, t, positionAt, { guess });
+            expect(res.converged).toBe(true);
             expectNear(res.te, reference, 1e-6);
             worstIterations = Math.max(worstIterations, res.iterations);
           }
@@ -117,16 +118,16 @@ describe('retardedTime (Newton sécurisé)', () => {
   it('résidu nul dès le départ : 1 itération', () => {
     // Objet immobile, amorce par défaut (t − r/c, exacte).
     const fixed = retardedTime({ x: 0, y: 0, z: 0 }, 10, () => ({ x: 300, y: 0, z: 0 }));
-    expect(fixed).toEqual({ te: 7, iterations: 1 });
+    expect(fixed).toEqual({ te: 7, iterations: 1, converged: true });
     const fixed2 = retardedTime({ x: 0, y: 0, z: 0 }, 10, () => ({ x: 123.456, y: -78.9, z: 2 }));
     expect(fixed2.iterations).toBe(1);
     expect(fixed2.te).toBe(10 - Math.hypot(123.456, -78.9, 2) / C);
     // Objet mobile, amorce exacte : p(8) = (100, 0, 0) est à 1 s-lumière de l'observateur à t = 9.
     const moving = retardedTime({ x: 0, y: 0, z: 0 }, 9, (te) => ({ x: 50 * te - 300, y: 0, z: 0 }), { guess: 8 });
-    expect(moving).toEqual({ te: 8, iterations: 1 });
+    expect(moving).toEqual({ te: 8, iterations: 1, converged: true });
     // Objet qui passe sur l'observateur à l'instant t : te = t (borne incluse).
     const crossing = retardedTime({ x: 5, y: 5, z: 0 }, 3, (te) => ({ x: 5 + 40 * (te - 3), y: 5, z: 0 }));
-    expect(crossing).toEqual({ te: 3, iterations: 1 });
+    expect(crossing).toEqual({ te: 3, iterations: 1, converged: true });
   });
 
   it('cas difficiles (orbite serrée à β = 0,99, amorce lointaine) : la bissection garantit la convergence', () => {
@@ -173,6 +174,21 @@ describe('retardedTime (Newton sécurisé)', () => {
       expectNear(res.te, bisectionReference(obs, t, walker), 1e-5);
       expect(res.iterations).toBeLessThanOrEqual(8);
     }
+  });
+
+  it('vitesse qui tend vers c dans le passé, observateur derrière l’horizon : converged = false', () => {
+    // Mouvement hyperbolique des cas réguliers (β = 0,99 en t = 10 s) : venu de x = +∞ presque
+    // à c, ses rayons vers −x vérifient x + ct > −L − 300 ≈ −442 m. À t = 0, x = −600 n'a
+    // encore reçu aucune lumière : G(d) < 0 pour tout d, il n'y a pas de racine.
+    const g = (C * (0.99 / Math.sqrt(1 - 0.99 * 0.99))) / 10;
+    const L = (C * C) / g;
+    const hyper = (te) => ({ x: L * (Math.sqrt(1 + ((g * te) / C) ** 2) - 1) - 300, y: 150, z: 0 });
+    const behind = retardedTime({ x: -600, y: 120, z: 0 }, 0, hyper);
+    expect(behind.converged).toBe(false);
+    expect(behind.iterations).toBe(30);
+    const seen = retardedTime({ x: -300, y: 120, z: 0 }, 0, hyper);
+    expect(seen.converged).toBe(true);
+    expectNear(seen.te, bisectionReference({ x: -300, y: 120, z: 0 }, 0, hyper), 1e-6);
   });
 });
 

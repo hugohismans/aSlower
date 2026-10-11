@@ -1,0 +1,43 @@
+# Teste chaque pull request (celles de Dependabot comprises) avant la fusion sur main :
+# mêmes étapes que le job build de deploy.yml, sans publication. Fichier séparé, hors du
+# groupe de concurrence « pages ». Réglage du dépôt conseillé : rendre ce contrôle
+# obligatoire sur main (Settings → Branches → règle de protection).
+name: Tests
+
+on:
+  pull_request:
+  # Relance manuelle depuis l'onglet Actions.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Une exécution par branche : une nouvelle poussée annule la précédente.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Récupérer le dépôt
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Installer Node (version de .nvmrc)
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Installer les dépendances (versions exactes de package-lock.json)
+        run: npm ci
+
+      - name: Tester
+        run: npm test
+
+      # postbuild : scripts/check-dist.mjs (licences dans dist/).
+      - name: Construire et vérifier les licences du site
+        run: npm run build

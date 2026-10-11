@@ -6,11 +6,12 @@
  * dernier groupe de tests vérifie que ces lignes figurent bien dans les sources GLSL
  * (garde-fou contre une dérive entre le miroir et les shaders).
  */
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import { DataTexture, DataUtils, HalfFloatType, LessEqualDepth, LinearFilter, RGBAFormat, Vector3 } from 'three';
 import { C, EYE_HEIGHT, LUT_HEIGHT, LUT_LOG2_RANGE, LUT_SIZE, TONEMAP_KNEE } from '../src/physics/constants.js';
 import { aberrate, aberrateInverse, dopplerFactor, gammaFromU, velocityFromU } from '../src/physics/relativity.js';
 import {
+  adaptationExposure,
   blackbodyColor,
   buildDopplerLutData,
   colorMatrix,
@@ -31,6 +32,7 @@ import {
 } from '../src/render/materials.js';
 import { createCamera, updateCamera, verticalFov } from '../src/render/camera.js';
 import { createCockpit } from '../src/render/cockpit.js';
+import { opaqueSort } from '../src/render/renderer.js';
 import { streetMapSize } from '../src/render/streetMap.js';
 
 /* ------------------------------------------------------------------------- */
@@ -229,6 +231,18 @@ describe('uniforms.updateObserver', () => {
     expect(len(observer().beta)).toBeCloseTo(b, 14);
   });
 
+  it('exposition d’adaptation : E(e^φ_eff) suivie à chaque mise à jour, 1 à l’arrêt et en vision classique', () => {
+    const phi = Math.atanh(90 / C); // 90 m/s
+    const snap = snapshotFromU(C * Math.sinh(phi), 0);
+    updateObserver(snap, 1);
+    expect(REL.uExposure.value).toBeCloseTo(adaptationExposure(Math.exp(phi)), 12);
+    expect(REL.uExposure.value).toBeCloseTo(0.0392, 3);
+    updateObserver(snap, 0);
+    expect(REL.uExposure.value).toBe(1);
+    updateObserver(snapshotFromU(0, 0), 1);
+    expect(REL.uExposure.value).toBe(1);
+  });
+
   it('setVisibility pose le brouillard et refuse des distances incohérentes', () => {
     setVisibility(120, 450);
     expect(REL.uFogNear.value).toBe(120);
@@ -386,6 +400,8 @@ describe('LUT Doppler (dopplerLut.js) lue comme dans rel_doppler.glsl', () => {
 });
 
 describe('chaîne de couleur des fragments (rel_doppler.glsl) = spectrum.perceivedColor', () => {
+  // uExposure suit désormais l'observateur (adaptation) : on compare à l'arrêt (E = 1).
+  beforeAll(() => updateObserver({ vx: 0, vy: 0, gamma: 1 }, 1));
   const texture = createDopplerLutTexture();
   const params = [LUT_SIZE, LUT_LOG2_RANGE, LUT_HEIGHT];
   const mirror = makeFragmentMirror(texture, params);
@@ -496,6 +512,14 @@ describe('sources GLSL : le miroir correspond aux shaders', () => {
     expect(surface.indexOf('relApplyFog')).toBeLessThan(surface.indexOf('relSurfaceColor'));
   });
 
+  it('cockpit comobile hors de l’adaptation (uExposure), ciel dégagé lu dans sa ligne de LUT', () => {
+    // Éclairé par la lumière projetée vers l'avant : l'adaptation le rendrait noir à 90 m/s.
+    expect(stripGlslComments(src['cockpit.frag'])).not.toMatch(/uExposure/);
+    const env = stripGlslComments(src['environment.frag']);
+    expect(env).toMatch(/relLutRow\(D, uSkyClearRow\)/);
+    expect(env).not.toMatch(/RAYLEIGH/);
+  });
+
   it('en-tête d’attribution sur les seuls fichiers GLSL dérivés ; copie envoyée au GPU en ASCII', () => {
     const header = (kind, where) =>
       `/*! ${kind} d'OpenRelativity (MIT Game Lab) — https://github.com/MITGameLab/OpenRelativity @35b806a1, ${where} — Copyright (c) 2013 Massachusetts Institute of Technology — SPDX-License-Identifier: MIT — voir THIRD_PARTY_NOTICES.md — Modifications (c) 2026 Hugo Hismans */`;
@@ -522,6 +546,16 @@ describe('matériaux', () => {
     expect(REL.uLut.value).toBeInstanceOf(DataTexture);
     expect(REL.uLut.value.type).toBe(HalfFloatType);
     expect(REL.uLutParams.value.toArray()).toEqual([LUT_SIZE, LUT_LOG2_RANGE, LUT_HEIGHT, 0]);
+  });
+
+  it('tri des opaques : renderOrder puis r (cm entiers), résultat −1, 0 ou 1', () => {
+    const item = (renderOrder, r) => ({ renderOrder, object: { userData: r === undefined ? {} : { r } } });
+    const list = [item(1, 0), item(0, 12345), item(0, 870), item(-1, 0), item(0, 870), item(0)];
+    const sorted = [...list].sort(opaqueSort);
+    expect(sorted.map((x) => [x.renderOrder, x.object.userData.r ?? 0])).toEqual([
+      [-1, 0], [0, 0], [0, 870], [0, 870], [0, 12345], [1, 0],
+    ]);
+    for (const a of list) for (const b of list) expect([-1, 0, 1]).toContain(opaqueSort(a, b));
   });
 
   it('variante classique : même objet d’uniformes, mêmes shaders, define REL_CLASSIC', () => {

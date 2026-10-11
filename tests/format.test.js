@@ -100,6 +100,16 @@ describe('createGammaPhrase', () => {
     }
   });
 
+  it('repasse au régime plus fin dès sa frontière franchie (freinage)', () => {
+    const p = createGammaPhrase();
+    expect(p(1.6)).toBe('La ville va ×1,5 plus vite que toi');
+    expect(p(1.49)).toBe('La ville va ×1,5 plus vite que toi');
+    expect(plain(p(1.4))).toBe('La ville va 40 % plus vite que toi');
+    const q = createGammaPhrase();
+    q(5.2);
+    expect(q(4.4)).toBe('La ville va ×4,5 plus vite que toi');
+  });
+
   it('ne change pas de libellé quand γ oscille autour d’une frontière', () => {
     const phrase = createGammaPhrase();
     const seen = new Set();

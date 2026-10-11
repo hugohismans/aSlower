@@ -20,7 +20,9 @@
  *
  * Toits : vus d'en dessous depuis l'œil (1,6 m, sous tous les toits), ce sont des
  * faces arrière, éliminées par le GPU ; ils ne sont subdivisés qu'au pas
- * max(s, ROOF_STEP), pour rester robustes à l'aberration sans coûter de triangles.
+ * max(s, ROOF_STEP), sans les coupures des murs, pour rester robustes à l'aberration sans
+ * coûter de triangles. Garde-fou : layout.js refuse tout bâtiment plus bas que
+ * MIN_BUILDING_HEIGHT (3 m) ; un toit vu d'en haut ouvrirait des fentes sous aberration.
  *
  * Attributs (docs/interfaces.md) : position (repère Three : X = x, Y = z, Z = −y),
  * color (réflectance r, g, b linéaire), aSpec (ir, uv, ombrage cuit). Lampadaires :
@@ -381,6 +383,7 @@ function createChunk(id, boxes, lodSteps) {
   const center = { x: (xmin + xmax) / 2, y: (ymin + ymax) / 2, z: hmax / 2 };
   const radius = Math.hypot((xmax - xmin) / 2, (ymax - ymin) / 2, hmax / 2);
   const cache = new Map();
+  const levelOf = (k) => Math.min(Math.max(Math.round(k) || 0, 0), lodSteps.length - 1);
 
   return {
     id,
@@ -397,10 +400,10 @@ function createChunk(id, boxes, lodSteps) {
       for (let i = 0; i < rects.length; i += 4) {
         const dx = Math.max(rects[i] - px, 0, px - rects[i + 2]);
         const dy = Math.max(rects[i + 1] - py, 0, py - rects[i + 3]);
-        const d = Math.hypot(dx, dy);
-        if (d < best) best = d;
+        const d2 = dx * dx + dy * dy;
+        if (d2 < best) best = d2;
       }
-      return best;
+      return Math.sqrt(best);
     },
     /**
      * Géométrie du LOD k (0 = la plus fine), créée au premier appel puis gardée.
@@ -408,7 +411,7 @@ function createChunk(id, boxes, lodSteps) {
      * @returns {BufferGeometry}
      */
     lod(k) {
-      const level = Math.min(Math.max(Math.round(k) || 0, 0), lodSteps.length - 1);
+      const level = levelOf(k);
       let geometry = cache.get(level);
       if (!geometry) {
         const m = meshBlock(boxes, lodSteps[level]);
@@ -423,6 +426,19 @@ function createChunk(id, boxes, lodSteps) {
         cache.set(level, geometry);
       }
       return geometry;
+    },
+    /**
+     * Libère la géométrie du LOD k (CPU et GPU) si elle existe ; un appel suivant à lod(k)
+     * la remaille.
+     * @param {number} k
+     */
+    release(k) {
+      const level = levelOf(k);
+      const geometry = cache.get(level);
+      if (geometry) {
+        geometry.dispose();
+        cache.delete(level);
+      }
     },
   };
 }
@@ -482,7 +498,6 @@ export function buildCity(scene, palette, { lodSteps = [...DEFAULT_LOD_STEPS] } 
     start: layout.start,
     visibility: layout.visibility,
     bounds: layout.bounds,
-    // En plus du contrat : emprises développées (ombres de streetMap.createStreetMap).
-    buildings: layout.buildings,
+    buildings: layout.buildings, // emprises développées (ombres de streetMap.createStreetMap)
   };
 }

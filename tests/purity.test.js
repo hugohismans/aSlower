@@ -172,7 +172,9 @@ const lineAt = (text, index) => text.slice(0, index).split('\n').length;
  */
 function findImports(code) {
   const found = [];
-  const staticRe = /\b(?:import|export)\s+(?:[\w$*{},\s]+?\s+from\s*)?(['"])([^'"\n]+)\1/g;
+  // Espaces facultatifs (import{A}from'x', import*as T from'x') ; le lookbehind écarte les
+  // chaînes 'import' / 'export' suivies d'une autre chaîne et les propriétés (a.import).
+  const staticRe = /(?<![\w$.'"`])(?:import|export)\b\s*(?:[\w$*{},\s]*?[\s}*]?from\s*)?(['"])([^'"\n]+)\1/g;
   for (const m of code.matchAll(staticRe)) found.push({ specifier: m[2], line: lineAt(code, m.index) });
   const dynamicRe = /\bimport\s*\(/g;
   for (const m of code.matchAll(dynamicRe)) {
@@ -352,6 +354,16 @@ describe('analyseur du test (commentaires, chaînes, gabarits, regex)', () => {
       { specifier: '../../THIRD_PARTY_NOTICES.md?raw', line: 7 },
       { specifier: null, line: 8 },
     ]);
+    // Sans espaces (aucun formateur n'impose la forme) : rien ne doit échapper au contrat.
+    expect(findImports(scanJs("import{A}from'three';export{b}from'./z.js';import*as T from'three';").code)).toEqual([
+      { specifier: 'three', line: 1 },
+      { specifier: './z.js', line: 1 },
+      { specifier: 'three', line: 1 },
+    ]);
+    // Pas de faux positif : chaînes 'import' / 'export', propriété nommée from, import.meta.
+    expect(
+      findImports(scanJs("const k = ['import', 'export']; export const from = 'x'; const u = import.meta.url;").code),
+    ).toEqual([]);
   });
 });
 

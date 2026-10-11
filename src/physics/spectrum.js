@@ -1,4 +1,4 @@
-/*! Adapté d'OpenRelativity (MIT Game Lab) — https://github.com/MITGameLab/OpenRelativity @35b806a1, relativity.shader:27-47, 243-327 — Copyright (c) 2013 Massachusetts Institute of Technology — SPDX-License-Identifier: MIT — voir THIRD_PARTY_NOTICES.md — Modifications (c) 2026 Hugo Hismans */
+/*! Adapté d'OpenRelativity (MIT Game Lab) — https://github.com/MITGameLab/OpenRelativity @35b806a1, relativity.shader:27-47, 243-327, 356-371 — Copyright (c) 2013 Massachusetts Institute of Technology — SPDX-License-Identifier: MIT — voir THIRD_PARTY_NOTICES.md — Modifications (c) 2026 Hugo Hismans */
 /**
  * Modèle spectral et LUT Doppler (module pur : ni three, ni DOM).
  *
@@ -36,7 +36,7 @@
  *     | lineColor(λ₀/D) · intensité  (lampe à raie)
  *     | blackbodyColor(D, T) · intensité (lampe corps noir : une lecture de LUT)
  *   c = gamutMap(c)                 (désaturation à luminance constante)
- *   c = c · beamFactor(D) · exposition
+ *   c = c · beamFactor(D) · exposition  (dans le jeu : adaptationExposure(D droit devant))
  *   c = toneMap(c, TONEMAP_KNEE)    (compression du maximum, teinte conservée)
  *
  * Références :
@@ -58,6 +58,9 @@ import {
   LUT_SIZE,
   LUT_LOG2_RANGE,
   BLACKBODY_TEMPERATURES,
+  ADAPTATION_REFERENCE,
+  SKY_AEROSOL_FRACTION,
+  SKY_CLEAR_LUMINANCE,
 } from './constants.js';
 
 /** @typedef {[number, number, number]} Rgb  sRGB linéaire */
@@ -300,6 +303,89 @@ export function blackbodyColor(D, T) {
   return [rgb[0] * scale, rgb[1] * scale, rgb[2] * scale];
 }
 
+/** Réflectance relative du ciel dégagé (Rayleigh + aérosols), nulle sous 295 nm (ozone). */
+function clearSkyShape(lambdaNm) {
+  if (lambdaNm < 295) return 0;
+  const x = 550 / lambdaNm;
+  return x * x * x * x + SKY_AEROSOL_FRACTION * x ** 1.3;
+}
+
+/** 𝐍·RGB(∫ CMF(λ)·D·E(Dλ)·shape(Dλ) dλ) sur [360 ; 830] (intégrande lisse : Simpson au pas de 1 nm). */
+function rawClearSkyRgb(D) {
+  const n = 470; // pas de 1 nm : intégrande lisse
+  const h = (WAVELENGTH_MAX - WAVELENGTH_MIN) / n;
+  let X = 0;
+  let Y = 0;
+  let Z = 0;
+  for (let i = 0; i <= n; i++) {
+    const l = WAVELENGTH_MIN + i * h;
+    const w = (i === 0 || i === n ? 1 : i % 2 ? 4 : 2) * D * planck(D * l, SUN_TEMPERATURE) * clearSkyShape(D * l);
+    if (w === 0) continue;
+    X += w * xBar(l);
+    Y += w * yBar(l);
+    Z += w * zBar(l);
+  }
+  return mulMat3Vec(getAdaptation(), mulMat3Vec(XYZ_TO_LINEAR_SRGB, [(X * h) / 3, (Y * h) / 3, (Z * h) / 3]));
+}
+
+let clearSkyScale = 0;
+/**
+ * Ciel dégagé vu avec D, AVANT projecteur (même convention que colorMatrix : un seul D).
+ * Spectre continu (pas de créneaux) : décalé, il reste bleu et lisse, sans fausses teintes.
+ * Luminance SKY_CLEAR_LUMINANCE au repos.
+ * @param {number} D
+ * @returns {Rgb}
+ */
+export function clearSkyColor(D) {
+  assertDoppler(D);
+  if (clearSkyScale === 0) clearSkyScale = SKY_CLEAR_LUMINANCE / luminance(rawClearSkyRgb(1));
+  const rgb = rawClearSkyRgb(D);
+  return [rgb[0] * clearSkyScale, rgb[1] * clearSkyScale, rgb[2] * clearSkyScale];
+}
+
+/** Gain G(D) de la façade de référence vue de face (projecteur compris), relatif au repos. */
+function referenceGain(D, beamExponent, beamMax) {
+  const M = colorMatrix(D);
+  const c = [0, 0, 0];
+  for (let k = 0; k < 5; k++) for (let j = 0; j < 3; j++) c[j] += ADAPTATION_REFERENCE[k] * M[k][j];
+  return (luminance(gamutMap(c)) * beamFactor(D, beamExponent, beamMax)) / luminance(ADAPTATION_REFERENCE);
+}
+
+/**
+ * Table de log₂ G sur log₂ D ∈ [0 ; LUT_LOG2_RANGE] (129 points, ≈ 30 ms une seule fois) :
+ * materials.js la construit au chargement, pour ne pas figer la première accélération.
+ */
+const ADAPTATION_SAMPLES = 129;
+let adaptationTable = null;
+
+/**
+ * Exposition d'adaptation de l'œil, réglée sur ce que le joueur regarde (droit devant) :
+ * E = 1/G(D_avant), G(D) = luminance(gamutMap(M(D)·ρ_ref))·beamFactor(D)/luminance(ρ_ref),
+ * ρ_ref = ADAPTATION_REFERENCE, D_avant = γ(1 + β) = e^φ. La façade de référence vue de face
+ * garde sa luminance du repos ; les rapports de luminance DANS l'image restent physiques.
+ * E = 1 pour D_avant ≤ 1 (arrêt, vision classique) et E ≤ 1 toujours.
+ * Réglages par défaut seulement (BEAM_EXPONENT, BEAM_MAX) : table interpolée (écart < 0,2 %),
+ * à recalculer si l'exposant du projecteur devient réglable.
+ * Règles de couleur du jeu (portes) : perceivedColor(src, D, {exposure: adaptationExposure(e^φ)}),
+ * pour suivre la même loi que l'écran.
+ * @param {number} Dforward
+ */
+export function adaptationExposure(Dforward) {
+  assertDoppler(Dforward);
+  if (Dforward <= 1) return 1;
+  if (!adaptationTable) {
+    adaptationTable = new Float64Array(ADAPTATION_SAMPLES);
+    for (let i = 0; i < ADAPTATION_SAMPLES; i++) {
+      const D = 2 ** ((LUT_LOG2_RANGE * i) / (ADAPTATION_SAMPLES - 1));
+      adaptationTable[i] = Math.log2(Math.max(1, referenceGain(D, BEAM_EXPONENT, BEAM_MAX)));
+    }
+  }
+  const s = Math.min(Math.log2(Dforward) / LUT_LOG2_RANGE, 1) * (ADAPTATION_SAMPLES - 1);
+  const i = Math.min(Math.floor(s), ADAPTATION_SAMPLES - 2);
+  const f = s - i;
+  return 2 ** -((1 - f) * adaptationTable[i] + f * adaptationTable[i + 1]);
+}
+
 /** max ȳ de l'ajustement de Wyman (≈ 1 vers 556 nm), calculé une fois. */
 let yBarMax = 0;
 function getYBarMax() {
@@ -468,9 +554,11 @@ function linearSrgbToOklab(rgb) {
  * Seuils de classifyHue (Oklab / OKLCh). Les bornes du vert sont RÉGLÉES sur les raies :
  * après lineColor, une raie à 562 nm a la teinte 127,7° et une raie à 510 nm 165,2°,
  * si bien qu'une raie est « vert » exactement pour λ ∈ [≈ 510 ; ≈ 562] nm (porte du N3).
- * Raie de 640 nm vue de face (perceivedColor, réglages par défaut) : rouge, orange dès
- * 7,1 m/s, jaune 9,3, vert 13,0 (561,8 nm), cyan 22,3 (510,3 nm), bleu 27,3, violet 32,6,
- * bleu 44,2 (sous 398 nm, où x̄ de Wyman est sous-estimé), noir dès 44,6 m/s.
+ * Raie de 640 nm vue de face (perceivedColor, réglages par défaut, exposition 1) : rouge,
+ * orange dès 7,1 m/s, jaune 9,3, vert 13,0 (561,8 nm), cyan 22,3 (510,3 nm), bleu 27,3,
+ * violet 32,6, bleu 44,2 (sous 398 nm, où x̄ de Wyman est sous-estimé), noir dès 44,6 m/s.
+ * Avec l'adaptation du jeu (exposure = adaptationExposure(D)) : mêmes seuils jusqu'au
+ * violet (la fenêtre « vert » ne change pas), puis noir dès 40,7 m/s.
  */
 const HUE_RULES = Object.freeze({
   /** Clarté Oklab sous laquelle tout est « noir » (≈ 0,8 % de la luminance du blanc). */
@@ -480,7 +568,7 @@ const HUE_RULES = Object.freeze({
   /** Clarté à partir de laquelle un achromatique est « blanc » (le blanc tone-mappé vaut ≈ 0,97). */
   whiteLightness: 0.9,
   /** Bornes inférieures des teintes (degrés OKLCh), dans l'ordre croissant. */
-  hueStarts: Object.freeze([
+  hueStarts: /** @type {ReadonlyArray<readonly [number, string]>} */ (Object.freeze([
     [45, 'orange'],
     [75, 'jaune'],
     [128, 'vert'],
@@ -488,7 +576,7 @@ const HUE_RULES = Object.freeze({
     [225, 'bleu'],
     [275, 'violet'],
     [345, 'rouge'],
-  ]),
+  ])),
 });
 
 /**
@@ -606,7 +694,7 @@ export function buildDopplerLutData({
   if (!Number.isInteger(size) || size < 2) throw new RangeError(`Taille de LUT invalide : ${size}`);
   if (!(log2Range > 0)) throw new RangeError(`Plage de LUT invalide : ${log2Range}`);
   const width = size;
-  const height = 5 + temperatures.length;
+  const height = 5 + temperatures.length + 1; // + ciel dégagé (dernière ligne)
   const data = new Float32Array(width * height * 4);
   const put = (row, i, rgb) => {
     const o = (row * width + i) * 4;
@@ -620,6 +708,7 @@ export function buildDopplerLutData({
     const M = colorMatrix(D);
     for (let k = 0; k < 5; k++) put(k, i, M[k]);
     temperatures.forEach((T, t) => put(5 + t, i, blackbodyColor(D, T)));
+    put(height - 1, i, clearSkyColor(D));
   }
   return { data, width, height, log2Range };
 }

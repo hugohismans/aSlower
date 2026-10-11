@@ -6,10 +6,12 @@ import {
   LOD_EPSILON,
   LOD_HYSTERESIS,
   LOD_KAPPA_MAX,
+  LOD0_RELEASE_M,
   apparentNearestDistance,
   chooseLod,
   dopplerMin,
   lodKappa,
+  shouldReleaseLod0,
 } from '../src/render/lod.js';
 
 const STEPS = [1.5, 5, 15];
@@ -158,5 +160,23 @@ describe('la règle tient l\'erreur de corde sous ε', () => {
       }
       expect(worst, `β = ${b}`).toBeLessThanOrEqual(1.05 * LOD_EPSILON);
     }
+  });
+});
+
+describe('libération du LOD 0', () => {
+  it('jamais le LOD affiché, seulement au-delà de la distance de libération', () => {
+    expect(shouldReleaseLod0(0, 1e6)).toBe(false);
+    expect(shouldReleaseLod0(1, LOD0_RELEASE_M)).toBe(false);
+    expect(shouldReleaseLod0(1, LOD0_RELEASE_M + 1)).toBe(true);
+    expect(shouldReleaseLod0(2, Infinity)).toBe(true);
+    expect(shouldReleaseLod0(null, Infinity)).toBe(true);
+  });
+  it('la libération est loin du seuil du LOD 1 à β = 0,92 (pas de remaillage en boucle)', () => {
+    const beta = 0.92;
+    const g = gammaOf(beta);
+    const corner = (48 * Math.PI) / 180;
+    // distance monde où le LOD 1 devient permis
+    const d1 = STEPS[1] / (lodKappa(g, beta) * apparentNearestDistance(1, g, beta, corner));
+    expect(LOD0_RELEASE_M).toBeGreaterThan(2 * d1);
   });
 });

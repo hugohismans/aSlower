@@ -41,6 +41,34 @@ function movingEast(phi, options = {}) {
   return s;
 }
 
+/** Angle ramené dans ]−π ; π]. */
+const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
+
+/**
+ * Oracle exact : déplacement (x, y) d'un morceau à rapidité et cap affines en τ,
+ * φ(s) = φ0 + k·s et θ(s) = θ0 + ω·s pour s ∈ [0, T] :
+ *   z = C ∫ sinh φ(s)·e^{iθ(s)} ds
+ *     = (C/2)·e^{iθ0}·[e^{φ0}(e^{(k+iω)T} − 1)/(k+iω) − e^{−φ0}(e^{(−k+iω)T} − 1)/(−k+iω)].
+ * (k, ω) ≠ (0, 0) exigé (pour k = 0, passer un k minuscule, 1e-300).
+ */
+function arc(phi0, k, theta0, omega, T) {
+  // ∫ e^{sign·(φ0 + k s)}·e^{iωs} ds, en (partie réelle, partie imaginaire)
+  const term = (sign) => {
+    const re = sign * k;
+    const im = omega;
+    const scale = Math.exp(sign * phi0);
+    const er = Math.exp(re * T) * Math.cos(im * T) - 1;
+    const ei = Math.exp(re * T) * Math.sin(im * T);
+    const d = re * re + im * im;
+    return [(scale * (er * re + ei * im)) / d, (scale * (ei * re - er * im)) / d];
+  };
+  const p = term(1);
+  const m = term(-1);
+  const zr = (C / 2) * (p[0] - m[0]);
+  const zi = (C / 2) * (p[1] - m[1]);
+  return { x: zr * Math.cos(theta0) - zi * Math.sin(theta0), y: zr * Math.sin(theta0) + zi * Math.cos(theta0) };
+}
+
 // Valeurs attendues après τ = 10 s de poussée pleine depuis l'arrêt (rapidité a·τ/c = 1).
 const V_10 = 100 * Math.tanh(1); // 76,159416 m/s
 const T_10 = 10 * Math.sinh(1); // 11,752012 s
@@ -142,6 +170,14 @@ describe('step : entrées et cas limites', () => {
     expect(b).toEqual(c);
   });
 
+  it('commandes NaN (gyroscope sans valeur) : traitées comme absentes', () => {
+    const a = movingEast(0);
+    const b = movingEast(0);
+    a.ux = 50;
+    b.ux = 50;
+    expect(step(a, { thrust: NaN, brake: NaN, steer: NaN }, 1)).toEqual(step(b, {}, 1));
+  });
+
   it('roue libre exacte : Δx = u·Δτ, Δt = γ·Δτ', () => {
     const s = movingEast(1);
     drive(s, {}, 5);
@@ -224,6 +260,26 @@ describe('frein', () => {
     expectNear(snapshot(a).rapidity, 0.7, 1e-12);
   });
 
+  it('freiner en tournant : le volant agit pendant le freinage, puis pivot après l’arrêt', () => {
+    const s = movingEast(1);
+    // Images de 0,07 s : l'arrêt (τ = 10 s) tombe au milieu d'une image.
+    drive(s, { brake: 1, steer: 1 }, 12, 0.07);
+    expect(s.ux).toBe(0); // arrêt exact
+    expect(s.uy).toBe(0);
+    expectNear(wrap(snapshot(s).heading - (-10 * TURN_RATE - 2 * PIVOT_RATE)), 0, 1e-9);
+    expectNear(s.t, 10 * Math.sinh(1) + 2, 1e-9);
+    const e = arc(1, -A / C, 0, -TURN_RATE, 10);
+    expect(Math.hypot(s.x - e.x, s.y - e.y)).toBeLessThan(1e-3); // 0,23 mm mesurés
+  });
+
+  it('frein partiel : arrêt exact à (c²/(b·a))(cosh φ − 1)', () => {
+    const s = movingEast(1);
+    drive(s, { brake: 0.5 }, 21);
+    expect(s.ux).toBe(0);
+    expectNear(s.x, ((C * C) / (0.5 * A)) * (Math.cosh(1) - 1), 1e-5);
+    expectNear(s.t, (C / (0.5 * A)) * Math.sinh(1) + 1, 1e-9);
+  });
+
   it('accélérer 10 s puis freiner 10 s : 1 086,161270 m et t = 23,504024 s', () => {
     const s = createPlayer({ heading: 0 });
     drive(s, { thrust: 1 }, 10);
@@ -283,6 +339,12 @@ describe('virage (modèle arcade)', () => {
     // Les sous-pas internes (≤ 1/60 s, ≤ 1 m) rendent la position quasi indépendante des images.
     expect(Math.hypot(a.x - b.x, a.y - b.y)).toBeLessThan(1e-3);
     expect(Math.hypot(c.x - b.x, c.y - b.y)).toBeLessThan(1e-3);
+  });
+
+  it('pousser en tournant depuis l’arrêt : position exacte (forme fermée) à 1 mm', () => {
+    const s = drive(createPlayer({ heading: 0 }), { thrust: 1, steer: 0.5 }, 10);
+    const e = arc(0, A / C, 0, -0.5 * TURN_RATE, 10);
+    expect(Math.hypot(s.x - e.x, s.y - e.y)).toBeLessThan(1e-3); // 0,39 mm mesurés à 60 Hz
   });
 });
 
@@ -362,6 +424,19 @@ describe('plafond de rapidité', () => {
       expectNear(snapshot(s).rapidity, phiMax, 1e-12);
       expectNear(s.x, 1000 * (Math.cosh(phiMax) - 1) + 5 * C * Math.sinh(phiMax), 1e-6);
       expectNear(s.t, 10 * Math.sinh(phiMax) + 5 * Math.cosh(phiMax), 1e-9);
+    }
+  });
+
+  it('plafond franchi en tournant : le volant agit encore au plafond (φ, cap, horloges et position exacts)', () => {
+    const phiMax = 0.5; // atteint à τ = 5 s
+    for (const frame of [1 / 60, 0.1, 10]) {
+      const s = drive(createPlayer({ heading: 0, phiMax }), { thrust: 1, steer: 1 }, 10, frame);
+      expectNear(snapshot(s).rapidity, phiMax, 1e-12);
+      expectNear(wrap(snapshot(s).heading + 10 * TURN_RATE), 0, 1e-9);
+      expectNear(s.t, 10 * Math.sinh(phiMax) + 5 * Math.cosh(phiMax), 1e-9);
+      const a = arc(0, A / C, 0, -TURN_RATE, 5);
+      const b = arc(phiMax, 1e-300, -5 * TURN_RATE, -TURN_RATE, 5);
+      expect(Math.hypot(s.x - a.x - b.x, s.y - a.y - b.y)).toBeLessThan(1e-3);
     }
   });
 

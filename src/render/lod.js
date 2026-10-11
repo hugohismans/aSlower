@@ -94,6 +94,9 @@ function coarsestAllowed(distance, kappa, lodSteps, margin = 0) {
   return 0;
 }
 
+/** Options par défaut de chooseLod (constante : pas d'objet alloué à chaque appel). */
+const DEFAULT_LOD_OPTIONS = Object.freeze({});
+
 /**
  * Choisit le LOD d'un îlot.
  * @param {number | null | undefined} currentLod LOD actuel (null/undefined : pas encore choisi)
@@ -110,7 +113,7 @@ export function chooseLod(
   gamma,
   beta,
   lodSteps,
-  { epsilon = LOD_EPSILON, hysteresis = LOD_HYSTERESIS } = {},
+  { epsilon = LOD_EPSILON, hysteresis = LOD_HYSTERESIS } = DEFAULT_LOD_OPTIONS,
 ) {
   const kappa = lodKappa(gamma, beta, epsilon);
   const strict = coarsestAllowed(nearestApparentDistance, kappa, lodSteps);
@@ -118,4 +121,21 @@ export function chooseLod(
   if (!known || strict <= currentLod) return strict; // premier choix, ou affinage immédiat
   // Passage à plus grossier : seulement avec la marge d'hystérésis, sinon on reste.
   return Math.max(currentLod, coarsestAllowed(nearestApparentDistance, kappa, lodSteps, hysteresis));
+}
+
+/**
+ * Distance monde (m) au-delà de laquelle le LOD 0 d'un îlot qui ne l'affiche pas est libéré
+ * (≈ 3 fois la distance où le LOD 1 devient permis à β = 0,92). Le plan garde les LOD 1 et 2
+ * résidents ; le LOD 0 est remaillé au retour.
+ */
+export const LOD0_RELEASE_M = 120;
+
+/**
+ * Faut-il libérer le LOD 0 d'un îlot ? Jamais celui qui est affiché.
+ * @param {number | null} currentLod LOD affiché
+ * @param {number} distance distance monde du point le plus proche (m)
+ * @param {number} [releaseDistance]
+ */
+export function shouldReleaseLod0(currentLod, distance, releaseDistance = LOD0_RELEASE_M) {
+  return currentLod !== 0 && distance > releaseDistance;
 }

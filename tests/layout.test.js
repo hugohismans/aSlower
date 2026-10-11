@@ -75,10 +75,12 @@ describe('palette', () => {
     }
   });
 
-  it('range les façades dans l\'ordre de l\'arc-en-ciel, avec du proche IR', () => {
+  it('range les façades dans l\'ordre de l\'arc-en-ciel, avec du proche IR varié', () => {
     expect(RAINBOW.map((n) => palette[n].srgb)).toEqual(['#E8371E', '#F28A1A', '#F5C71A', '#34B04A', '#1FB5C9', '#3557E0', '#8A3FD1']);
     for (const n of RAINBOW) {
-      expect(palette[n].ir).toBeCloseTo(0.3, 10);
+      // pigments réels : ≈ 0,05 (noir de carbone) à 0,6-0,85 (oxydes de fer, blanc de titane)
+      expect(palette[n].ir).toBeGreaterThanOrEqual(0.05);
+      expect(palette[n].ir).toBeLessThanOrEqual(0.85);
       expect(palette[n].uv).toBeGreaterThanOrEqual(0.1);
       expect(palette[n].uv).toBeLessThanOrEqual(0.3);
     }
@@ -427,6 +429,23 @@ describe('cityMesher', () => {
     expect(() => buildCity(avenue, palette, { lodSteps: [5, 1.5] })).toThrow(/lodSteps/);
   });
 
+  it('libère un LOD (dispose) et le remaille au besoin', () => {
+    const city = buildCity(avenue, palette, { lodSteps: [1.5, 5, 15] });
+    const chunk = city.chunks[0];
+    const g0 = chunk.lod(0);
+    let disposed = 0;
+    g0.addEventListener('dispose', () => disposed++);
+    const g1 = chunk.lod(1);
+    chunk.release(0);
+    expect(disposed).toBe(1);
+    const again = chunk.lod(0);
+    expect(again).not.toBe(g0);
+    expect(again.index.count).toBe(g0.index.count);
+    expect(chunk.lod(1)).toBe(g1); // les autres LOD sont gardés
+    chunk.release(2); // jamais maillé : sans effet
+    expect(chunk.lod(1)).toBe(g1);
+  });
+
   it('maille les îlots de l\'avenue sans jonction en T, vers l\'extérieur, à tous les LOD', () => {
     const city = buildCity(avenue, palette);
     const layout = expandScene(avenue, palette);
@@ -503,5 +522,18 @@ describe('cityMesher', () => {
       }
     }
     expect(exposed).toBeGreaterThan(0);
+  });
+});
+
+describe('hauteur minimale des bâtiments', () => {
+  it("refuse un bâtiment ou une rangée plus bas que l'œil + 1 m", async () => {
+    const { MIN_BUILDING_HEIGHT } = await import('../src/render/layout.js');
+    const { EYE_HEIGHT } = await import('../src/physics/constants.js');
+    expect(MIN_BUILDING_HEIGHT).toBeGreaterThanOrEqual(EYE_HEIGHT + 1);
+    const low = { ...avenue, batiments: [...avenue.batiments, { id: 'kiosque', pos: [0, 200], taille: [4, 4], hauteur: 1, couleur: 'jaune' }] };
+    expect(() => expandScene(low, palette)).toThrow(/kiosque.*hauteur/);
+    const lowRow = { ...avenue, rangees: avenue.rangees.map((r, i) => (i === 0 ? { ...r, hauteurs: [1, 30] } : r)) };
+    expect(() => expandScene(lowRow, palette)).toThrow(/hauteurs/);
+    for (const b of expandScene(avenue, palette).buildings) expect(b.height).toBeGreaterThanOrEqual(MIN_BUILDING_HEIGHT);
   });
 });

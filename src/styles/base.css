@@ -76,7 +76,7 @@ body {
   user-select: none;
   -webkit-touch-callout: none;
   -webkit-tap-highlight-color: transparent;
-  touch-action: manipulation; /* pas de zoom au double toucher dans les menus */
+  touch-action: pan-x pan-y; /* pas de pincement (iOS ignore user-scalable=no) */
 }
 
 /* Canvas WebGL plein écran. Le moteur de rendu fixe sa résolution. */
@@ -133,6 +133,9 @@ body {
   padding: var(--sa-top) var(--sa-right) var(--sa-bottom) var(--sa-left);
   background: rgb(10 13 20 / 0.86);
   overflow: auto;
+  /* Défile, mais sans pincement. Répété ici : WebKit repart de « auto » sur chaque
+     conteneur overflow: auto, le touch-action de body ne s'y applique pas. */
+  touch-action: pan-x pan-y;
 }
 
 .title-card {
@@ -259,6 +262,17 @@ body {
   font-weight: 800;
 }
 
+/* Fenêtre en portrait sur un écran en paysage (écran partagé, Slide Over) : tourner
+   l'appareil n'y change rien, le panneau demande d'agrandir la fenêtre (main.js). */
+.rotate-window,
+[data-fenetre='etroite'] .rotate-turn {
+  display: none;
+}
+
+[data-fenetre='etroite'] .rotate-window {
+  display: block;
+}
+
 .rotate-text {
   max-width: 32ch;
   margin: 0;
@@ -293,6 +307,7 @@ body {
   max-height: calc(100dvh - 2 * var(--gutter) - 4px);
   overflow: auto;
   overscroll-behavior: contain;
+  touch-action: pan-y; /* conteneur défilant : voir .title-screen */
   padding: 16px max(20px, env(safe-area-inset-right, 0px)) 24px max(20px, env(safe-area-inset-left, 0px));
   font-weight: 500;
   font-size: 16px;
@@ -338,6 +353,7 @@ body {
   padding: 12px;
   max-height: 60dvh;
   overflow: auto;
+  touch-action: pan-y;
   border-radius: 8px;
   background: #05070b;
   color: #e6e9ef;

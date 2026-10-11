@@ -18,8 +18,10 @@ import {
   LUT_LOG2_RANGE,
   LUT_SIZE,
   TONEMAP_KNEE,
+  SKY_CLEAR_ROW,
   blackbodyRow,
 } from '../physics/constants.js';
+import { adaptationExposure } from '../physics/spectrum.js';
 
 /**
  * Direction du soleil dans le repère du JEU (unitaire, vers le soleil) : sud-ouest,
@@ -38,11 +40,13 @@ const DEFAULT_FOG_FAR = 600;
  * Uniformes partagés (voir docs/interfaces.md, « render/uniforms.js »).
  * - uBeta, uGamma, uG2 : observateur effectif (β_eff = kβ), calculés en double côté CPU ;
  * - uLut, uLutParams (N, L, H, 0) : LUT Doppler (posée par materials.js à la première fabrique) ;
- * - uBeamExp, uBeamMax, uKnee, uExposure : projecteur, tone mapping, exposition ;
+ * - uBeamExp, uBeamMax, uKnee, uExposure : projecteur, tone mapping, exposition d'adaptation
+ *   (calculée par updateObserver) ;
  * - uFogNear, uFogFar, uFogSpec (r, g, b), uFogIrUv (ir, uv) : brouillard en distance monde ;
  * - uEyeHeight, uStreetMap, uStreetBounds (xmin, ymin, xmax, ymax du jeu) : sol de la passe
  *   d'environnement ;
- * - uSunDir (repère Three), uSkyRow (ligne de LUT de la lumière du ciel).
+ * - uSunDir (repère Three), uSkyRow (ligne de LUT de la lumière du ciel), uSkyClearRow (ligne
+ *   de LUT du ciel dégagé à spectre continu).
  */
 export const REL = {
   uBeta: { value: new Vector3(0, 0, 0) },
@@ -63,6 +67,7 @@ export const REL = {
   uStreetBounds: { value: new Vector4(-1000, -1000, 1000, 1000) },
   uSunDir: { value: new Vector3(SUN_DIRECTION.x, SUN_DIRECTION.z, -SUN_DIRECTION.y) },
   uSkyRow: { value: blackbodyRow(6500) },
+  uSkyClearRow: { value: SKY_CLEAR_ROW },
 };
 
 /**
@@ -71,6 +76,8 @@ export const REL = {
  * - vision classique : β_eff = k·β, γ_eff = 1/√(1 − k²β²), uG2 = γ_eff²/(γ_eff + 1).
  * γ_eff est calculé en double précision sous la forme 1/√((1 − k²) + k²/γ²), qui évite
  * l'annulation de 1 − β² près de c (γ vient de la vitesse propre, sans perte).
+ * - exposition : uExposure = adaptationExposure(D droit devant = γ_eff + √(γ_eff² − 1)),
+ *   1 à l'arrêt et en vision classique (spectrum.js).
  * @param {{vx: number, vy: number, gamma?: number}} snapshot instantané de physics/player.js
  * @param {number} k 1 = relativiste, 0 = vision classique (borné à [0, 1])
  */
@@ -84,6 +91,8 @@ export function updateObserver(snapshot, k) {
   const gammaEff = 1 / Math.sqrt(1 - k2 + k2 / (gamma * gamma));
   REL.uGamma.value = gammaEff;
   REL.uG2.value = (gammaEff * gammaEff) / (gammaEff + 1);
+  // Adaptation de l'œil au facteur Doppler droit devant, e^φ_eff = γ + √(γ² − 1).
+  REL.uExposure.value = adaptationExposure(gammaEff + Math.sqrt(Math.max(0, gammaEff * gammaEff - 1)));
 }
 
 /**

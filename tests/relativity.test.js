@@ -184,6 +184,34 @@ describe('hyperbolicSegment', () => {
     expectNear(s.t, one.dt, 1e-11);
   });
 
+  it('poussée oblique : â fixe dans le référentiel comobile initial (Fermi-Walker), découpage non indifférent', () => {
+    const [ux, uy, ax, ay, h] = [100, 0, 0, 10, 2];
+    const one = hyperbolicSegment(ux, uy, ax, ay, h);
+    // Hyperbole dans le référentiel comobile initial (boost pur de u₀), puis boost vers le monde.
+    const a = Math.hypot(ax, ay);
+    const eta = (a * h) / C;
+    const g0 = gammaFromU(ux, uy);
+    const v = { x: ux / g0, y: uy / g0 };
+    const boost = (T, X, Y) => {
+      const vx = (v.x * X + v.y * Y) / (v.x * v.x + v.y * v.y);
+      return {
+        T: g0 * (T + (v.x * X + v.y * Y) / (C * C)),
+        X: X + (g0 - 1) * vx * v.x + g0 * v.x * T,
+        Y: Y + (g0 - 1) * vx * v.y + g0 * v.y * T,
+      };
+    };
+    const range = ((C * C) / a) * (Math.cosh(eta) - 1);
+    const d = boost((C / a) * Math.sinh(eta), (range * ax) / a, (range * ay) / a);
+    const u = boost(Math.cosh(eta), (C * Math.sinh(eta) * ax) / a, (C * Math.sinh(eta) * ay) / a);
+    expectNear(one.dt / d.T, 1, 1e-12);
+    expectNear(Math.hypot(one.dx - d.X, one.dy - d.Y) / Math.hypot(d.X, d.Y), 0, 1e-12);
+    expectNear(Math.hypot(one.ux - u.X, one.uy - u.Y) / Math.hypot(u.X, u.Y), 0, 1e-12);
+    // Deux demi-segments : la poussée est relue dans un autre référentiel comobile.
+    const half = hyperbolicSegment(ux, uy, ax, ay, h / 2);
+    const two = hyperbolicSegment(half.ux, half.uy, ax, ay, h / 2);
+    expect(Math.hypot(two.ux - one.ux, two.uy - one.uy)).toBeGreaterThan(0.1);
+  });
+
   it('sans poussée : roue libre exacte (Δx = u·h, Δt = γ·h)', () => {
     const seg = hyperbolicSegment(40, -30, 0, 0, 2);
     expect(seg.ux).toBe(40);

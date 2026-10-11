@@ -75,8 +75,11 @@ function formatFactor(x) {
  *
  * Hystérésis : le libellé ne change que si γ s'écarte de plus de 0,6 pas de la
  * valeur affichée (pas du libellé courant : 0,01, 0,5 ou 1). La phrase ne clignote
- * donc pas quand γ oscille autour d'une frontière. Comme le régime « × » ne commence
- * qu'à 1,5, la phrase ne dit jamais « ×1,0 ».
+ * donc pas quand γ oscille autour d'une frontière. Mais au-dessous de la frontière basse
+ * de son régime, moins 0,6 pas du régime plus fin (1,495 − 0,006 pour « ×… », 4,75 − 0,3
+ * pour les entiers), le libellé repasse au régime plus fin : en freinant, on ne garde
+ * pas « ×1,5 » jusqu'à γ = 1,2. Comme le régime « × » ne commence qu'à 1,5, la phrase ne
+ * dit jamais « ×1,0 ».
  *
  * Rappel physique : dt/dτ = γ compare ta montre aux horloges de la ville que tu
  * croises (référentiel de la ville).
@@ -86,29 +89,34 @@ function formatFactor(x) {
 export function createGammaPhrase() {
   let center = NaN; // valeur de γ que le libellé courant représente
   let stepSize = 0; // pas du libellé courant
+  let floor = -Infinity; // sous ce γ, on quitte le régime courant (hystérésis du pas plus fin)
   let text = '';
   return (gamma) => {
     const g = Number.isFinite(gamma) && gamma > 1 ? gamma : 1;
-    if (text && Math.abs(g - center) <= 0.6 * stepSize) return text;
+    if (text && g >= floor && Math.abs(g - center) <= 0.6 * stepSize) return text;
     if (g < 1.01) {
       center = 1;
       stepSize = 0.01;
+      floor = -Infinity;
       text = 'Toi et la ville, même rythme';
     } else if (g < 1.495) {
       // 1 % à 49 % ; à partir de 1,495 on passe à « ×1,5 ».
       const percent = Math.round((g - 1) * 100);
       center = 1 + percent / 100;
       stepSize = 0.01;
+      floor = -Infinity;
       text = `La ville va ${percent}${NNBSP}% plus vite que toi`;
     } else if (g < 4.75) {
       const x = Math.round(g * 2) / 2;
       center = x;
       stepSize = 0.5;
+      floor = 1.495 - 0.6 * 0.01; // retour aux % dès γ < 1,489
       text = `La ville va ×${formatFactor(x)} plus vite que toi`;
     } else {
       const x = Math.round(g);
       center = x;
       stepSize = 1;
+      floor = 4.75 - 0.6 * 0.5; // retour aux demi-pas dès γ < 4,45
       text = `La ville va ×${x} plus vite que toi`;
     }
     return text;

@@ -6,7 +6,8 @@
  * instantané du joueur, composée relativistement à la vitesse courante
  * (MovementScripts.cs:114-183), et le temps de la ville avance de Δτ·γ
  * (GameState.cs:220-246). Ici, sous forme exacte : état en vitesse propre u = γv,
- * segments hyperboliques (voir `hyperbolicSegment`), donc résultat indépendant du découpage.
+ * segments hyperboliques (voir `hyperbolicSegment`) : exact et indépendant du découpage en
+ * ligne droite et en virage pur, d'ordre 2 en virage avec poussée (voir plus bas).
  *
  * Modèle « voiture arcade » (choix de l'auteur) :
  * - poussée et frein (|a| ≤ A = 10 m/s², en accélération propre) le long du cap ;

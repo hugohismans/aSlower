@@ -16,9 +16,11 @@ import { clampFrameDt } from './physics/player.js';
 
 /**
  * @param {(dtReal: number, dt: number, now: number) => void} frame
+ * @param {{onError?: (error: unknown) => void}} [options] onError : appelé une fois quand une
+ *   exception de `frame` arrête la boucle (prévenir le joueur)
  * @returns {{start(): void, stop(): void, readonly running: boolean, dispose(): void}}
  */
-export function createLoop(frame) {
+export function createLoop(frame, { onError } = {}) {
   let handle = 0;
   /** Horodatage de l'image précédente (ms) ; null : horloge à réinitialiser. */
   let last = null;
@@ -36,6 +38,7 @@ export function createLoop(frame) {
       // Une erreur à chaque image inonderait la console : on arrête la boucle.
       wanted = false;
       halt();
+      onError?.(error);
       throw error;
     }
   }

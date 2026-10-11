@@ -6,7 +6,9 @@
  * l'instant t (temps de la ville), l'observateur en x_obs reçoit la lumière émise à te tel que
  *   c·(t − te) = |x_obs − p(te)|,  te ≤ t.
  * Le cône de lumière est invariant : la vitesse de l'observateur n'intervient pas.
- * Si l'objet va moins vite que la lumière, la racine est unique.
+ * La racine est unique si elle existe ; elle existe si sup|w| < c sur ]−∞, t] (ou si la
+ * position est figée avant un instant donné, comme dans `createHistory`). Sinon (vitesse qui
+ * tend vers c dans le passé, observateur derrière l'horizon), `converged` vaut false.
  *
  * Reprise d'OpenRelativity : la forme fermée du mouvement uniforme est leur équation du
  * second degré (RelativisticObject.cs:316-328, relativity.shader:176-182), réécrite sous une
@@ -17,15 +19,6 @@ import { C } from './constants.js';
 
 /** Pas (s) de la différence finie centrée qui estime la vitesse de l'objet. */
 const DERIVATIVE_STEP = 1e-4;
-
-/**
- * Distance entre deux points {x, y, z} (z absent = 0).
- * @param {{x: number, y: number, z?: number}} a
- * @param {{x: number, y: number, z?: number}} b
- */
-function distance(a, b) {
-  return Math.hypot(a.x - b.x, a.y - b.y, (a.z ?? 0) - (b.z ?? 0));
-}
 
 /**
  * Retard t − te pour un objet en mouvement uniforme de vitesse w, qui est en p à l'instant
@@ -72,7 +65,8 @@ export function retardedTimeUniform(observer, t, p0, w, t0) {
  * Résout te = t − |observer − positionAt(te)|/c (te ≤ t) par Newton sécurisé.
  *
  * On travaille sur le retard d = t − te ≥ 0 : G(d) = d − |observer − p(t − d)|/c est
- * strictement croissante (G' = 1 − n̂·w/c ≥ 1 − β > 0), G(0) ≤ 0, d'où une racine unique.
+ * strictement croissante (G' = 1 − n̂·w/c ≥ 1 − β > 0) et G(0) ≤ 0 : au plus une racine, qui
+ * existe si sup|w| < c sur ]−∞, t] (G croît alors sans borne) ; sinon converged = false.
  * - Amorce : `guess` (te de l'image précédente, par exemple) ou, à défaut, la forme fermée
  *   du mouvement uniforme à la vitesse de l'objet en t (exacte si l'objet est uniforme).
  * - Chaque itération évalue G (et une différence finie centrée pour G'), resserre
@@ -85,7 +79,9 @@ export function retardedTimeUniform(observer, t, p0, w, t0) {
  * @param {(te: number) => {x: number, y: number, z?: number}} positionAt trajectoire (ville)
  * @param {{tolerance?: number, maxIterations?: number, guess?: number}} [options]
  *   tolerance en secondes sur te ; guess : te de départ.
- * @returns {{te: number, iterations: number}} iterations = nombre d'évaluations de G
+ * @returns {{te: number, iterations: number, converged: boolean}} iterations = nombre
+ *   d'évaluations de G ; converged = false si maxIterations est atteint sans convergence
+ *   (te n'a alors pas de sens).
  */
 export function retardedTime(observer, t, positionAt, { tolerance = 1e-5, maxIterations = 30, guess } = {}) {
   /**
@@ -122,6 +118,7 @@ export function retardedTime(observer, t, positionAt, { tolerance = 1e-5, maxIte
   let lo = 0; // G(lo) ≤ 0
   let hi = Infinity; // G(hi) ≥ 0, inconnue au départ
   let iterations = 0;
+  let converged = false;
   while (iterations < maxIterations) {
     iterations++;
     const { p, wx, wy, wz } = sample(d);
@@ -130,7 +127,10 @@ export function retardedTime(observer, t, positionAt, { tolerance = 1e-5, maxIte
     const rz = (observer.z ?? 0) - (p.z ?? 0);
     const r = Math.hypot(rx, ry, rz);
     const g = d - r / C;
-    if (g === 0) break; // résidu nul : d est la racine
+    if (g === 0) {
+      converged = true; // résidu nul : d est la racine
+      break;
+    }
     if (g < 0) lo = d;
     else hi = d;
 
@@ -143,9 +143,12 @@ export function retardedTime(observer, t, positionAt, { tolerance = 1e-5, maxIte
     }
     const change = Math.abs(next - d);
     d = next;
-    if (change <= tolerance) break;
+    if (change <= tolerance) {
+      converged = true;
+      break;
+    }
   }
-  return { te: t - d, iterations };
+  return { te: t - d, iterations, converged };
 }
 
 /**

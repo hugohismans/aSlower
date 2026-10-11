@@ -10,5 +10,5 @@
     "resolveJsonModule": true,
     "types": ["vite/client"]
   },
-  "include": ["src", "tests", "scripts"]
+  "include": ["src"]
 }

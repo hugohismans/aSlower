@@ -61,9 +61,25 @@ export const SUN_TEMPERATURE = 5800;
 /**
  * Effet projecteur : couleur × min(D^BEAM_EXPONENT, BEAM_MAX).
  * Avec la convention de M(D) (facteur D inclus), l'exposant 4 est physique.
+ * BEAM_MAX = 8⁴ : D⁴ exact jusqu'à D = 8 (γ ≈ 4,1 de face), donc sur tous les niveaux prévus ;
+ * la borne reste (cahier des charges) et garde les valeurs loin du maximum half float (65 504).
+ * La luminosité d'ensemble est rendue par l'adaptation (spectrum.adaptationExposure).
  */
 export const BEAM_EXPONENT = 4;
-export const BEAM_MAX = 8;
+export const BEAM_MAX = 4096;
+
+/**
+ * Façade de référence de l'adaptation de l'œil (r, g, b, ir, uv) : gris moyen, ir et uv
+ * moyens de la palette. L'exposition garde sa luminance de face égale à celle du repos.
+ */
+export const ADAPTATION_REFERENCE = Object.freeze([0.6, 0.6, 0.6, 0.3, 0.15]);
+
+/**
+ * Ciel dégagé à spectre continu : ρ(λ) ∝ (550/λ)⁴ + SKY_AEROSOL_FRACTION·(550/λ)^1,3, nul sous
+ * 295 nm (ozone), de luminance SKY_CLEAR_LUMINANCE au repos.
+ */
+export const SKY_AEROSOL_FRACTION = 0.35;
+export const SKY_CLEAR_LUMINANCE = 0.186;
 
 /** Tone mapping qui préserve la teinte : identité jusqu'au genou, compression douce au-delà. */
 export const TONEMAP_KNEE = 0.75;
@@ -74,11 +90,12 @@ export const LUT_LOG2_RANGE = 4.5;
 
 /**
  * Lignes de la LUT : 5 colonnes de M(D) (réflectances r, g, b, IR, UV), puis une
- * ligne par température de corps noir (lampadaires, ciel).
+ * ligne par température de corps noir (lampadaires, ciel), puis le ciel dégagé.
  */
 export const LUT_ROWS = Object.freeze({ r: 0, g: 1, b: 2, ir: 3, uv: 4 });
 export const BLACKBODY_TEMPERATURES = Object.freeze([2700, 6500]);
-export const LUT_HEIGHT = 5 + BLACKBODY_TEMPERATURES.length;
+export const SKY_CLEAR_ROW = 5 + BLACKBODY_TEMPERATURES.length;
+export const LUT_HEIGHT = SKY_CLEAR_ROW + 1;
 
 /** Ligne de la LUT pour un corps noir de température T (doit figurer dans BLACKBODY_TEMPERATURES). */
 export function blackbodyRow(T) {

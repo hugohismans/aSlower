@@ -2,6 +2,7 @@
 // Les références (𝐍, intégrales, facteur Doppler) sont recalculées ici de façon
 // indépendante : autre pas d'intégration, D = √((1 + β)/(1 − β)) écrit à la main.
 import { describe, it, expect, beforeAll } from 'vitest';
+import palette from '../src/data/palette.json';
 import {
   cmfWyman,
   planck,
@@ -16,6 +17,8 @@ import {
   toneMap,
   perceivedColor,
   classifyHue,
+  clearSkyColor,
+  adaptationExposure,
   buildDopplerLutData,
   sampleLutLikeGpu,
   halfFloatBits,
@@ -37,6 +40,8 @@ import {
   LUT_HEIGHT,
   BLACKBODY_TEMPERATURES,
   blackbodyRow,
+  ADAPTATION_REFERENCE,
+  SKY_CLEAR_ROW,
 } from '../src/physics/constants.js';
 
 /* ---------------------------- Outils de référence ---------------------------- */
@@ -300,7 +305,8 @@ describe('gamut, projecteur, tone mapping', () => {
     expect(beamFactor(1)).toBe(1);
     expect(beamFactor(1.2)).toBeCloseTo(1.2 ** 4, 12);
     expect(beamFactor(0.5)).toBeCloseTo(0.0625, 12);
-    expect(beamFactor(3)).toBe(BEAM_MAX);
+    expect(beamFactor(9)).toBe(BEAM_MAX);
+    expect(beamFactor(4.36)).toBeCloseTo(4.36 ** 4, 9); // 90 m/s de face : D⁴ non borné
     expect(beamFactor(2, 2, 10)).toBe(4);
   });
 
@@ -374,6 +380,9 @@ describe('classifyHue', () => {
       const D = dopplerHeadOn(v);
       const lambdaSeen = 640 / D;
       const isGreen = classifyHue(perceivedColor({ kind: 'line', lambda: 640 }, D)) === 'vert';
+      // Même fenêtre avec l'adaptation de l'écran (règle de porte du jeu).
+      const adapted = perceivedColor({ kind: 'line', lambda: 640 }, D, { exposure: adaptationExposure(D) });
+      expect(classifyHue(adapted) === 'vert', `v = ${v} m/s (adaptation)`).toBe(isGreen);
       if (lambdaSeen >= 513 && lambdaSeen <= 559) expect(isGreen, `v = ${v} m/s`).toBe(true);
       if (lambdaSeen < 507 || lambdaSeen > 565) expect(isGreen, `v = ${v} m/s`).toBe(false);
       if (isGreen) greenSpeeds.push(v);
@@ -527,8 +536,8 @@ describe('LUT Doppler', () => {
   it('accepte une taille, une plage et des températures personnalisées', () => {
     const small = buildDopplerLutData({ size: 9, log2Range: 1, temperatures: [3000] });
     expect(small.width).toBe(9);
-    expect(small.height).toBe(6);
-    expect(small.data.length).toBe(9 * 6 * 4);
+    expect(small.height).toBe(7);
+    expect(small.data.length).toBe(9 * 7 * 4);
     expect(maxDiff(sampleLutLikeGpu(small, 1, 5), blackbodyColor(1, 3000))).toBeLessThan(2e-3);
   });
 });
@@ -554,5 +563,63 @@ describe('préréglage OpenRelativity (comparaison)', () => {
     expect(luminance(openRelativityColor([1, 1, 1], D))).toBeLessThan(0.02);
     const ours = luminance(apply(colorMatrix(D), [1, 1, 1, 0.3, 0.3])) * beamFactor(D);
     expect(ours).toBeGreaterThan(0.2);
+  });
+});
+
+describe('projecteur physique et adaptation (revue J1)', () => {
+  const lumAhead = (rho, D) => luminance(gamutMap(apply(colorMatrix(D), rho))) * beamFactor(D);
+
+  it('façades de face : plus lumineuses à 90 m/s qu’à 48 m/s (BEAM_MAX = 8 inversait l’ordre)', () => {
+    for (const hex of [...Object.values(FACADES), 'EDE6D6']) {
+      const rho = [...srgbHexToLinear(hex), 0.3, 0.1];
+      const at48 = lumAhead(rho, dopplerHeadOn(47.7));
+      const at90 = lumAhead(rho, dopplerHeadOn(90));
+      expect(at90 / at48, hex).toBeGreaterThan(3);
+      // l'ancienne borne : 90 m/s plus sombre que 48 m/s
+      const old = (D) => luminance(gamutMap(apply(colorMatrix(D), rho))) * beamFactor(D, 4, 8);
+      expect(old(dopplerHeadOn(90)) / old(dopplerHeadOn(47.7)), hex).toBeLessThan(0.5);
+    }
+  });
+
+  it('adaptation : la façade de référence vue de face garde sa luminance de repos', () => {
+    expect(adaptationExposure(1)).toBe(1);
+    expect(adaptationExposure(0.5)).toBe(1);
+    const rest = luminance(ADAPTATION_REFERENCE);
+    let previous = 1;
+    for (const v of [5, 20, 30, 50, 76.16, 90, 95]) {
+      const D = dopplerHeadOn(v);
+      const E = adaptationExposure(D);
+      expect(E).toBeLessThan(previous);
+      previous = E;
+      expect(Math.abs((lumAhead(ADAPTATION_REFERENCE, D) * E) / rest - 1)).toBeLessThan(2e-3);
+      expect(E).toBeLessThanOrEqual(1);
+    }
+  });
+
+  it('ciel dégagé continu : luminance de repos, bleu sans fausses teintes, pas de creux vers D = 2', () => {
+    expect(luminance(clearSkyColor(1))).toBeCloseTo(0.186, 6);
+    let previous = 0;
+    for (let D = 1; D <= 4.5; D += 0.05) {
+      const c = clearSkyColor(D);
+      if (D <= 2.5) expect(classifyHue(c.map((x) => x * 3)), `D = ${D}`).toBe('bleu');
+      const y = luminance(c) * D ** 4;
+      expect(y, `D = ${D}`).toBeGreaterThan(previous);
+      previous = y;
+    }
+    const lut = buildDopplerLutData();
+    expect(maxDiff(sampleLutLikeGpu(lut, 1, SKY_CLEAR_ROW), clearSkyColor(1))).toBeLessThan(1e-3);
+  });
+
+  it('palette : au-delà de D = 830/360, les façades restent distinctes par leur proche IR', () => {
+    // À D = 3, seule la base IR tombe dans le visible : avec ir = 0,3 partout, rapport 1,000.
+    const names = ['rouge', 'orange', 'jaune', 'vert', 'cyan', 'bleu', 'violet'];
+    const lums = names.map((n) => {
+      const { srgb, ir, uv } = palette[n];
+      return lumAhead([...srgbHexToLinear(srgb.slice(1)), ir, uv], 3);
+    });
+    expect(Math.max(...lums) / Math.min(...lums)).toBeGreaterThanOrEqual(3);
+    // La moyenne des façades reste proche de la référence d'adaptation (ir 0,3).
+    const meanIr = names.reduce((s, n) => s + palette[n].ir, 0) / names.length;
+    expect(Math.abs(meanIr - ADAPTATION_REFERENCE[3])).toBeLessThan(0.05);
   });
 });

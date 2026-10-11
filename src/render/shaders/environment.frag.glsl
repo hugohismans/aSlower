@@ -7,8 +7,9 @@
 //    direction monde n : D = 1/(γ(1 − β·n')), n = (n' + (γ²/(γ+1)(β·n') − γ)β)·D ;
 // 2. intersection analytique avec le sol (Three : y = 0, œil à uEyeHeight), SANS branchement
 //    avant la lecture de texture, puis carte des rues (repère du jeu, uStreetBounds) ;
-// 3. ciel en dégradé (horizon : ligne de LUT uSkyRow ; zénith : bleu de Rayleigh), disque
-//    solaire, brume à l'horizon ; brouillard du sol en distance monde, mélangé avant le Doppler ;
+// 3. ciel en dégradé (horizon : ligne de LUT uSkyRow ; zénith : ciel dégagé à spectre continu,
+//    ligne de LUT uSkyClearRow), disque solaire, brume à l'horizon ; brouillard du sol en
+//    distance monde, mélangé avant le Doppler ;
 // 4. même fin de chaîne que les façades (LUT, gamut, projecteur, tone mapping, sRGB).
 // Miroir JS : physics/relativity.js (aberrateInverse), vérifié par tests/render-math.test.js.
 #include <rel_fog>
@@ -19,6 +20,7 @@ uniform sampler2D uStreetMap;     // carte des rues (sRGB, décodée en linéair
 uniform highp vec4 uStreetBounds; // (xmin, ymin, xmax, ymax) du jeu couverts par la carte
 uniform highp vec3 uSunDir;       // direction du soleil (monde, repère Three, unitaire)
 uniform float uSkyRow;            // ligne de LUT de la lumière du ciel (corps noir)
+uniform float uSkyClearRow;       // ligne de LUT du ciel dégagé (spectre continu)
 uniform vec2 uGroundIrUv;         // réflectances ir, uv du sol, en fraction de sa luminance
 
 varying highp vec3 vRay;
@@ -26,13 +28,12 @@ varying highp vec3 vRay;
 // Ciel dégagé, en dégradé de l'horizon au zénith :
 // - près de l'horizon, lumière diffuse blanche (longs trajets, diffusion multiple) : corps noir
 //   de la ligne uSkyRow (6 500 K), luminance SKY_HORIZON ;
-// - vers le zénith, diffusion de Rayleigh du soleil (∝ λ⁻⁴) : réflectances moyennes de λ⁻⁴ sur
-//   chaque bande (b ≈ 3,0 ; g ≈ 1,1 ; r ≈ 0,40 ; ir ≈ 0,04 ; uv ≈ 4,5, coupé vers 280 nm),
-//   mises à l'échelle pour une luminance ≈ 0,19 du blanc éclairé ; décalées par M(D).
+// - vers le zénith, lumière du soleil diffusée par l'air (Rayleigh, ∝ λ⁻⁴) et les aérosols
+//   (∝ λ^−1,3), nulle sous 295 nm (ozone) : spectre CONTINU (spectrum.clearSkyColor), tabulé
+//   dans la ligne uSkyClearRow de la LUT, de luminance SKY_CLEAR_LUMINANCE (0,186) au repos.
+//   Décalé, il reste bleu et lisse : pas de fausses teintes aux bords des 5 bandes.
 const float SKY_HORIZON = 0.55;
-const vec3 RAYLEIGH_RGB = vec3(0.067, 0.188, 0.515);
-const vec2 RAYLEIGH_IR_UV = vec2(0.007, 0.77);
-const float ZENITH_HEIGHT = 0.6;     // le bleu de Rayleigh domine au-dessus de ≈ 37°
+const float ZENITH_HEIGHT = 0.6;     // le bleu du ciel dégagé domine au-dessus de ≈ 37°
 const float HAZE_HEIGHT = 0.12;      // le ciel sort de la brume sur ≈ 7° au-dessus de l'horizon
 const float SUN_COS_OUTER = 0.99990; // disque solaire : bord flou entre ≈ 0,5° et 0,8°
 const float SUN_COS_INNER = 0.99996;
@@ -68,13 +69,13 @@ void main() {
   vec3 groundRgb = mix(ground, uFogSpec, fog);
   vec2 groundIrUv = mix(uGroundIrUv * dot(ground, REL_LUMA), uFogIrUv, fog);
 
-  // --- Ciel : brume près de l'horizon, puis ciel dégagé en dégradé (blanc → bleu de Rayleigh).
+  // --- Ciel : brume près de l'horizon, puis ciel dégagé en dégradé (blanc → bleu du ciel dégagé).
   float isGround = step(0.0, down);
   float up = max(n.y, 0.0);
   float clearSky = (1.0 - isGround) * smoothstep(0.0, HAZE_HEIGHT, up); // 0 : brume, 1 : dégagé
   float zenith = smoothstep(0.0, ZENITH_HEIGHT, up);                   // 0 : horizon, 1 : zénith
-  vec3 skyRgb = uFogSpec * (1.0 - clearSky) + RAYLEIGH_RGB * (clearSky * zenith);
-  vec2 skyIrUv = uFogIrUv * (1.0 - clearSky) + RAYLEIGH_IR_UV * (clearSky * zenith);
+  vec3 skyRgb = uFogSpec * (1.0 - clearSky);
+  vec2 skyIrUv = uFogIrUv * (1.0 - clearSky);
 
   // Soleil (corps noir à la température du soleil) : réflectance 1 dans les 5 bandes,
   // c'est-à-dire exactement le spectre solaire, décalé par M(D) comme le reste.
@@ -85,7 +86,8 @@ void main() {
   vec3 rho = mix(skyRgb, groundRgb, isGround) + vec3(sun);
   vec2 rhoIrUv = mix(skyIrUv, groundIrUv, isGround) + vec2(sun);
   vec3 c = relSurfaceColor(rho, rhoIrUv, D);
-  c += (clearSky * (1.0 - zenith) * SKY_HORIZON) * relLutRow(D, uSkyRow);
+  c += (clearSky * (1.0 - zenith) * SKY_HORIZON) * relLutRow(D, uSkyRow)
+     + (clearSky * zenith) * relLutRow(D, uSkyClearRow);
 
   gl_FragColor = vec4(relFinish(c, D), 1.0);
   #include <colorspace_fragment>

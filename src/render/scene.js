@@ -22,8 +22,8 @@ import { EYE_HEIGHT } from '../physics/constants.js';
 import { setCameraVisibility } from './camera.js';
 import { DEFAULT_LOD_STEPS, buildCity } from './cityMesher.js';
 import { createCockpit } from './cockpit.js';
-import { chunkDistance, isChunkVisible } from './culling.js';
-import { apparentNearestDistance, chooseLod } from './lod.js';
+import { chunkDistance } from './culling.js';
+import { apparentNearestDistance, chooseLod, shouldReleaseLod0 } from './lod.js';
 import {
   createClassicVariant,
   createEmitterMaterial,
@@ -152,6 +152,14 @@ export function createWorld(renderer, sceneJson, palette, { tier = 'default', lo
     }
   }
 
+  /** Libère le LOD 0 d'un îlot qui ne l'affiche pas, s'il est loin (mémoire CPU et GPU). */
+  function releaseLod0(entry, distance) {
+    if (entry.built.has(0) && shouldReleaseLod0(entry.lod, distance)) {
+      entry.chunk.release(0);
+      entry.built.delete(0);
+    }
+  }
+
   /** Bascule tous les meshes sur les matériaux relativistes ou « vision classique ». */
   function useClassic(on) {
     if (on === classic) return;
@@ -201,14 +209,16 @@ export function createWorld(renderer, sceneJson, palette, { tier = 'default', lo
 
       const visible = [];
       for (const entry of entries) {
-        if (isChunkVisible(entry.chunk, eye, visibilityFar)) {
-          entry.distance = chunkDistance(entry.chunk, eye);
+        const distance = chunkDistance(entry.chunk, eye);
+        if (distance <= visibilityFar) {
+          entry.distance = distance;
           visible.push(entry);
         } else if (entry.mesh) {
           entry.mesh.visible = false;
+          releaseLod0(entry, Infinity);
         }
       }
-      visible.sort((a, b) => a.distance - b.distance);
+      visible.sort((a, b) => (a.distance < b.distance ? -1 : a.distance > b.distance ? 1 : 0));
 
       const budget = primed ? GENERATION_BUDGET_MS : Infinity;
       primed = true;
@@ -231,8 +241,11 @@ export function createWorld(renderer, sceneJson, palette, { tier = 'default', lo
             showLod(entry, coarsest);
           }
         }
+        releaseLod0(entry, entry.distance);
         entry.mesh.visible = true;
-        entry.mesh.userData.r = entry.distance;
+        // Distance à l'œil en cm, ENTIÈRE : sous V8, lire un flottant dans le comparateur du
+        // tri des opaques l'alloue (≈ 23 Ko par image) ; un petit entier, non.
+        entry.mesh.userData.r = Math.round(entry.distance * 100);
         lodCounts[entry.lod] += 1;
       }
       lastStats = { visibleChunks: visible.length, lodCounts, generated, generationMs: performance.now() - start };

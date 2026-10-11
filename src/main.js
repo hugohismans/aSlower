@@ -321,6 +321,9 @@ const dom = {
   noticeActions: $('notice-actions'),
 };
 
+// Safari iOS ignore user-scalable=no : pas de pincement, sur toute la page (titre, pause, Crédits).
+document.addEventListener('gesturestart', (event) => event.preventDefault());
+
 const params = new URLSearchParams(window.location.search);
 const requestedScene = params.get('scene');
 const sceneId = requestedScene && requestedScene in SCENES ? requestedScene : DEFAULT_SCENE;
@@ -355,7 +358,19 @@ let game = null;
 /** Intervalle moyen entre images (s), pour les i/s du HUD en ?diag. */
 let averageDt = NaN;
 
-const loop = createLoop(frame);
+const loop = createLoop(frame, {
+  // Exception dans une image : la boucle s'est arrêtée ; sans console sur GSM, on le dit.
+  onError: () => {
+    mode = 'error';
+    controls.setEnabled(false);
+    hud.hide();
+    showNotice({
+      title: "Le jeu s'est arrêté",
+      text: 'Une erreur inattendue a interrompu le jeu. Recharge la page pour reprendre.',
+      actions: [{ label: 'Recharger', primary: true, onClick: () => window.location.reload() }],
+    });
+  },
+});
 
 /** Affiche le panneau générique (#notice) avec ses boutons. */
 function showNotice({ title, text, actions = [] }) {
@@ -412,6 +427,15 @@ portrait.addEventListener('change', (event) => {
   if (event.matches) pause();
 });
 
+/** Fenêtre en portrait sur un écran en paysage : « Agrandis la fenêtre » au lieu de « Tourne ton GSM ». */
+function updateWindowShape() {
+  const landscapeScreen = window.screen.orientation?.type.startsWith('landscape') ?? false;
+  document.documentElement.dataset.fenetre = portrait.matches && landscapeScreen ? 'etroite' : '';
+}
+updateWindowShape();
+portrait.addEventListener('change', updateWindowShape);
+window.screen.orientation?.addEventListener('change', updateWindowShape);
+
 /* --- Création du jeu ------------------------------------------------------- */
 
 /** Monde, caméra, joueur ; préchauffage des programmes derrière l'écran de chargement. */
@@ -456,7 +480,9 @@ async function createGame() {
 
   watchContextLoss(renderer, {
     timeoutMs: CONTEXT_RESTORE_TIMEOUT_MS,
+    // Après une erreur (mode 'error'), le panneau « Le jeu s'est arrêté » reste affiché.
     onLost: () => {
+      if (mode === 'error') return;
       if (mode === 'playing' || mode === 'paused') {
         mode = 'lost';
         controls.setEnabled(false);
@@ -467,6 +493,7 @@ async function createGame() {
       });
     },
     onRestored: async () => {
+      if (mode === 'error') return;
       showNotice({ title: 'Affichage interrompu', text: "Préparation de l'affichage…" });
       await world.warmup(camera); // three a tout réinitialisé : recompilation, données renvoyées
       if (mode !== 'lost') {
@@ -478,6 +505,7 @@ async function createGame() {
       else pause(); // le joueur reprend quand il est prêt
     },
     onRestoreTimeout: () => {
+      if (mode === 'error') return;
       showNotice({
         title: 'Affichage interrompu',
         text: "Le navigateur n'a pas rendu la carte graphique au jeu. Recharge la page pour reprendre.",

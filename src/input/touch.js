@@ -101,6 +101,12 @@ export function createTouch(rootElement, { mode = 'drag' } = {}) {
     return true;
   }
 
+  /** Doigts de l'accélérateur glissés sur la pédale : ils freinent (capturés par l'accélérateur). */
+  const slidOnBrake = new Set();
+  /** Rectangle de la pédale, lu au pointerdown de l'accélérateur (jamais dans la boucle d'images). */
+  let brakeRect = null;
+  const brakeHeld = () => holds.get('brake').size > 0 || slidOnBrake.size > 0;
+
   // Zones « à maintenir » : accélérateur, frein, vision classique.
   for (const name of HOLD_CONTROLS) {
     const el = elements.get(name);
@@ -108,13 +114,27 @@ export function createTouch(rootElement, { mode = 'drag' } = {}) {
     listen(el, 'pointerdown', (event) => {
       if (!accept(event, el)) return;
       pointers.add(event.pointerId);
+      if (name === 'thrust') brakeRect = elements.get('brake')?.getBoundingClientRect() ?? null;
       setActive(el, true);
     });
     const release = (event) => {
-      if (pointers.delete(event.pointerId) && pointers.size === 0) setActive(el, false);
+      if (name === 'thrust' && slidOnBrake.delete(event.pointerId)) setActive(elements.get('brake'), brakeHeld());
+      if (pointers.delete(event.pointerId) && pointers.size === 0) setActive(el, name === 'brake' ? brakeHeld() : false);
     };
     for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) listen(el, type, release);
   }
+
+  // Le pouce glisse de l'accélérateur sur la pédale : il freine ; s'il en ressort, il réaccélère.
+  listen(elements.get('thrust'), 'pointermove', (event) => {
+    if (!brakeRect || !holds.get('thrust').has(event.pointerId)) return;
+    const r = brakeRect;
+    const over = event.clientX >= r.left && event.clientX <= r.right && event.clientY >= r.top && event.clientY <= r.bottom;
+    if (over === slidOnBrake.has(event.pointerId)) return;
+    if (over) slidOnBrake.add(event.pointerId);
+    else slidOnBrake.delete(event.pointerId);
+    setActive(elements.get('brake'), brakeHeld());
+    setActive(elements.get('thrust'), holds.get('thrust').size > slidOnBrake.size);
+  });
 
   // Volant à origine flottante.
   const steerZone = elements.get('steer');
@@ -142,6 +162,7 @@ export function createTouch(rootElement, { mode = 'drag' } = {}) {
   listen(rootElement, 'gesturestart', (event) => event.preventDefault());
 
   function releaseAll() {
+    slidOnBrake.clear();
     for (const [name, pointers] of holds) {
       pointers.clear();
       setActive(elements.get(name), false);
@@ -153,8 +174,8 @@ export function createTouch(rootElement, { mode = 'drag' } = {}) {
   return {
     read() {
       return {
-        thrust: holds.get('thrust').size > 0 ? 1 : 0,
-        brake: holds.get('brake').size > 0 ? 1 : 0,
+        thrust: holds.get('thrust').size > slidOnBrake.size ? 1 : 0,
+        brake: brakeHeld() ? 1 : 0,
         steer: steerValue(),
         classic: holds.get('classic').size > 0,
       };
