@@ -2,7 +2,7 @@
 
 > Contrat entre modules (signatures, repères, attributs, imports permis) : [`docs/interfaces.md`](interfaces.md). En cas de désaccord sur une signature, c'est le contrat qui fait foi ; ce document donne le pourquoi.
 
-Statut : **jalon 1 en cours** (plan validé ; décisions de l'auteur du 2026-10-11 intégrées, voir §11). Le dépôt `hugohismans/aSlower` est public ; GitHub Pages y est publié en mode « GitHub Actions ». Les prototypes jetables du bac à sable (§0) ont servi de base au code du jalon 1. Publication sur <https://hugohismans.github.io/aSlower/> (la casse de l'URL compte).
+Statut : **jalon 1 terminé** le 2026-10-11, prochain : jalon 2 (plan validé ; décisions de l'auteur du 2026-10-11 intégrées, voir §11). Le dépôt `hugohismans/aSlower` est public ; GitHub Pages y est publié en mode « GitHub Actions ». Les prototypes jetables du bac à sable (§0) ont servi de base au code du jalon 1. Publication sur <https://hugohismans.github.io/aSlower/> (la casse de l'URL compte).
 
 Méthode : six analyses en parallèle (shaders et physique d'OpenRelativity, mathématiques, rendu Three.js, outillage et contrôles, game design), puis une relecture critique sous quatre angles. Chaque objection a été contre-vérifiée et tous les chiffres ci-dessous ont été recalculés par script.
 
@@ -501,6 +501,12 @@ aSlower/
 ## 9. Jalons
 
 ### J1 : socle physique et rendu
+
+**Bilan (2026-10-11) : terminé.** 292 tests verts, CI et Pages en ligne, vision classique identique au pixel près
+au rendu sans effets. Mesure `?bench` sur l'iPhone 14 Pro Max de l'auteur (Safari, DPR 2, profil normal) :
+avenue 59 i/s, image p95 17 ms (max 68 ms), 39 appels, 21,7 k triangles ; quartier 59 i/s, p95 17 ms
+(max 34 ms), 211 appels, 110 k triangles ; CPU du rendu ≤ 2 ms au p95. Commandes tactiles et virage validés
+par l'auteur. Reste à mesurer : un GSM Android moyen (J2).
 Un seul jalon à valider. Chaque étape est publiée sur Pages et jouable sur le GSM.
 
 | Étape | Contenu |
