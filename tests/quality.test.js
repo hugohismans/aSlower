@@ -7,7 +7,7 @@ import { armBootGuard, confirmBoot, createQuality, LITE_TTL_MS, startBootGuard }
 const T0 = 1_000_000_000_000;
 
 beforeEach(() => {
-  for (const key of ['gl-boot', 'gl-crash', 'gl-tier']) {
+  for (const key of ['gl-boot', 'gl-crash', 'gl-tier', 'gl-boot-v2', 'gl-crash-v2', 'gl-tier-v2']) {
     local.remove(key);
     session.remove(key);
   }
@@ -43,10 +43,27 @@ describe('garde-fou de démarrage', () => {
     expect(startBootGuard(T0).crashes).toBe(0);
   });
 
-  it('ancien format (« lite » sans échéance) : profil normal', () => {
+  it('états des versions précédentes ignorés et effacés', () => {
     local.set('gl-tier', 'lite');
-    expect(startBootGuard(T0).tier).toBe('default');
+    local.set('gl-boot', true);
+    session.set('gl-boot', true);
+    local.set('gl-crash', 1);
+    expect(startBootGuard(T0)).toEqual({ crashes: 0, tier: 'default' });
     expect(local.get('gl-tier', null)).toBe(null);
+    expect(local.get('gl-boot', null)).toBe(null);
+  });
+
+  it('un drapeau resté seulement en stockage local (onglet fermé) ne compte pas', () => {
+    local.set('gl-boot-v2', true);
+    expect(startBootGuard(T0).crashes).toBe(0);
+  });
+
+  it('?qualite=normale oublie le profil « lite »', () => {
+    armBootGuard();
+    expect(startBootGuard(T0).tier).toBe('lite');
+    const q = createQuality({ search: '?qualite=normale', deviceDpr: 3 });
+    expect(q.tier).toBe('default');
+    expect(q.dpr).toBe(2);
   });
 
   it('createQuality : DPR 2 au plus sans plantage', () => {

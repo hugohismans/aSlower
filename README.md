@@ -102,6 +102,7 @@ Paramètres d'URL (combinables, par exemple `?scene=quartier-test&bench&dpr=1`) 
 | `?diag` | panneau de diagnostic : images par seconde, temps d'image p50 et p95, temps CPU du rendu, appels de dessin, triangles, durée de la première image, GPU, DPR. La touche E (ou la case du panneau) coupe et rétablit la passe ciel/sol, pour mesurer son coût |
 | `?bench` | parcours de mesure automatique et déterministe (aucune entrée, pas fixe de 1/60 s par image), avec le panneau de diagnostic. Sur `avenue-test` : poussée pleine jusqu'à γ ≈ 2,5, puis freinage jusqu'à l'arrêt. Sur `quartier-test` : caméra scriptée le long d'une rue, β imposé de 0 à 0,92. À la fin, le panneau affiche p50/p95 des temps d'image, le CPU du rendu, les appels de dessin et triangles maximaux ; le résultat complet est dans `window.__benchResult` (et la console). Ajouter `&sansciel` mesure le même parcours sans la passe ciel/sol (coût de la passe par différence) |
 | `?dpr=1.5` | impose le rapport de pixels (de 0,25 à 4) ; sinon min(devicePixelRatio, 2), plafonné à 2,2 millions de pixels |
+| `?qualite=normale` | oublie un plantage mémorisé et quitte le profil « lite » (DPR 0,75, sans anticrénelage) |
 
 **Publication** : chaque push sur `main` lance le workflow
 [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) : `npm ci`, `npm test`,

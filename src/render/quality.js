@@ -3,10 +3,11 @@
  *
  * - DPR par défaut : min(devicePixelRatio, 2), plafonné pour ne pas dépasser MAX_PIXELS
  *   pixels physiques (iPhone 14 Pro Max en paysage : 932 × 430 px CSS à DPR 2 ≈ 1,6 Mpx).
- * - `?dpr=` dans l'URL impose le DPR (mesures, captures).
+ * - `?dpr=` dans l'URL impose le DPR (mesures, captures) ; `?qualite=normale` oublie les
+ *   plantages mémorisés et le profil « lite ».
  * - Garde-fou : un drapeau `gl-boot` est posé par armBootGuard() juste avant de créer le
  *   renderer (pas à l'ouverture de la page : quitter l'écran titre n'est pas un plantage),
- *   en stockage local ET de session (storage.js, clés préfixées « aslower:v1: »), et retiré
+ *   en stockage de session (storage.js, clés préfixées « aslower:v1: »), et retiré
  *   par confirmBoot() une fois les premières images affichées, ou si la page est cachée ou
  *   fermée. S'il est encore là au démarrage suivant, la page a planté pendant le démarrage :
  *   - 1er plantage : profil « lite » (DPR 0,75, sans MSAA), mémorisé dans `gl-tier` pendant
@@ -26,9 +27,12 @@ export const DPR_LITE = 0.75;
 const DPR_OVERRIDE_MIN = 0.25;
 const DPR_OVERRIDE_MAX = 4;
 
-const KEY_BOOT = 'gl-boot';
-const KEY_CRASH = 'gl-crash';
-const KEY_TIER = 'gl-tier';
+// Clés « v2 » : les états des versions précédentes (drapeau posé dès l'écran titre,
+// profil « lite » sans échéance) ne sont plus lus, et sont effacés au chargement.
+const KEY_BOOT = 'gl-boot-v2';
+const KEY_CRASH = 'gl-crash-v2';
+const KEY_TIER = 'gl-tier-v2';
+const LEGACY_KEYS = ['gl-boot', 'gl-crash', 'gl-tier'];
 
 /** Durée du profil « lite » après un plantage (ms) : 3 jours, puis nouvel essai normal. */
 export const LITE_TTL_MS = 3 * 24 * 3600 * 1000;
@@ -87,7 +91,14 @@ export function resolvePixelRatio(quality, cssWidth, cssHeight) {
  * @returns {{crashes: number, tier: 'default' | 'lite'}}
  */
 export function startBootGuard(now = Date.now()) {
-  const pending = Boolean(local.get(KEY_BOOT, false) || session.get(KEY_BOOT, false));
+  for (const key of LEGACY_KEYS) {
+    local.remove(key);
+    session.remove(key);
+  }
+  // Drapeau en stockage de SESSION seulement : après un vrai plantage, iOS recharge la page
+  // dans le même onglet (la session survit) ; un onglet ou un navigateur intégré fermé
+  // sur l'écran titre, lui, n'en laisse aucune trace.
+  const pending = Boolean(session.get(KEY_BOOT, false));
   let crashes = Number(local.get(KEY_CRASH, 0)) || 0;
   if (pending) {
     crashes += 1;
@@ -108,7 +119,6 @@ export function startBootGuard(now = Date.now()) {
  * (ce n'est pas un plantage du démarrage).
  */
 export function armBootGuard() {
-  local.set(KEY_BOOT, true);
   session.set(KEY_BOOT, true);
   if (typeof window !== 'undefined') {
     window.addEventListener('pagehide', clearBootFlag, { once: true });
@@ -125,6 +135,15 @@ export function confirmBoot() {
 }
 
 /**
+ * Oublie les plantages et le profil « lite » mémorisés (paramètre d'URL `?qualite=normale`).
+ */
+export function resetBootGuard() {
+  local.remove(KEY_CRASH);
+  local.remove(KEY_TIER);
+  session.remove(KEY_BOOT);
+}
+
+/**
  * Qualité de cette session (à appeler UNE fois, avant de créer le renderer : elle
  * déclenche le garde-fou de démarrage).
  * @param {{search?: string, deviceDpr?: number}} [options]
@@ -134,6 +153,7 @@ export function createQuality({ search, deviceDpr } = {}) {
   const hasWindow = typeof window !== 'undefined';
   const query = search ?? (hasWindow ? window.location.search : '');
   const device = deviceDpr ?? (hasWindow ? window.devicePixelRatio || 1 : 1);
+  if (new URLSearchParams(query).get('qualite') === 'normale') resetBootGuard();
   const { crashes, tier } = startBootGuard();
   return {
     tier,
@@ -147,6 +167,5 @@ export function createQuality({ search, deviceDpr } = {}) {
 }
 
 function clearBootFlag() {
-  local.remove(KEY_BOOT);
   session.remove(KEY_BOOT);
 }
