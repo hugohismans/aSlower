@@ -34,6 +34,7 @@ import {
 } from './materials.js';
 import { warmup } from './renderer.js';
 import { createStreetMap } from './streetMap.js';
+import { groundDetailFor } from './streetPlan.js';
 import { REL, setStreetMap, setVisibility, updateObserver } from './uniforms.js';
 
 /** Temps de maillage permis par image (ms) ; au moins un îlot est maillé par image. */
@@ -73,13 +74,16 @@ function headingGap(snapshot) {
  * @param {any} sceneJson scène de src/data/scenes/ (schéma « coursier-scene/1 »)
  * @param {Record<string, {srgb: string, ir?: number, uv?: number}>} palette src/data/palette.json
  * @param {{tier?: 'default' | 'lite', lodSteps?: number[], physics?: {lengthUnit: number},
- *          level?: import('./levelObjects.js').LevelView | null}} [options]
+ *          level?: import('./levelObjects.js').LevelView | null,
+ *          groundDetail?: 'full' | 'lite' | 'off'}} [options]
  *   profil de qualité (choisit la visibilité « lite » ou « defaut » de la scène) ; pas des LOD
  *   (m) ; constantes physiques de la partie (physicsFor(c)) : la scène est développée pour
  *   leur unité de longueur L (défaut : réglage par défaut) ; level : vue statique d'un niveau
- *   (zones, clients, portes, lampes : render/levelObjects.js), mise à jour par updateLevel
+ *   (zones, clients, portes, lampes : render/levelObjects.js), mise à jour par updateLevel ;
+ *   groundDetail : détail de la carte des rues ('full', 'lite' ou 'off' : voir
+ *   streetPlan.groundDetailFor et `?solDetail=0`) ; par défaut, celui du profil
  */
-export function createWorld(renderer, sceneJson, palette, { tier = 'default', lodSteps, physics, level = null } = {}) {
+export function createWorld(renderer, sceneJson, palette, { tier = 'default', lodSteps, physics, level = null, groundDetail } = {}) {
   const city = buildCity(sceneJson, palette, {
     ...(lodSteps ? { lodSteps } : {}),
     ...(physics ? { lengthUnit: physics.lengthUnit } : {}),
@@ -92,14 +96,22 @@ export function createWorld(renderer, sceneJson, palette, { tier = 'default', lo
   setVisibility(FOG_NEAR_FRACTION * visibilityFar, visibilityFar);
 
   // Carte des rues AVANT les matériaux : pas de sol uni provisoire.
-  const streetMap = createStreetMap(city.streets, city.bounds, { buildings: city.buildings });
+  // Pelouses et pieds d'arbres : facultatifs (city.greens, city.vegetation, s'ils existent).
+  const vegetationEntry = palette.vegetation;
+  const streetMap = createStreetMap(city.streets, city.bounds, {
+    buildings: city.buildings,
+    detail: groundDetail ?? groundDetailFor('', tier),
+    greens: city.greens ?? [],
+    vegetation: city.vegetation ?? [],
+    ...(vegetationEntry ? { lawnColor: vegetationEntry.srgb } : {}),
+  });
   setStreetMap(streetMap, city.bounds);
 
   // Matériaux relativistes et leurs variantes « vision classique » (mêmes uniformes).
   const relMaterials = {
     surface: createSurfaceMaterial(),
     emitter: createEmitterMaterial(),
-    environment: createEnvironmentMaterial(),
+    environment: createEnvironmentMaterial(vegetationEntry ? { vegetation: vegetationEntry } : {}),
   };
   const classicMaterials = {
     surface: createClassicVariant(relMaterials.surface),

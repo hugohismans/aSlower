@@ -29,10 +29,14 @@ import {
 import { adaptationExposure } from '../physics/spectrum.js';
 import { REL } from './uniforms.js';
 import { createDopplerLutTexture } from './dopplerLut.js';
+import { irUvPerLuminance } from './streetPlan.js';
 import { SHADERS } from './shaders/index.js';
 
 /** Réflectances ir et uv du sol, en fraction de sa luminance (asphalte, béton : spectre plat). */
 const GROUND_IR_UV = Object.freeze([0.9, 0.5]);
+
+/** Végétation par défaut (entrée « vegetation » de src/data/palette.json). */
+const DEFAULT_VEGETATION = Object.freeze({ srgb: '#4E8F3A', ir: 0.6, uv: 0.05 });
 
 /**
  * Pose les textures partagées manquantes : LUT Doppler (et ses paramètres) et, en
@@ -109,9 +113,14 @@ export function createLampMaterial() {
  * Passe plein écran ciel + sol + brouillard. À dessiner avec renderOrder 1 sur un triangle
  * plein écran (voir createEnvironmentMesh). Ses uniformes de caméra (inverse de la
  * projection, rotation de la vue) sont mis à jour juste avant le dessin.
+ * Sol : ir, uv = luminance de la carte des rues × rapport du sol minéral (uGroundIrUv) ou de la
+ * végétation (uVegetationIrUv, selon le canal végétation de la carte : streetMap.js).
+ * @param {{vegetation?: {srgb: string, ir?: number, uv?: number}}} [options] réflectances de
+ *   la végétation (palette « vegetation »)
  * @returns {ShaderMaterial}
  */
-export function createEnvironmentMaterial() {
+export function createEnvironmentMaterial({ vegetation = DEFAULT_VEGETATION } = {}) {
+  const vegetationIrUv = irUvPerLuminance(vegetation);
   const material = relMaterial(
     'rel-environment',
     SHADERS.environment,
@@ -119,6 +128,7 @@ export function createEnvironmentMaterial() {
       uInvProjection: { value: new Matrix4() },
       uCameraRotation: { value: new Matrix3() },
       uGroundIrUv: { value: new Vector2(GROUND_IR_UV[0], GROUND_IR_UV[1]) },
+      uVegetationIrUv: { value: new Vector2(vegetationIrUv[0], vegetationIrUv[1]) },
     },
     { depthWrite: false, depthTest: true, depthFunc: LessEqualDepth },
   );
