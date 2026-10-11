@@ -20,6 +20,7 @@
     <meta name="apple-mobile-web-app-title" content="Coursier" />
     <!-- Styles liés ici (et non importés en JS) : src/hud/ n'importe que physics et storage. -->
     <link rel="stylesheet" href="/src/styles/base.css" />
+    <link rel="stylesheet" href="/src/styles/menus.css" />
     <link rel="stylesheet" href="/src/hud/hud.css" />
     <link rel="stylesheet" href="/src/hud/bubbles.css" />
   </head>
@@ -49,36 +50,117 @@
     <!-- HUD, rempli par src/hud/hud.js ; ne capte aucun toucher -->
     <div id="hud" class="hud" hidden></div>
 
-    <!-- Écran titre -->
-    <section id="title" class="title-screen" aria-labelledby="title-heading">
-      <div class="title-card">
-        <h1 id="title-heading">Coursier de la lumière lente</h1>
-        <p class="title-sub">Livre tes colis dans une ville où la lumière est lente&nbsp;: à toi de choisir à quel point.</p>
-        <!-- Réglage de c (src/hud/lightSpeed.js), rempli par src/main.js -->
-        <div id="light-speed"></div>
-        <!-- Réglage Direction (src/hud/direction.js), écran tactile seulement -->
-        <div id="direction" class="touch-only"></div>
-        <div class="title-actions">
-          <button type="button" id="play" class="btn btn-primary">Jouer</button>
-          <button type="button" id="free-drive" class="btn">Conduite libre</button>
-          <button type="button" id="open-credits" class="btn">Crédits</button>
-        </div>
-        <p class="title-help title-help-touch">
-          <span id="help-tilt">Penche ton GSM pour tourner · Maintiens à droite pour accélérer · Frein en bas à gauche · 👁 vision classique</span>
-          <span id="help-drag" hidden>Maintiens à droite pour accélérer · Frein en bas · Glisse à gauche pour tourner · 👁 vision classique</span>
-        </p>
-        <p id="help-ios" class="title-help title-help-ios" hidden>
-          Plein écran sur iPhone&nbsp;: Partager, puis «&nbsp;Sur l'écran d'accueil&nbsp;».
-        </p>
-        <p class="title-help title-help-keys">
-          Clavier&nbsp;: ↑ accélérer · ← → tourner · Espace freiner · C vision classique · Échap pause
-        </p>
+    <!-- Ciel animé des menus (src/hud/sky.js) : accueil, sélection, briefing -->
+    <canvas id="sky" class="sky" aria-hidden="true" hidden></canvas>
+
+    <!-- Écran d'accueil -->
+    <section id="title" class="title-screen home-screen" aria-labelledby="title-heading">
+      <div class="home">
+        <header class="home-brand">
+          <p class="home-kicker">Un jeu de relativité restreinte</p>
+          <h1 id="title-heading" class="home-title">
+            <span class="home-title-line">Coursier de la</span>
+            <span class="home-title-line"><span class="home-title-light">lumière</span> lente</span>
+          </h1>
+          <p class="home-tagline">
+            Livre tes colis dans une ville où la lumière ne va qu'à <span id="home-c-inline">30&nbsp;m/s</span>.
+            Ce que tu y vois n'est pas truqué&nbsp;: c'est calculé.
+          </p>
+          <!-- Progression et vitesse de la lumière (src/main.js, refreshHome) -->
+          <p class="home-status">
+            <span class="chip chip-stars"><span aria-hidden="true">★</span> <span id="home-stars">0 étoile sur 9</span></span>
+            <span class="chip" id="home-c">c = 30 m/s</span>
+          </p>
+          <p id="help-ios" class="home-note" hidden>
+            Plein écran sur iPhone&nbsp;: Partager, puis «&nbsp;Sur l'écran d'accueil&nbsp;».
+          </p>
+        </header>
+
+        <nav class="home-menu" aria-label="Menu principal">
+          <button type="button" id="play" class="menu-btn menu-btn-primary">
+            <svg class="menu-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.2v13.6L18.6 12z" fill="currentColor" /></svg>
+            <span class="menu-text">
+              <span class="menu-label">Jouer</span>
+              <span class="menu-sub" id="play-sub">Les tournées de livraison</span>
+            </span>
+          </button>
+          <button type="button" id="free-drive" class="menu-btn">
+            <svg class="menu-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="12" cy="12" r="8.5" /><circle cx="12" cy="12" r="2.2" />
+              <path d="M3.8 10.6c5.4-1.4 11-1.4 16.4 0M10.2 13.7 6.6 19.6M13.8 13.7l3.6 5.9" />
+            </svg>
+            <span class="menu-text">
+              <span class="menu-label">Conduite libre</span>
+              <span class="menu-sub">L'avenue, sans chrono</span>
+            </span>
+          </button>
+          <a id="open-theory" class="menu-btn" href="theorie/">
+            <svg class="menu-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 6.3C9.6 4.8 6.6 4.6 3.5 5.5v13c3.1-.9 6.1-.7 8.5.8 2.4-1.5 5.4-1.7 8.5-.8v-13c-3.1-.9-6.1-.7-8.5.8zM12 6.3v13" />
+            </svg>
+            <span class="menu-text">
+              <span class="menu-label">Théorie</span>
+              <span class="menu-sub">Comprendre ce que tu vois</span>
+            </span>
+          </a>
+          <div class="home-menu-row">
+            <button type="button" id="open-settings" class="menu-btn menu-btn-small" aria-haspopup="dialog">
+              <svg class="menu-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M4 7h9M17 7h3M4 17h3M11 17h9" /><circle cx="15" cy="7" r="2.2" /><circle cx="9" cy="17" r="2.2" />
+              </svg>
+              <span class="menu-label">Réglages</span>
+            </button>
+            <button type="button" id="open-credits" class="menu-btn menu-btn-small" aria-haspopup="dialog">
+              <svg class="menu-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="12" cy="12" r="8.5" /><path d="M12 11v5.5M12 7.6v.2" />
+              </svg>
+              <span class="menu-label">Crédits</span>
+            </button>
+          </div>
+        </nav>
       </div>
+      <!-- Ce que montre le ciel : la vitesse de l'observateur (src/hud/sky.js) -->
+      <p id="sky-readout" class="sky-readout" aria-hidden="true"></p>
     </section>
+
+    <!-- Réglages (accueil) : rempli en partie par src/main.js (c, Direction) -->
+    <dialog id="settings" class="sheet settings" aria-labelledby="settings-title">
+      <div class="sheet-body">
+        <header class="sheet-head">
+          <h2 id="settings-title">Réglages</h2>
+          <form method="dialog">
+            <button type="submit" class="btn btn-close">Fermer</button>
+          </form>
+        </header>
+        <div class="settings-grid">
+          <section class="settings-block settings-c" aria-label="Vitesse de la lumière">
+            <!-- Réglage de c (src/hud/lightSpeed.js) -->
+            <div id="light-speed"></div>
+          </section>
+          <!-- Réglage Direction (src/hud/direction.js), écran tactile seulement -->
+          <section id="direction" class="settings-block touch-only" aria-label="Direction"></section>
+          <section class="settings-block" aria-labelledby="settings-help-title">
+            <h3 id="settings-help-title" class="settings-title">Aides</h3>
+            <div class="settings-toggles">
+              <button type="button" class="btn btn-preset" id="settings-spectro" data-option="spectrometre" aria-pressed="false">Spectromètre&nbsp;: non</button>
+              <button type="button" class="btn btn-preset" id="settings-bubbles">Revoir les bulles</button>
+            </div>
+            <p id="settings-status" class="c-setting-message" role="status"></p>
+          </section>
+          <section class="settings-block settings-keys title-help-keys" aria-labelledby="settings-keys-title">
+            <h3 id="settings-keys-title" class="settings-title">Clavier</h3>
+            <p class="title-help">
+              <kbd>↑</kbd> accélérer · <kbd>←</kbd> <kbd>→</kbd> tourner · <kbd>Espace</kbd> freiner ·
+              <kbd>C</kbd> vision classique · <kbd>Échap</kbd> pause
+            </p>
+          </section>
+        </div>
+      </div>
+    </dialog>
 
     <!-- Écrans des niveaux (sélection, briefing, bilan, échec) : rempli par src/hud/screens.js -->
     <section id="screen" class="title-screen" hidden aria-live="polite">
-      <div class="title-card screen-card"></div>
+      <div class="title-card screen-card panel"></div>
     </section>
 
     <!-- Décompte 3-2-1 et messages courts (reprise), par-dessus la vue -->
@@ -86,7 +168,7 @@
 
     <!-- Pause, affichage interrompu (perte du contexte WebGL), erreurs : rempli par src/main.js -->
     <section id="notice" class="title-screen" hidden aria-labelledby="notice-title">
-      <div class="title-card">
+      <div class="title-card notice-card panel">
         <h2 id="notice-title" class="notice-title"></h2>
         <p id="notice-text" class="title-sub"></p>
         <div id="notice-content"></div>

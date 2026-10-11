@@ -227,6 +227,7 @@ const PURE_FILES = [
   'src/render/adaptiveDpr.js',
   'src/hud/format.js',
   'src/hud/levelFormat.js',
+  'src/hud/skyMath.js',
   'src/input/tiltMath.js',
   'src/game/conditions.js',
   'src/game/bubbles.js',

@@ -60,7 +60,7 @@ import { createCredits } from './hud/credits.js';
 import { createDiag, diagModeFromUrl, readGlInfo } from './hud/diag.js';
 import { createDirectionControl } from './hud/direction.js';
 import { createHud } from './hud/hud.js';
-import { formatLightSpeed } from './hud/format.js';
+import { formatClock, formatGap, formatKmh, formatLightSpeed } from './hud/format.js';
 import { createLevelHud } from './hud/levelHud.js';
 import {
   activeAids,
@@ -82,6 +82,8 @@ import {
 } from './hud/levelFormat.js';
 import { createLightSpeedControl } from './hud/lightSpeed.js';
 import { createScreens } from './hud/screens.js';
+import { createSettingsPanel } from './hud/settingsPanel.js';
+import { createSky } from './hud/sky.js';
 import { createTiltDebug, tiltDebugFromUrl } from './hud/tiltDebug.js';
 import { BUBBLES_SCHEMA, createBubbleEngine, createBubbleVariables, facadeAhead } from './game/bubbles.js';
 import { BOT_DT, createBotDriver } from './game/bot.js';
@@ -431,6 +433,17 @@ const dom = {
   play: /** @type {HTMLButtonElement} */ ($('play')),
   freeDrive: /** @type {HTMLButtonElement} */ ($('free-drive')),
   openCredits: $('open-credits'),
+  openSettings: $('open-settings'),
+  openTheory: /** @type {HTMLAnchorElement} */ ($('open-theory')),
+  settings: /** @type {HTMLDialogElement} */ ($('settings')),
+  settingsSpectro: $('settings-spectro'),
+  settingsBubbles: $('settings-bubbles'),
+  homeStars: $('home-stars'),
+  homeC: $('home-c'),
+  homeCInline: $('home-c-inline'),
+  playSub: $('play-sub'),
+  sky: /** @type {HTMLCanvasElement} */ ($('sky')),
+  skyReadout: $('sky-readout'),
   credits: /** @type {HTMLDialogElement} */ ($('credits')),
   diag: $('diag'),
   notice: $('notice'),
@@ -440,8 +453,6 @@ const dom = {
   noticeActions: $('notice-actions'),
   lightSpeed: $('light-speed'),
   direction: $('direction'),
-  helpTilt: $('help-tilt'),
-  helpDrag: $('help-drag'),
   helpIos: $('help-ios'),
   screen: $('screen'),
   countdown: $('countdown'),
@@ -474,6 +485,7 @@ let chosenC = startLight.c;
 function chooseLightSpeed(c) {
   chosenC = c;
   saveSettings({ c });
+  refreshHome();
 }
 
 // Garde-fou de démarrage (lecture) : à appeler une fois, avant de créer le renderer.
@@ -589,7 +601,7 @@ function shownDirection() {
   return preferredMode === 'tilt' && tiltFallback ? 'drag' : preferredMode;
 }
 
-/** Met à jour les réglages Direction (titre, pause), l'aide du titre et « Recentrer le volant ». */
+/** Met à jour les réglages Direction (accueil, pause) et « Recentrer le volant ». */
 function refreshDirection() {
   const shown = shownDirection();
   const message = tiltFallback && wantsTilt() ? TILT_FALLBACK_TEXTS[tiltFallback] : '';
@@ -599,8 +611,6 @@ function refreshDirection() {
     control.setMessage(message);
     control.setRetry(Boolean(message));
   }
-  dom.helpTilt.hidden = shown !== 'tilt';
-  dom.helpDrag.hidden = shown === 'tilt';
   const recenter = /** @type {HTMLElement | null} */ (dom.noticeActions.querySelector('[data-action="recentrer"]'));
   if (recenter) recenter.hidden = !canRecenter();
 }
@@ -660,6 +670,12 @@ function hideToast() {
 
 const credits = createCredits(/** @type {HTMLDialogElement} */ (dom.credits));
 dom.openCredits.addEventListener('click', () => credits.open());
+const settingsPanel = createSettingsPanel(dom.settings);
+dom.openSettings.addEventListener('click', () => settingsPanel.open());
+// Page « Théorie » (theorie/), servie à côté du jeu (« /aSlower/theorie/ » sur GitHub Pages).
+dom.openTheory.href = `${import.meta.env.BASE_URL}theorie/`;
+/** Ciel animé des menus (accueil, sélection, briefing) ; jamais en ?bench. */
+const sky = benchMode ? null : createSky(dom.sky, { readout: dom.skyReadout });
 const diag = diagMode ? createDiag(dom.diag) : null;
 diag?.show();
 const tiltDebug = tiltDebugFromUrl(window.location.search) ? createTiltDebug(document.body) : null;
@@ -692,6 +708,30 @@ const standalone =
   /** @type {any} */ (navigator).standalone === true || window.matchMedia('(display-mode: standalone), (display-mode: fullscreen)').matches;
 dom.helpIos.hidden = !(ios && !standalone);
 refreshDirection();
+
+/** Accueil : étoiles gagnées (tous niveaux, meilleur c) et vitesse de la lumière choisie. */
+function refreshHome() {
+  const total = totalStars(progress, LEVEL_IDS);
+  const max = 3 * LEVEL_IDS.length;
+  dom.homeStars.textContent = `${total} étoile${total > 1 ? 's' : ''} sur ${max}`;
+  dom.homeC.textContent = `${formatLightSpeed(chosenC)} ≈ ${formatKmh(chosenC)}`;
+  dom.homeCInline.textContent = `${chosenC}\u00a0m/s`;
+  dom.playSub.textContent = `${LEVEL_IDS.length} tournées · ${total}\u202f/\u202f${max} ★`;
+}
+refreshHome();
+
+// Réglages → Aides : spectromètre (même bascule que la sélection et la pause), bulles.
+dom.settingsSpectro.textContent = spectroLabel();
+dom.settingsSpectro.setAttribute('aria-pressed', String(options.spectrometre));
+dom.settingsSpectro.addEventListener('click', () => {
+  toggleSpectro();
+  settingsPanel.setStatus(options.spectrometre ? 'Spectromètre : la teinte des lampes s’affichera en mots.' : 'Spectromètre coupé.');
+});
+dom.settingsBubbles.addEventListener('click', () => {
+  bubbles.reset();
+  settingsPanel.setStatus("Bulles d'aide remises à zéro : elles reviendront pendant la partie.");
+});
+sky?.show();
 
 /** Option « Spectromètre » (sélection des niveaux et pause) : bouton bascule (aria-pressed). */
 function spectroLabel() {
@@ -800,8 +840,10 @@ function onStateChange(to, from, event) {
     case 'menu':
       leaveGameView();
       screens.hide();
+      refreshHome();
       dom.title.hidden = false;
-      dom.play.focus({ preventScroll: true });
+      // Au chargement sur écran tactile, pas de focus (son anneau n'aide qu'au clavier).
+      if (!(touchDevice && from === 'chargement')) dom.play.focus({ preventScroll: true });
       break;
     case 'selection':
       leaveGameView();
@@ -815,6 +857,7 @@ function onStateChange(to, from, event) {
       break;
     case 'decompte':
       screens.hide();
+      sky?.hide();
       startCountdown(from === 'pause' && event === 'reprendre' ? COUNTDOWN_RESUME_S : from === 'reprise' ? COUNTDOWN_RESUME_S : COUNTDOWN_START_S);
       break;
     case 'enCours':
@@ -852,9 +895,10 @@ function onStateChange(to, from, event) {
   refreshDirection();
 }
 
-/** Hors de la vue de jeu (menus, sélection, briefing) : HUD masqué, commandes coupées. */
+/** Hors de la vue de jeu (menus, sélection, briefing) : HUD masqué, commandes coupées, ciel. */
 function leaveGameView() {
   if (mode !== 'loading') mode = 'title';
+  sky?.show();
   controls.setEnabled(false);
   wakeLock.release();
   hud.hide();
@@ -915,6 +959,14 @@ function briefingClients(json) {
   });
 }
 
+/** Rappel des commandes du briefing : celles de l'appareil (et de la direction choisie). */
+function controlsHelp() {
+  if (!touchDevice) return 'Clavier : ↑ accélérer · ← → tourner · Espace freiner · C vision classique · Échap pause';
+  return shownDirection() === 'tilt'
+    ? 'Penche ton GSM pour tourner · Maintiens à droite pour accélérer · Frein en bas à gauche · 👁 vision classique'
+    : 'Glisse à gauche pour tourner · Maintiens à droite pour accélérer · Frein en bas · 👁 vision classique';
+}
+
 /** Échecs mémorisés sur un niveau (tous c). */
 const failuresOf = (id) => progress.niveaux[id]?.echecs ?? 0;
 
@@ -935,6 +987,7 @@ function showBriefing() {
     battery: `${json.batterie.tauMax} s`,
     cText: formatLightSpeed(chosenC),
     hint: hint ? hint.texte : '',
+    controls: controlsHelp(),
     onGo: () => onGoClick(view),
     onBack: () => sm.send('retour'),
   });
@@ -969,6 +1022,7 @@ function startCountdown(seconds) {
   hud.show();
   if (flow === 'niveau') levelHud.show();
   dom.title.hidden = true;
+  sky?.hide();
   game.countdown = { remaining: seconds, go: 0 };
   screens.showCountdown(String(Math.ceil(seconds)));
   if (seconds >= COUNTDOWN_START_S && controls.getMode() === 'tilt') calibrationPending = true;
@@ -1485,9 +1539,11 @@ async function startFreeDrive() {
   if (mode !== 'title') return;
   mode = 'loading';
   hideNotice();
-  const label = dom.freeDrive.textContent;
+  const label = /** @type {HTMLElement} */ (dom.freeDrive.querySelector('.menu-label') ?? dom.freeDrive);
+  const text = label.textContent;
   dom.freeDrive.disabled = true;
-  dom.freeDrive.textContent = 'Chargement…';
+  dom.freeDrive.setAttribute('aria-busy', 'true');
+  label.textContent = 'Chargement…';
   dom.freeDrive.blur(); // sinon Espace (frein) pourrait « recliquer » le bouton
   await nextPaint();
   try {
@@ -1501,12 +1557,14 @@ async function startFreeDrive() {
     return;
   } finally {
     dom.freeDrive.disabled = false;
-    dom.freeDrive.textContent = label;
+    dom.freeDrive.removeAttribute('aria-busy');
+    label.textContent = text;
   }
   flow = 'libre';
   useBubbleEngine(null);
   resetPartyMessages();
   dom.title.hidden = true;
+  sky?.hide();
   hud.show();
   levelHud.hide();
   hud.setSpeedZone(null);
@@ -1528,6 +1586,7 @@ function leaveFreeDrive() {
   flow = null;
   hideNotice();
   leaveGameView();
+  refreshHome();
   dom.title.hidden = false;
   dom.play.focus({ preventScroll: true });
 }
@@ -1568,7 +1627,12 @@ function showResult() {
     stars: formatStars(score.etoiles),
     starsCount: score.etoiles,
     lines: starLines(score),
-    figures: [`${f.montre} · ${f.ville} · ${f.ecart}`, f.batterie, f.contrefactuel],
+    stats: [
+      { label: 'Ta montre', value: formatClock(score.econome.tauFin) },
+      { label: 'Horloge de la ville', value: formatClock(score.ponctuel.tFin) },
+      { label: 'Écart', value: formatGap(Math.max(0, score.ponctuel.tFin - score.econome.tauFin)) },
+    ],
+    figures: [f.batterie, f.contrefactuel],
     records: recordTexts,
     hasNext: Boolean(nextId),
     onReplay: () => replayFrom('rejouer'),

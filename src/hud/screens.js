@@ -1,6 +1,6 @@
 /**
- * Écrans des niveaux (jalon 3), dans le panneau #screen de index.html (même allure que l'écran
- * titre ; styles dans src/styles/base.css, section « Écrans des niveaux ») : sélection des
+ * Écrans des niveaux (jalon 3), dans le panneau #screen de index.html (même allure que l'accueil ;
+ * styles dans src/styles/menus.css, section « Écrans des niveaux ») : sélection des
  * niveaux, briefing, bilan, échec ; et le décompte 3-2-1 (#countdown), par-dessus la vue.
  *
  * Le module ne décide de rien : main.js (machine à états game/states.js) appelle show…() avec
@@ -33,9 +33,30 @@ function h(spec, attrs = {}, children = []) {
   return node;
 }
 
-/** Bouton (≥ 48 px, classes .btn de base.css). */
-function button(label, onClick, { primary = false, id, disabled = false } = {}) {
-  return h(`button.btn${primary ? '.btn-primary' : ''}`, { type: 'button', onClick, 'data-action': id, disabled }, [label]);
+/**
+ * Bouton (≥ 48 px, classes .btn de styles/menus.css) ; `back` : chevron de retour.
+ * @param {string} label
+ * @param {(event: Event) => void} onClick
+ * @param {{primary?: boolean, id?: string, disabled?: boolean, back?: boolean}} [options]
+ * @returns {HTMLButtonElement}
+ */
+function button(label, onClick, { primary = false, id = undefined, disabled = false, back = false } = {}) {
+  return /** @type {HTMLButtonElement} */ (h(`button.btn${primary ? '.btn-primary' : ''}${back ? '.btn-back' : ''}`, { type: 'button', onClick, 'data-action': id, disabled }, [label]));
+}
+
+/** Étoiles « ★★☆ » en signes séparés (pleines en jaune, vides en gris) ; décoratives. */
+function starsNode(text, spec = 'span.stars') {
+  return h(spec, { 'aria-hidden': 'true' }, [...text].map((ch) => h(`span.star${ch === '★' ? '.is-on' : ''}`, { text: ch })));
+}
+
+/** Cadenas (SVG, décoratif). */
+function lockIcon() {
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('aria-hidden', 'true');
+  svg.setAttribute('class', 'level-lock');
+  svg.innerHTML = '<rect x="5" y="10.5" width="14" height="10" rx="2.5"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/>';
+  return svg;
 }
 
 /**
@@ -63,69 +84,99 @@ export function createScreens(root, countdownRoot) {
      *          stars: string, starsLabel: string, locked: boolean, note: string}[],
      *          cText: string, total: string, onChoose: (id: string) => void, onBack: () => void,
      *          option?: {label: string, pressed: boolean, onToggle: (button: HTMLElement) => void}}} o
-     *   option : bascule d'une option (le spectromètre), à côté de « Menu »
+     *   option : bascule d'une option (le spectromètre), en pied d'écran
      */
     showSelection({ levels, cText, total, onChoose, onBack, option }) {
       const cards = levels.map((l) =>
         h(
-          'button.level-card',
+          `button.level-card${l.locked ? '.is-locked' : ''}`,
           {
             type: 'button',
             disabled: l.locked,
             'data-level': l.id,
-            'aria-label': `Niveau ${l.numero}, ${l.titre}. ${l.locked ? 'Verrouillé.' : l.starsLabel}`,
+            'aria-label': `Niveau ${l.numero}, ${l.titre} : ${l.notion}. ${l.locked ? 'Verrouillé.' : l.starsLabel}${l.note && !l.locked ? ` ${l.note}` : ''}`,
             onClick: () => onChoose(l.id),
           },
           [
-            h('span.level-num', { text: l.locked ? `🔒 ${l.numero}` : String(l.numero) }),
+            h('span.level-top', {}, [
+              h('span.level-num', { 'aria-hidden': 'true' }, [l.locked ? lockIcon() : String(l.numero)]),
+              l.locked ? h('span.level-locked', { text: 'Verrouillé' }) : starsNode(l.stars, 'span.stars.level-stars'),
+            ]),
             h('span.level-title', { text: l.titre }),
             h('span.level-notion', { text: l.notion }),
-            h('span.level-stars', { 'aria-hidden': 'true', text: l.locked ? '' : l.stars }),
             l.note ? h('span.level-note', { text: l.note }) : null,
+            l.locked ? null : h('span.level-go', { 'aria-hidden': 'true', text: l.stars.includes('★') ? 'Rejouer' : 'Commencer' }),
           ],
         ),
       );
       render('selection', [
-        h('h2.notice-title', { text: 'Tournées' }),
-        h('p.title-sub', { text: `${cText} · ${total}` }),
+        h('header.screen-head', {}, [
+          button('Menu', onBack, { id: 'menu', back: true }),
+          h('div.screen-head-title', {}, [h('p.brief-kicker', { text: 'Photon Express' }), h('h2.notice-title', { text: 'Tournées' })]),
+          h('p.screen-head-meta', {}, [h('span.chip.chip-stars', {}, [h('span', { 'aria-hidden': 'true', text: '★ ' }), total]), h('span.chip', { text: cText })]),
+        ]),
         h('div.level-list', {}, cards),
-        h('div.title-actions', {}, [
-          button('Menu', onBack, { id: 'menu' }),
-          option
-            ? h('button.btn.btn-preset', {
+        option
+          ? h('footer.screen-foot', {}, [
+              h('button.btn.btn-preset', {
                 type: 'button',
                 'data-option': 'spectrometre',
                 'aria-pressed': String(option.pressed),
                 text: option.label,
                 onClick: (event) => option.onToggle(/** @type {HTMLElement} */ (event.currentTarget)),
-              })
-            : null,
-        ]),
+              }),
+              h('p.screen-foot-note', { text: `Étoiles et records comptés à ${cText}.` }),
+            ])
+          : null,
       ]);
       /** @type {HTMLElement | null} */ (card.querySelector('.level-card:not([disabled])'))?.focus({ preventScroll: true });
     },
 
     /**
-     * Briefing : objectif, clients et heures de la ville, batterie, notion.
+     * Briefing : objectif, clients et heures de la ville, batterie, notion, commandes.
      * @param {{numero: number, titre: string, notion: string, lines: string[],
      *          clients: {client: string, nom: string, when: string}[], battery: string,
-     *          cText: string, hint: string, onGo: () => void, onBack: () => void}} o
+     *          cText: string, hint: string, controls?: string, onGo: () => void, onBack: () => void}} o
      * @returns {{setBusy(text: string | null): void}}
      */
-    showBriefing({ numero, titre, notion, lines, clients, battery, cText, hint, onGo, onBack }) {
+    showBriefing({ numero, titre, notion, lines, clients, battery, cText, hint, controls = '', onGo, onBack }) {
       const go = button("C'est parti !", onGo, { primary: true, id: 'partir' });
+      const timed = clients.some((c) => c.when);
       render('briefing', [
-        h('p.brief-kicker', { text: `Niveau ${numero} · ${notion}` }),
-        h('h2.notice-title', { text: titre }),
-        h('div.brief-text', {}, lines.map((line) => h('p', { text: line }))),
-        h(
-          'ul.brief-clients',
-          {},
-          clients.map((c) => h('li', {}, [h('strong', { text: c.client }), ` — ${c.nom}`, c.when ? h('span.brief-when', { text: ` · ${c.when}` }) : null])),
-        ),
-        h('p.brief-meta', { text: `Batterie : ${battery} de ta montre · ${cText} · horaires à l'horloge de la ville` }),
-        hint ? h('p.brief-hint', { text: `Indice : ${hint}` }) : null,
-        h('div.title-actions', {}, [go, button('Niveaux', onBack, { id: 'niveaux' })]),
+        h('div.brief', {}, [
+          h('div.brief-main', {}, [
+            h('p.brief-kicker', {}, [h('span.brief-num', { text: `Niveau ${numero}` }), ` · ${notion}`]),
+            h('h2.notice-title', { text: titre }),
+            h('div.brief-text', {}, lines.map((line) => h('p', { text: line }))),
+            controls ? h('p.brief-controls', { text: controls }) : null,
+          ]),
+          h('div.brief-aside', {}, [
+          h('div.brief-side', {}, [
+            h('h3.side-title', { text: 'Livraisons' }),
+            h(
+              'ol.brief-clients',
+              {},
+              clients.map((c, i) =>
+                h('li', {}, [
+                  h('span.client-num', { 'aria-hidden': 'true', text: String(i + 1) }),
+                  h('span.client-body', {}, [
+                    h('strong', { text: c.client }),
+                    h('span.client-what', { text: ` — ${c.nom}` }),
+                    c.when ? h('span.brief-when', { text: c.when }) : null,
+                  ]),
+                ]),
+              ),
+            ),
+            h('dl.brief-facts', {}, [
+              h('div', {}, [h('dt', { text: 'Batterie' }), h('dd', { text: `${battery} de ta montre` })]),
+              h('div', {}, [h('dt', { text: 'Lumière' }), h('dd', { text: cText })]),
+              timed ? h('div', {}, [h('dt', { text: 'Horaires' }), h('dd', { text: "à l'horloge de la ville" })]) : null,
+            ]),
+            hint ? h('p.brief-hint', {}, [h('strong', { text: 'Indice : ' }), hint]) : null,
+          ]),
+          h('div.title-actions.brief-actions', {}, [go, button('Niveaux', onBack, { id: 'niveaux', back: true })]),
+          ]),
+        ]),
       ]);
       return {
         setBusy(text) {
@@ -139,25 +190,45 @@ export function createScreens(root, countdownRoot) {
      * Bilan d'une réussite.
      * @param {{titre: string, stars: string, starsCount: number,
      *          lines: {name: string, ok: boolean, detail: string}[], figures: string[],
+     *          stats?: {label: string, value: string}[],
      *          records: string[], hasNext: boolean, onReplay: () => void, onNext: () => void,
      *          onQuit: () => void}} o
+     *   stats : chiffres en tuiles (montre, ville, écart) ; figures : phrases sous les tuiles
      */
-    showResult({ titre, stars, starsCount, lines, figures, records, hasNext, onReplay, onNext, onQuit }) {
+    showResult({ titre, stars, starsCount, lines, figures, stats = [], records, hasNext, onReplay, onNext, onQuit }) {
       render('bilan', [
-        h('p.brief-kicker', { text: titre }),
-        h('h2.notice-title', { text: 'Livré !' }),
-        h('p.result-stars', { 'aria-label': `${starsCount} étoile${starsCount > 1 ? 's' : ''} sur 3`, text: stars }),
-        h(
-          'ul.result-lines',
-          {},
-          lines.map((l) => h(`li.${l.ok ? 'is-ok' : 'is-missing'}`, {}, [h('span.result-mark', { 'aria-hidden': 'true', text: l.ok ? '★' : '☆' }), h('strong', { text: `${l.name} ` }), l.detail])),
-        ),
-        h('div.result-figures', {}, figures.filter(Boolean).map((f) => h('p', { text: f }))),
-        records.length ? h('p.result-records', { text: records.join(' · ') }) : null,
+        h('div.result', {}, [
+          h('div.result-hero', {}, [
+            h('p.brief-kicker', { text: titre }),
+            h('h2.notice-title', { text: 'Livré !' }),
+            h('p.result-stars', { role: 'img', 'aria-label': `${starsCount} étoile${starsCount > 1 ? 's' : ''} sur 3` }, [starsNode(stars)]),
+            records.length ? h('p.result-records', { text: records.join(' · ') }) : null,
+          ]),
+          h('div.result-detail', {}, [
+            h(
+              'ul.result-lines',
+              {},
+              lines.map((l) =>
+                h(`li.${l.ok ? 'is-ok' : 'is-missing'}`, {}, [
+                  h('span.result-mark', { 'aria-hidden': 'true', text: l.ok ? '★' : '☆' }),
+                  h('span', {}, [h('strong', { text: `${l.name} ` }), h('span.result-why', { text: l.detail })]),
+                ]),
+              ),
+            ),
+            stats.length
+              ? h(
+                  'dl.result-stats',
+                  {},
+                  stats.map((st) => h('div', {}, [h('dt', { text: st.label }), h('dd', { text: st.value })])),
+                )
+              : null,
+            h('div.result-figures', {}, figures.filter(Boolean).map((f) => h('p', { text: f }))),
+          ]),
+        ]),
         h('div.title-actions', {}, [
           hasNext ? button('Niveau suivant', onNext, { primary: true, id: 'suivant' }) : null,
           button('Rejouer', onReplay, { primary: !hasNext, id: 'rejouer' }),
-          button('Niveaux', onQuit, { id: 'niveaux' }),
+          button('Niveaux', onQuit, { id: 'niveaux', back: true }),
         ]),
       ]);
     },
@@ -172,11 +243,11 @@ export function createScreens(root, countdownRoot) {
         h('p.brief-kicker', { text: titre }),
         h('h2.notice-title', { text: 'Raté…' }),
         h('p.title-sub', { text: reason }),
-        hint ? h('p.brief-hint', { text: `Indice : ${hint}` }) : null,
+        hint ? h('p.brief-hint', {}, [h('strong', { text: 'Indice : ' }), hint]) : null,
         h('div.title-actions', {}, [
           button('Recommencer', onRetry, { primary: true, id: 'recommencer' }),
           canSkip ? button('Passer ce niveau', onSkip, { id: 'passer' }) : null,
-          button('Niveaux', onQuit, { id: 'niveaux' }),
+          button('Niveaux', onQuit, { id: 'niveaux', back: true }),
         ]),
       ]);
     },

@@ -9,13 +9,17 @@ Lab) et adapte une partie d'[OpenRelativity](https://github.com/MITGameLab/OpenR
 
 **Jouer : <https://hugohismans.github.io/aSlower/>**
 
+**Comprendre : <https://hugohismans.github.io/aSlower/theorie/>** — la page « Théorie », en trois
+niveaux (débutant sans équations avec des captures du jeu, intermédiaire avec les équations et des
+exemples chiffrés, expert avec le modèle complet et ses limites).
+
 ## Le concept
 
 Dans la ville, la lumière va à c = 30 m/s (≈ 108 km/h) et ton moteur pousse à 3 m/s².
 L'échelle naturelle du jeu est donc de quelques centaines de mètres (c²/a = 300 m) et la
 dizaine de secondes (c/a = 10 s).
 
-**La vitesse de la lumière est un réglage** : sur l'écran titre (ou au menu pause,
+**La vitesse de la lumière est un réglage** : dans « Réglages » sur l'accueil (ou au menu pause,
 « Changer c », qui recommence la partie), choisis un entier de 10 à 100 m/s (préréglages
 10, 30, 50 et 100). L'accélération suit, a = c/10 : le rythme du jeu (c/a = 10 s) ne change
 pas, seules les distances changent (c²/a = 10·c mètres : 100 m à c = 10, 1 km à c = 100).
@@ -70,6 +74,23 @@ seuil) ; ★ Ponctuel (tout livré à temps, à l'horloge de la ville). Seul la 
 Feuille de route complète dans [`docs/conception.md`](docs/conception.md) (§ 9) :
 lumière retardée et objets mobiles (J4), horizon de Rindler et paradoxe des jumeaux (J5).
 
+## L'accueil
+
+Le menu d'accueil propose **Jouer** (les tournées : sélection des niveaux, avec étoiles et
+verrous), **Conduite libre** (l'avenue de test, sans mission), **Théorie** (la page
+[`theorie/`](https://hugohismans.github.io/aSlower/theorie/), qui explique ce que l'on voit),
+**Réglages** et **Crédits**. Il rappelle les étoiles gagnées et la vitesse de la lumière
+choisie. **Réglages** regroupe la vitesse de la lumière c (−/+, saisie, préréglages 10, 30, 50
+et 100 m/s), la Direction (inclinaison ou glisser, sur écran tactile), le spectromètre,
+« Revoir les bulles » et les touches du clavier.
+
+Derrière le menu, le ciel est calculé comme la ville : des étoiles vues par un observateur qui
+file à une vitesse v montant de 0 à 0,9 c puis redescendant (lecture discrète « v = … c ·
+γ = … » en bas à droite). Le ciel se resserre devant (aberration), bleuit devant et rougit sur
+les bords (effet Doppler sur des corps noirs, comme les lampes du jeu). Canevas 2D léger
+(30 images/s au plus, rien quand il est caché) ; image fixe si le système demande de réduire
+les animations.
+
 ## Commandes
 
 ### Clavier
@@ -87,7 +108,7 @@ clavier AZERTY et sur un clavier QWERTY.
 
 ### Tactile (GSM, tablette)
 
-Deux façons de tourner, au choix sur l'écran titre et au menu pause (« Direction ») ; le
+Deux façons de tourner, au choix dans « Réglages » sur l'accueil et au menu pause (« Direction ») ; le
 choix est mémorisé. Par défaut, l'inclinaison.
 
 - **Inclinaison** : tiens le GSM en paysage comme un volant et penche-le pour tourner. Au
@@ -158,7 +179,7 @@ Paramètres d'URL (combinables, par exemple `?scene=quartier-test&bench&c=30&dpr
 
 | Paramètre | Effet |
 |---|---|
-| `?c=30` | vitesse de la lumière de la partie, entier de 10 à 100 m/s (a = c/10). Prioritaire sur le réglage de l'écran titre et jamais mémorisée ; hors plage, ramenée dans la plage ; non entière, ignorée (avec un message). Exemple : `?c=100&bench` reproduit les mesures du jalon 1 |
+| `?c=30` | vitesse de la lumière de la partie, entier de 10 à 100 m/s (a = c/10). Prioritaire sur le réglage de l'accueil et jamais mémorisée ; hors plage, ramenée dans la plage ; non entière, ignorée (avec un message). Exemple : `?c=100&bench` reproduit les mesures du jalon 1 |
 | `?scene=avenue-test` ou `?scene=quartier-test` | scène de développement à charger (`src/data/scenes/`) ; `avenue-test` par défaut |
 | `?diag` | panneau de diagnostic : images par seconde, temps d'image p50 et p95, temps CPU du rendu, appels de dessin, triangles, durée de la première image, GPU, DPR. La touche E (ou la case du panneau) coupe et rétablit la passe ciel/sol, pour mesurer son coût |
 | `?bench` | parcours de mesure automatique et déterministe (aucune entrée, pas fixe de 1/60 s par image), avec le panneau de diagnostic. Sur `avenue-test` : poussée pleine jusqu'à γ ≈ 2,5, puis freinage jusqu'à l'arrêt. Sur `quartier-test` : caméra scriptée le long d'une rue, β imposé de 0 à 0,92. À la fin, le panneau affiche p50/p95 des temps d'image, le CPU du rendu, les appels de dessin et triangles maximaux ; le résultat complet est dans `window.__benchResult` (et la console). Ajouter `&sansciel` mesure le même parcours sans la passe ciel/sol (coût de la passe par différence) |
@@ -187,9 +208,10 @@ contrat entre modules (signatures, repères, imports permis) est dans
 ## Organisation du code
 
 ```
-index.html              page unique : canvas, HUD, commandes, écrans, <dialog> Crédits
+index.html              page du jeu : canvas, HUD, commandes, écrans, <dialog> Crédits
+theorie/                page « Théorie » (/aSlower/theorie/) : index.html (MathML et SVG en ligne), theorie.css, theorie.js
 src/
-  main.js  loop.js      démarrage (écran titre, panneau « Tourne ton GSM ») et boucle d'images
+  main.js  loop.js      démarrage (accueil, panneau « Tourne ton GSM ») et boucle d'images
   storage.js            seul accès à localStorage/sessionStorage (clés « aslower:v1: »)
   physics/              PUR (ni DOM ni three) : constantes, relativité, véhicule,
                         couleurs (spectrum.js), temps retardé
@@ -202,13 +224,15 @@ src/
                         progression
   levels/               niveaux du jeu (n01-premier-jour.json…), schéma « coursier-niveau/1 »
   hud/                  horloges, jauge, HUD de niveau, écrans (sélection, briefing, bilan, échec),
-                        bulles, annonces, réglages, diagnostic (?diag, ?debug), Crédits
+                        bulles, annonces, réglages, ciel animé des menus, diagnostic (?diag,
+                        ?debug), Crédits
   data/                 palette, bulles d'aide et scènes de test (JSON)
   styles/               feuilles de style
 tests/                  tests Vitest (Node, sans navigateur)
 scripts/check-dist.mjs  vérifie les licences dans dist/ après le build
 scripts/generate-icons.mjs  génère les icônes PNG depuis le favicon (Playwright global)
-public/                 favicon, manifeste, icônes et textes de licence servis avec le jeu
+public/                 favicon, manifeste, icônes et textes de licence servis avec le jeu ;
+                        public/theorie/ : captures WebP et police STIX Two Math (SIL OFL) de la page Théorie
 docs/                   conception (plan, décisions, glossaire) et contrat d'interfaces
 ```
 

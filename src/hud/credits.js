@@ -12,12 +12,14 @@
 /** Balisage du dialogue (aucune donnée extérieure n'y est injectée en HTML). */
 function template(base) {
   return `
-  <div class="credits-body">
-    <form method="dialog" class="credits-close">
-      <button type="submit" class="btn" autofocus>Fermer</button>
-    </form>
-    <h2 id="credits-title">Crédits</h2>
-    <p><strong>Coursier de la lumière lente</strong>, un jeu de Hugo Hismans.
+  <div class="sheet-body credits-body">
+    <header class="sheet-head">
+      <h2 id="credits-title">Crédits</h2>
+      <form method="dialog">
+        <button type="submit" class="btn btn-close" autofocus>Fermer</button>
+      </form>
+    </header>
+    <p class="credits-lead"><strong>Coursier de la lumière lente</strong>, un jeu de Hugo Hismans.
       Code sous licence MIT&#8239;; contenus (données JSON, textes) sous licence CC&nbsp;BY&nbsp;4.0.</p>
 
     <h3>Inspiration et code adapté</h3>
@@ -52,7 +54,7 @@ function template(base) {
  * @returns {{open(): void, close(): void}}
  */
 export function createCredits(dialogElement) {
-  dialogElement.classList.add('credits');
+  dialogElement.classList.add('sheet', 'credits');
   dialogElement.setAttribute('aria-labelledby', 'credits-title');
   dialogElement.innerHTML = template(import.meta.env.BASE_URL);
   const notices = /** @type {HTMLElement} */ (dialogElement.querySelector('.credits-notices'));

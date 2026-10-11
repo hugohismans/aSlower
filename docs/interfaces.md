@@ -444,8 +444,9 @@ hintFor(indices, echecs) · activeAids(indices, echecs) → Set · starLines(sco
 resultFigures({tauFin, tFin, tauMax, distance, c}) → {montre, ville, ecart, batterie, contrefactuel}
 // screens.js (jalon 3) : #screen et #countdown de index.html
 createScreens(root, countdownRoot) // → {showSelection({levels, cText, total, onChoose, onBack,
-                                   //  option}), showBriefing({…, onGo, onBack}) → {setBusy(text)},
-                                   //  showResult({…, onReplay, onNext, onQuit}), showFailure({…,
+                                   //  option}), showBriefing({…, controls, onGo, onBack}) →
+                                   //  {setBusy(text)}, showResult({…, stats: [{label, value}],
+                                   //  onReplay, onNext, onQuit}), showFailure({…,
                                    //  canSkip, onRetry, onSkip, onQuit}), hide(), showCountdown(text,
                                    //  {small}), hideCountdown()}
 // lightSpeed.js (DOM)
@@ -466,6 +467,15 @@ gapState(previous, gamma, gap)     // état de la pastille d'écart, avec hysté
                                    // 'growing' | 'steady' | 'zero'
 // credits.js
 createCredits(dialogElement)       // ouvre THIRD_PARTY_NOTICES.md (?raw) dans un <dialog>
+// settingsPanel.js (DOM) : <dialog id="settings"> de l'accueil
+createSettingsPanel(dialog, {onClose}) // → {open(), close(), setStatus(text), isOpen}
+// skyMath.js (pur) : ciel animé des menus
+skyBeta(t) · aberrateCos(cosθ, β) · dopplerCos(cosθ, β) · stereoRadius(cosθ′) · makeStars(n, seed)
+starColorTable() → {rgb, intensity} (corps noir D·T, comme les lampes) · tableIndex(D)
+starLook(I, mag) → {alpha, size} · formatSkyReadout(β) → « v = 0,62 c · γ = 1,27 »
+// sky.js (DOM) : canevas 2D #sky derrière l'accueil, la sélection et le briefing
+createSky(canvas, {readout, reducedMotion}) // → {show(), hide(), visible} ; 30 i/s au plus,
+                                   // image fixe sous prefers-reduced-motion
 // diag.js
 createDiag(rootElement)            // panneau #diag : p50/p95, CPU render, appels de dessin,
                                    // triangles, première image, extensions, GPU, DPR (courant,
@@ -726,12 +736,14 @@ export const session               // idem pour sessionStorage
 
 ## `src/main.js` et `src/loop.js`
 
-- `main.js` : écran titre (réglage de c, réglage Direction sur écran tactile, Jouer, Crédits,
-  ligne « Sur l'écran d'accueil » sur iPhone), menu pause (Reprendre ; Recentrer le volant si
+- `main.js` : accueil (Jouer, Conduite libre, Théorie → `BASE_URL + 'theorie/'`, Réglages,
+  Crédits ; étoiles gagnées et c courant ; ligne « Sur l'écran d'accueil » sur iPhone ; ciel
+  animé `hud/sky.js`), dialogue Réglages (réglage de c, Direction sur écran tactile,
+  Spectromètre, Revoir les bulles, touches du clavier), menu pause (Reprendre ; Recentrer le volant si
   l'inclinaison est active ; Direction ; « Changer c » → nouvelle partie au départ avec le
   nouveau c ; Revoir les bulles ; Recommencer ; Crédits ; tout au clavier et au toucher),
   panneau « Tourne ton GSM » en portrait (appareils tactiles, strictement imposé), création du
-  monde, des commandes, du HUD et des bulles. Clic « Jouer », dans cet ordre :
+  monde, des commandes, du HUD et des bulles. Clic « C'est parti ! » (briefing) ou « Conduite libre », dans cet ordre :
   `tilt.requestPermission()` (synchrone, en premier), `enterFullscreen()` (écran tactile),
   puis le chargement. Wake Lock pris en jeu, rendu en pause. DPR adaptatif.
 - Application installable : `public/manifest.webmanifest` (start_url et scope `/aSlower/`,
