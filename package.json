@@ -1,0 +1,29 @@
+{
+  "name": "coursier-de-la-lumiere-lente",
+  "version": "0.1.0",
+  "description": "Jeu web relativiste : livrer des colis dans une ville où la lumière va à 100 m/s.",
+  "type": "module",
+  "private": true,
+  "license": "MIT AND CC-BY-4.0",
+  "author": "Hugo Hismans",
+  "engines": {
+    "node": "^22.12.0 || ^24.0.0 || >=26.0.0"
+  },
+  "scripts": {
+    "dev": "vite",
+    "dev:gsm": "vite --host",
+    "build": "vite build",
+    "postbuild": "node scripts/check-dist.mjs",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "three": "0.186.1"
+  },
+  "devDependencies": {
+    "@types/three": "0.186.0",
+    "vite": "8.3.1",
+    "vitest": "5.0.2"
+  }
+}
