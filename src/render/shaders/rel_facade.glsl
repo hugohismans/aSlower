@@ -163,13 +163,17 @@ void relFacade(inout vec3 rgb, inout vec2 iu, highp vec2 fac, highp vec2 uz) {
   // --- Brique : joints de mortier (assises de 7,5 cm, briques de 23,5 cm décalées), teinte
   // des briques, pierres d'angle alternées.
 #if FACADES > 1
-  if (brique) {
+  // Au-delà de 4 assises par pixel, les joints valent leur moyenne exacte (couverture
+  // 1 - 0,84 x 0,95) : raccord continu entre 2 et 4 assises par pixel.
+  float brickFar = smoothstep(2.0, 4.0, wz / 0.075);
+  if (brique && brickFar >= 1.0) facMix(rgb, iu, mix(FAC_PIERRE, base, 0.25), mix(FAC_PIERRE_IU, baseIu, 0.25), 0.45 * 0.202);
+  if (brique && brickFar < 1.0) {
     float course = floor(z / 0.075);
     float fadeC = smoothstep(0.3, 0.8, wz / 0.075);
     float off = mix(0.5 * mod(course, 2.0), 0.25, fadeC);
     float hz = facGrid(z / 0.075, 0.0, 0.16, 1.0e5, wz / 0.075);
     float vz = facGrid(u / 0.235 + off, 0.0, 0.05, 1.0e5, wu / 0.235);
-    float mortar = 1.0 - (1.0 - hz) * (1.0 - vz);
+    float mortar = mix(1.0 - (1.0 - hz) * (1.0 - vz), 0.202, brickFar);
     float tint = mix(0.88 + 0.24 * facHash(vec2(floor(u / 0.235 + off), course) + seed), 1.0,
                      smoothstep(0.3, 0.8, max(wu / 0.235, wz / 0.075)));
     rgb *= tint;
@@ -326,12 +330,15 @@ void relFacade(inout vec3 rgb, inout vec2 iu, highp vec2 fac, highp vec2 uz) {
       facMix(rgb, iu, FAC_PIERRE, FAC_PIERRE_IU, span * slab);
       iron = span * (facRailing(z - z1, u, wz, wu) + facRailing(z - z2, u, wz, wu));
     }
-    // Garde-corps de 0,6 m devant chaque fenêtre (créneaux périodiques en étages).
-    float rowBody = facGrid(t, sill / fh, (sill + 0.6) / fh, nReg, wt);
-    float rowRail = facGrid(t, (sill + 0.53) / fh, (sill + 0.6) / fh, nReg, wt);
-    float bars = facGrid(u / 0.13, 0.0, 0.3, 1.0e5, wu / 0.13);
-    iron += facGrid(s, 0.5 - hw - 0.05 / p, 0.5 + hw + 0.05 / p, n, ws) * (1.0 - balFloors)
-          * (rowRail + (rowBody - rowRail) * bars);
+    // Garde-corps de 0,6 m devant chaque fenêtre (créneaux périodiques en étages), calculés
+    // seulement près de leur rangée (ou quand un étage tient dans quelques pixels).
+    if (wt > 0.3 || abs(fract(t) * fh - sill - 0.3) < 0.31 + 0.5 * wz) {
+      float rowBody = facGrid(t, sill / fh, (sill + 0.6) / fh, nReg, wt);
+      float rowRail = facGrid(t, (sill + 0.53) / fh, (sill + 0.6) / fh, nReg, wt);
+      float bars = facGrid(u / 0.13, 0.0, 0.3, 1.0e5, wu / 0.13);
+      iron += facGrid(s, 0.5 - hw - 0.05 / p, 0.5 + hw + 0.05 / p, n, ws) * (1.0 - balFloors)
+            * (rowRail + (rowBody - rowRail) * bars);
+    }
     facMix(rgb, iu, FAC_FER, FAC_FER_IU, clamp(iron, 0.0, 1.0));
   }
 #endif
