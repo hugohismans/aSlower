@@ -1,0 +1,191 @@
+{
+  "schema": "coursier-bulles/1",
+  "description": "Bulles pedagogiques du jalon 2 (scene libre, sans niveaux). Schema et regles : src/game/bubbles.js ; langage des declencheurs : src/game/conditions.js. Vitesses en fractions de c (beta), jamais en m/s. Ordre du fichier = ordre pedagogique (a priorite egale, la premiere declenchee passe d'abord).",
+  "bulles": [
+    {
+      "id": "accel",
+      "texte": "Maintiens ton doigt sur la moitié droite de l'écran pour accélérer.",
+      "texteDesktop": "Maintiens ↑ (Z en AZERTY, W en QWERTY) pour accélérer.",
+      "priorite": 3,
+      "note": "Toujours a l'arret 2 s apres le depart, sans avoir jamais accelere.",
+      "quand": {
+        "tous": [
+          { "var": "depuisDebut", "op": ">", "val": 2 },
+          { "non": { "var": "dejaParti" } }
+        ]
+      }
+    },
+    {
+      "id": "deux-horloges",
+      "texte": "Deux horloges : ta montre (ta batterie) et celle de la ville (tes clients).",
+      "priorite": 1,
+      "note": "Peu apres le depart (apres la bulle doppler si l'on fonce).",
+      "quand": {
+        "tous": [
+          { "var": "dejaParti" },
+          { "var": "depuisDebut", "op": ">", "val": 4 }
+        ]
+      }
+    },
+    {
+      "id": "inertie",
+      "texte": "Tu as lâché : tu gardes ta vitesse. Ici, rien ne te freine.",
+      "priorite": 1,
+      "note": "Ni poussee ni frein pendant 1 s en roulant (beta > 0,05).",
+      "quand": {
+        "pendant": {
+          "cond": {
+            "tous": [
+              { "var": "relache" },
+              { "var": "beta", "op": ">", "val": 0.05 }
+            ]
+          },
+          "s": 1
+        }
+      }
+    },
+    {
+      "id": "frein",
+      "texte": "Pour ralentir, maintiens le bouton Frein.",
+      "texteDesktop": "Pour ralentir, maintiens Espace (ou ↓).",
+      "priorite": 3,
+      "note": "Le bord de la zone roulable approche (moins de 2,5 distances d'arret) sans freiner, ou la butee douce freine a ta place.",
+      "quand": {
+        "un": [
+          {
+            "tous": [
+              { "var": "beta", "op": ">", "val": 0.2 },
+              { "var": "margeFreinage", "op": "<", "val": 2.5 },
+              { "non": { "var": "freine" } }
+            ]
+          },
+          { "evenement": "butee" }
+        ]
+      }
+    },
+    {
+      "id": "tourner",
+      "texte": "Glisse ton pouce à gauche de l'écran pour tourner.",
+      "texteDrag": "Pose ton pouce à gauche de l'écran et glisse-le vers la gauche ou la droite pour tourner.",
+      "texteTilt": "Penche ton GSM comme un volant pour tourner.",
+      "texteDesktop": "Tourne avec ← et → (Q et D en AZERTY).",
+      "priorite": 0,
+      "note": "En route depuis 5 s sans avoir encore tourne (remplace approcheVirage tant qu'il n'y a pas de niveaux).",
+      "quand": {
+        "tous": [
+          { "pendant": { "cond": { "var": "beta", "op": ">", "val": 0.03 }, "s": 5 } },
+          { "non": { "var": "dejaTourne" } }
+        ]
+      }
+    },
+    {
+      "id": "doppler",
+      "texte": "Les murs bleuissent devant toi : c'est l'effet Doppler. Tu fonces dans leur lumière.",
+      "priorite": 2,
+      "note": "Texte du cahier des charges. Beta > 0,15 pendant 1 s, facade dans l'axe a moins de 300 m, vision relativiste.",
+      "quand": {
+        "tous": [
+          { "pendant": { "cond": { "var": "beta", "op": ">", "val": 0.15 }, "s": 1 } },
+          { "var": "facadeDevant" },
+          { "var": "k", "op": ">", "val": 0.99 }
+        ]
+      }
+    },
+    {
+      "id": "vision",
+      "texte": "Maintiens 👁 pour voir la ville sans relativité. Compare !",
+      "texteDesktop": "Maintiens C (ou Maj) pour voir la ville sans relativité. Compare !",
+      "priorite": 1,
+      "note": "Apres la bulle doppler, a beta > 0,25.",
+      "quand": {
+        "tous": [
+          { "apres": "doppler" },
+          { "var": "beta", "op": ">", "val": 0.25 },
+          { "var": "k", "op": ">", "val": 0.99 }
+        ]
+      }
+    },
+    {
+      "id": "projecteur",
+      "texte": "Tout s'illumine devant toi : la lumière s'entasse dans ta direction.",
+      "note": "Beta > 0,4 pendant 1 s, vision relativiste.",
+      "quand": {
+        "tous": [
+          { "pendant": { "cond": { "var": "beta", "op": ">", "val": 0.4 }, "s": 1 } },
+          { "var": "k", "op": ">", "val": 0.99 }
+        ]
+      }
+    },
+    {
+      "id": "invisible",
+      "texte": "Certaines couleurs ont filé dans l'ultraviolet : ton œil ne les voit plus.",
+      "note": "Beta > 0,45 pendant 1 s (D > 1,6 : le bleu des facades passe sous 300 nm), facade dans l'axe.",
+      "quand": {
+        "tous": [
+          { "pendant": { "cond": { "var": "beta", "op": ">", "val": 0.45 }, "s": 1 } },
+          { "var": "facadeDevant" },
+          { "var": "k", "op": ">", "val": 0.99 }
+        ]
+      }
+    },
+    {
+      "id": "aberration",
+      "texte": "Le décor se resserre vers l'avant : la lumière semble venir de devant toi.",
+      "note": "Beta > 0,5 pendant 1 s, vision relativiste.",
+      "quand": {
+        "tous": [
+          { "pendant": { "cond": { "var": "beta", "op": ">", "val": 0.5 }, "s": 1 } },
+          { "var": "k", "op": ">", "val": 0.99 }
+        ]
+      }
+    },
+    {
+      "id": "retro",
+      "texte": "Derrière toi, tout a viré au rouge : la lumière qui te rattrape est étirée.",
+      "note": "Coup d'oeil arriere (debloque en J3 ; regardArriere vaut false avant) a beta > 0,25.",
+      "quand": {
+        "tous": [
+          { "var": "regardArriere" },
+          { "var": "beta", "op": ">", "val": 0.25 },
+          { "var": "k", "op": ">", "val": 0.99 }
+        ]
+      }
+    },
+    {
+      "id": "ecart",
+      "texte": "La ville a vécu {ecart} s de plus que toi : compare les deux horloges.",
+      "note": "Des que l'ecart t - tau atteint 1 s.",
+      "quand": { "var": "ecart", "op": ">=", "val": 1 }
+    },
+    {
+      "id": "gamma",
+      "texte": "La ville va ×{gamma} plus vite que toi : ta montre prend du retard.",
+      "note": "Gamma >= 1,5 pendant 1 s (beta > 0,745).",
+      "quand": { "pendant": { "cond": { "var": "gamma", "op": ">=", "val": 1.5 }, "s": 1 } }
+    },
+    {
+      "id": "vitesse-propre",
+      "texte": "{vitessePropre} m de ville par seconde de ta montre : plus que c ! La rue a raccourci ×{gamma}.",
+      "note": "Gamma.beta > 1 (beta > 1/racine de 2) pendant 1 s : la vitesse propre depasse c.",
+      "quand": { "pendant": { "cond": { "var": "beta", "op": ">", "val": 0.7072 }, "s": 1 } }
+    },
+    {
+      "id": "asymptote",
+      "texte": "Tu frôles c = {c} m/s sans jamais l'atteindre : chaque poussée compte un peu moins.",
+      "note": "Beta > 0,9.",
+      "quand": { "var": "beta", "op": ">", "val": 0.9 }
+    },
+    {
+      "id": "attente",
+      "texte": "À l'arrêt aussi, ta batterie s'use : 1 s de ta montre = 1 s de batterie.",
+      "note": "Arret (beta < 0,01) pendant 4 s apres etre deja parti, plus de 5 s apres le depart.",
+      "quand": {
+        "tous": [
+          { "var": "dejaParti" },
+          { "var": "depuisDebut", "op": ">", "val": 5 },
+          { "pendant": { "cond": { "var": "beta", "op": "<", "val": 0.01 }, "s": 4 } }
+        ]
+      }
+    }
+  ]
+}

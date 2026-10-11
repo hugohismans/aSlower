@@ -1,0 +1,121 @@
+/*
+ * Bulles pédagogiques (src/hud/bubbles.js) et région d'annonces (src/hud/announcer.js).
+ * Jetons de couleur et marges : src/styles/base.css. À lier dans index.html après hud.css.
+ *
+ * La bulle se place dans le HUD (colonne centrée), juste sous .hud-top : étroite, deux lignes
+ * au plus, le centre de la vue reste libre. Fond clair opaque et texte foncé (≈ 18:1), filet
+ * jaune : lisible au soleil et distincte des panneaux sombres du HUD. Elle seule capte les
+ * touchers (le HUD a pointer-events: none) ; pendant sa sortie, plus aucun.
+ */
+
+.bubble {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  max-width: min(34em, 64vw);
+  margin-top: 8px;
+  padding: 8px 34px 9px 14px;
+  border-left: 6px solid var(--accent);
+  border-radius: 12px;
+  background: #fffdf6;
+  box-shadow: 0 2px 10px rgb(0 0 0 / 0.45);
+  color: var(--bg);
+  cursor: pointer;
+  pointer-events: auto;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    opacity 180ms ease-out,
+    transform 180ms ease-out;
+}
+
+.bubble[hidden] {
+  display: none;
+}
+
+.bubble[data-state='enter'],
+.bubble[data-state='out'] {
+  opacity: 0;
+  transform: translate3d(0, -8px, 0);
+}
+
+.bubble[data-state='in'] {
+  opacity: 1;
+  transform: none;
+}
+
+/* Sortie : les touchers repassent au jeu tout de suite. */
+.bubble[data-state='out'] {
+  pointer-events: none;
+}
+
+.bubble-text {
+  display: -webkit-box;
+  margin: 0;
+  overflow: hidden;
+  font-size: clamp(15px, 4.4vh, 18px);
+  font-weight: 650;
+  line-height: 1.3;
+  text-align: left;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+
+/* Croix discrète : indique qu'un toucher ferme la bulle (toute la bulle est la cible). */
+.bubble-close {
+  position: absolute;
+  top: 6px;
+  right: 10px;
+  color: #4a5260;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* Bulle bloquante (tutoriel) : reste jusqu'au toucher. */
+.bubble-hint {
+  margin-top: 4px;
+  color: #4a5260;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.bubble-hint[hidden] {
+  display: none;
+}
+
+/* Petits écrans en paysage (GSM) : un peu plus large, marges réduites. */
+@media (max-height: 420px) {
+  .bubble {
+    max-width: min(34em, 72vw);
+    margin-top: 6px;
+    padding: 6px 30px 7px 12px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bubble,
+  .bubble[data-state='enter'],
+  .bubble[data-state='out'] {
+    transform: none;
+    transition: none;
+  }
+}
+
+/* Région d'annonces : lue par les lecteurs d'écran, invisible et sans effet sur la page. */
+.sr-announcer {
+  position: fixed;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+  pointer-events: none;
+}
