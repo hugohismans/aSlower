@@ -78,6 +78,14 @@ export const TURN_RATE = 1.0;
 /** Taux de pivot à l'arrêt (rad/s), pour se réorienter sans avancer. */
 export const PIVOT_RATE = 0.8;
 
+/**
+ * Marche arrière lente (jalon 3, option `reverse` de createPlayer) : frein maintenu à l'arrêt
+ * pendant REVERSE_DELAY s de temps propre, puis recul plafonné à REVERSE_MAX_BETA·c
+ * (1,5 m/s à c = 30). Le délai laisse le temps de livrer (0,5 s sous 0,03·c) sans reculer.
+ */
+export const REVERSE_DELAY = 0.5;
+export const REVERSE_MAX_BETA = 0.05;
+
 /** Vitesse au-dessous de laquelle on considère le joueur à l'arrêt (m/s de vitesse propre). */
 export const REST_EPSILON = 1e-9;
 

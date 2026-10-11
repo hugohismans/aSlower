@@ -84,7 +84,8 @@ Erreur ≤ 2e-11 sur les trois valeurs, quel que soit le découpage, y compris u
 
 **Imports permis** (liste de référence dans `docs/interfaces.md`), vérifiés par `tests/purity.test.js` :
 - `physics/` : seulement `physics/` ;
-- `game/` : physics, storage ;
+- `game/` : physics, storage, et le seul fichier pur `render/layout.js` (scènes paramétriques des niveaux, J3) ;
+- `levels/` : rien (JSON chargés par `import.meta.glob`) ;
 - `render/` : physics, storage (garde-fou) et three ;
 - `hud/` : physics (constantes et formats), storage, et la documentation importée en `?raw` pour l'écran Crédits ;
 - `input/` : DOM seulement ;
@@ -137,14 +138,14 @@ Pause sur `visibilitychange`.
 - Taux de virage en temps propre : dθ/dτ = −steer·TURN_RATE (`steer` > 0 : à droite, sens horaire ; TURN_RATE = 1,0 rad/s dans `constants.js`). Dans la ville, le rayon vaut r = |u|/TURN_RATE = γv/TURN_RATE, volant à fond : 0,117·L à β = 0,76 et 0,206·L à β = 0,9, soit 35 m à 22,8 m/s et 62 m à 27 m/s à c = 30 (117 et 206 m à c = 100). TURN_RATE ne dépend pas de c (les temps du jeu non plus) : les rayons suivent la ville, à l'échelle de L.
 - **À l'arrêt**, le volant fait pivoter le cap sur place à PIVOT_RATE (0,8 rad/s) ; la poussée part ensuite dans la direction du cap.
 - **Relâcher** : roue libre exacte (Δt = γh, Δx = u·h), sans frottement.
-- **Frein** : poussée opposée, prioritaire sur l'accélérateur, bornée pour s'arrêter exactement à v = 0, sans marche arrière en J1. Marche arrière lente (≤ 0,05·c, 1,5 m/s à c = 30) en maintenant le frein à l'arrêt, en J3.
-- **Collisions (J3)** : test balayé ; la composante normale de u est annulée. La pénalité prend la forme d'un **étourdissement à l'arrêt** de κ_choc·(γ_avant − γ_après) s, ajouté à τ et à t, de sorte que la batterie reste égale à τ.
+- **Frein** : poussée opposée, prioritaire sur l'accélérateur, bornée pour s'arrêter exactement à v = 0, sans marche arrière en J1. **Marche arrière lente (livrée en J3**, option `reverse` de `createPlayer`, activée par les niveaux) : frein maintenu à l'arrêt pendant 0,5 s de τ (délai compté depuis l'arrêt : il laisse le temps de livrer), puis recul le long de −cap, plafonné à 0,05·c (1,5 m/s à c = 30) ; le cap reste celui du véhicule, volant inversé comme en voiture, la poussée freine le recul puis repart en avant.
+- **Collisions (livrées en J3, `physics/collisions.js`)** : véhicule = cercle de 0,6 m, obstacles = emprises rectangulaires (bâtiments, portes fermées, bords de la carte). Test **balayé** (segment contre rectangle grossi du rayon, coins arrondis), sur des morceaux de ≤ 1 m : aucune traversée, même à φ = 3. Réponse inélastique : la composante normale de u est annulée, la tangentielle conservée (on glisse le long du mur, le cap suit). La pénalité prend la forme d'un **étourdissement à l'arrêt** de κ·(γ_avant − γ_après) s, **κ = 20 s**, borné à 30 s, ajouté à τ et à t, de sorte que la batterie reste égale à τ : choc de face à β = 0,2 → 0,4 s ; β = 0,5 → 3,1 s ; β = 0,76 → 10,9 s (pour tout c). Un choc contre une porte qui a une reprise coûte la reprise à la place.
 
 ### Horloges
 - Batterie = τ, qui s'use aussi à l'arrêt. Tout ce qui appartient à la ville (délais, pont, flash, pommier) avance en t.
 - Le HUD affiche t, l'heure de la ville à l'endroit du joueur, synchronisée dans le référentiel de la ville. L'écart t − τ ne dépend d'aucune convention.
 - Les objets **vus** sont affichés à leur temps d'émission t_e. Leurs horloges défilent donc au rythme D par rapport à ta montre (×2,7 en fonçant vers elles à β = 0,76, soit 22,8 m/s à c = 30 ; ×0,37 en s'éloignant), et non γ. Les bulles et le carnet l'expliquent.
-- Objets fixes qui changent d'état (porte, client) : t_e = t − d/c, via `emissionTimeStatic` (J3).
+- Objets fixes qui changent d'état (porte, client, lampe) : t_e = t − d/c, via `emissionTimeStatic` (livré en J1, utilisé par `game/rules.js` en J3 : `seenDoorOpen`, `seenClientPresent`, lampes à horaire). Les règles, elles, suivent l'état réel à t (on livre sur place, la porte bloque dès qu'elle est fermée).
 
 ### Temps retardé des objets mobiles (`physics/retarded.js`, livré et testé en J1, rendu en J4)
 - Trajectoires analytiques p(t) en temps de ville.
@@ -312,22 +313,26 @@ Position des objets à l'instant t de la **ville**, passée par la même aberrat
 ## 6. Niveaux (data-driven) et score
 
 ### Format
-- Schéma `coursier-niveau/1`, un JSON par niveau : `src/levels/n01-premier-jour.json` … `n06-pommier-langevin.json`.
-- Un seul glob, `./n[0-9][0-9]-*.json`, dans `src/levels/index.js`. `level.js` et `validate.js` reçoivent des objets simples, donc utilisables par un script Node.
+- Schéma `coursier-niveau/1`, un JSON par niveau : `src/levels/n01-premier-jour.json` … `n06-pommier-langevin.json`. **Documentation complète en tête de `src/game/validate.js`** (résumé dans `docs/interfaces.md`, exemple complet : `tests/fixtures/levels-valid/n99-exemple.json`). Clés : `schema, id, numero, titre, notion, briefing[], note?, parametres?, scene` (format des scènes de `render/layout.js`, sans départ ni paramètres), `depart {pos, capDegres, beta?}`, `batterie {tauMax}`, `phiMax`, `colis[] {id, client, nom?, retrait? {lieu, rayon?, pasAvant?}, livraison {lieu, rayon?, pasAvant?}, delai?, obligatoire}`, `portes[]? {id, pos, capDegres, largeur, hauteur, lampe {raie | corpsNoir, intensite?, hauteur?, allumee?}, teinte, portee [min, max], maintien, resteOuverte?, reprise?}`, `reprises[]? {id, pos, capDegres, cout}`, `etoiles {batterieMin, tVilleMax}`, `bulles[]?`, `indices[]? {apresEchecs, texte, aide?}`, `parcours? {reference, naif?}` (itinéraires du bot).
+- **Unités** (décision 10) : toutes les distances de jeu en L (expressions `{fois, de?, plus?, min?…}` de `layout.js`, paramètres communs à la scène et au jeu), l'échelle humaine (rues, îlots, rayons de zone, hauteurs) en mètres ; temps (délais, batterie, « pas avant », maintien, coûts) en secondes, **nombres seulement** (le validateur refuse une expression en L dans un temps) ; vitesses en β.
+- Un seul glob, `./n[0-9][0-9]-*.json`, dans `src/levels/index.js` (`LEVEL_FILES`, chargés d'avance). `level.js` et `validate.js` reçoivent des objets simples, donc utilisables par un script Node.
 - La palette est dans `src/data/palette.json` (J1). Les scènes de développement sont dans `src/data/scenes/` (J1) et utilisent le même format de carte.
 - **Validateur maison en deux passes** (structure puis sémantique), avec des messages précis (chemin JSON et raison). Fichiers invalides de test dans `tests/fixtures/`.
-- **Règles vérifiées par le validateur** :
-  - id = nom du fichier ;
+- **Règles vérifiées par le validateur** (J3 : structure, puis sémantique pour c = 10, 30 et 100 m/s) :
+  - id = nom du fichier, numéro = ses deux chiffres ;
   - φ_max explicite et ≤ 3 ;
-  - `visibilite` suffisante pour les objets clés ;
-  - aucune géométrie sous y = 0 ;
-  - abris hors de la ligne de vue des flashs ;
-  - capteurs de porte à au moins 12 m.
-- **Bot de référence** (`game/bot.js`, pur) : les tests vérifient que les seuils d'étoiles sont atteignables (parcours de référence = 3 étoiles, parcours naïf < 3). `npm run calibrate` affiche des seuils suggérés sans rien écrire.
+  - `visibilite` suffisante pour les objets clés (avertissement si la portée d'une porte la dépasse) ;
+  - aucune géométrie sous y = 0 (hauteurs des bâtiments, portes, lampes) ;
+  - abris hors de la ligne de vue des flashs (J5) ;
+  - capteurs de porte à au moins 12 m, plage d'au moins 12 m ;
+  - départ, zones de retrait et de livraison, reprises : dans la carte, hors des bâtiments et **atteignables** depuis le départ (remplissage sur une grille de 1 m, rayon du véhicule, portes ouvertes) ;
+  - références d'ids (porte → reprise), ids uniques, bulles du niveau valides et distinctes des bulles globales, « pas avant » antérieur au délai, au moins un colis obligatoire, temps sans expression en L.
+- **Bot de référence** (`game/bot.js`, pur, livré en J3) : il suit `parcours.reference` (points de passage, β de croisière, arrêts, attentes « jusqu'à t ») avec la vraie physique (`level.advance` : player.step, collisions, règles). Les tests vérifient, pour c = 10, 30 et 100, que le parcours de référence fait 3 étoiles et le parcours naïf moins de 3. `npm run calibrate` affiche des seuils suggérés sans rien écrire (batterieMin ≈ (τmax − 1,15·τ_ref)/τmax, tVilleMax ≈ 1,12·t_ref).
+- **Machine à états** (`game/states.js`) : chargement → menu → selection → briefing → decompte → enCours ⇄ pause / reprise → bilan | echec ; table déclarative et gardes (« passer » après 4 échecs). **Progression** (`game/progress.js`, `aslower:v1:progression`) : étoiles et records gardés **par niveau et par valeur de c** ; un niveau se débloque quand le précédent est réussi (à n'importe quel c) ou passé.
 - **Aucune fenêtre de vitesse dans le JSON** : les portes appellent `spectrum.js`.
 
 ### Réussite, échecs et étoiles
-- **Réussite** : tous les colis obligatoires livrés (zone + v ≤ 0,03·c pendant 0,5 s de τ : 0,9 m/s à c = 30, 3 m/s à c = 100 ; à confirmer), même en retard (décision 6).
+- **Réussite** : tous les colis obligatoires livrés (zone + v ≤ 0,03·c pendant 0,5 s de τ : 0,9 m/s à c = 30, 3 m/s à c = 100 ; et t ≥ pasAvant : on peut attendre dans la zone), même en retard (décision 6). Ordre des règles dans une image : retraits et livraisons, portes, chocs et reprises, réussite, puis échecs.
 - **Échecs** : seulement la batterie vide (τ ≥ τmax) et le flash (N5). Un délai dépassé n'est **pas** un échec : il coûte l'étoile « Ponctuel ».
 - **Reprises** (pas d'échec) : chute du pont, choc contre une porte. On repart au point défini dans le JSON, avec quelques secondes ajoutées aux deux horloges.
 - **Étoiles**, une par critère du cahier des charges :
@@ -429,7 +434,7 @@ aSlower/
 ├── package.json  package-lock.json  vite.config.js
 ├── scripts/
 │   ├── check-dist.mjs             # J1 : licences présentes dans dist/
-│   └── calibrate.mjs              # J3 : seuils d'étoiles suggérés par le bot
+│   └── calibrate.mjs              # J3 : seuils d'étoiles suggérés par le bot (npm run calibrate)
 ├── public/
 │   ├── favicon.svg
 │   ├── licences/openrelativity-MIT.txt
@@ -483,7 +488,7 @@ aSlower/
 │   ├── game/
 │   │   ├── settings.js            # J1 : réglage de c (saisie, ?c=, stockage aslower:v1:reglages)
 │   │   ├── conditions.js  bubbles.js   # J2 : déclencheurs (sans eval), moteur « une seule fois »
-│   │   └── states.js  level.js  rules.js  score.js  validate.js  bot.js   # J3
+│   │   └── states.js  level.js  rules.js  score.js  validate.js  bot.js  progress.js   # J3
 │   ├── levels/                    # J3+
 │   │   ├── index.js               # seul glob ./n[0-9][0-9]-*.json
 │   │   └── n01-premier-jour.json … n06-pommier-langevin.json
@@ -492,7 +497,8 @@ aSlower/
     ├── J1 : player  relativity  retarded  spectrum (LUT échantillonnée comme le GPU)
     │        render-math  layout  lod  culling  format  storage  purity  licence  check-dist  loop  settings
     ├── J2 : tiltMath  conditions
-    ├── J3 : collisions  rules  levels (+ fixtures/levels-invalid/)  score  states  culling (cône apparent)
+    ├── J3 : collisions  rules  levels (+ fixtures/levels-valid/n99-exemple.json, fixtures/levels-invalid/)
+    │        score  states  progress  culling (cône apparent)
     └── J4 : living
 ```
 
@@ -606,6 +612,16 @@ Reste à faire ou à mesurer :
 - profils mid/full (seul le DPR adaptatif est livré ; pas de mesure GPU par `EXT_disjoint_timer_query_webgl2`).
 
 ### J3 : moteur de niveaux et niveaux 1 à 3
+
+**Statut (2026-10-11) : partie 1 livrée (moteur pur et testé)** — schéma `coursier-niveau/1` et validateur
+(`game/validate.js`, fixtures invalides), collisions (`physics/collisions.js`), marche arrière (`player.js`),
+partie et règles (`game/level.js`, `game/rules.js` : livraisons, « pas avant », retards, portes à lampe par la
+teinte perçue, reprises, batterie), étoiles (`game/score.js`), machine à états (`game/states.js`), progression
+par c (`game/progress.js`), bot et calibrage (`game/bot.js`, `scripts/calibrate.mjs`), glob des niveaux
+(`src/levels/index.js`) et niveau d'exemple `tests/fixtures/levels-valid/n99-exemple.json`. Reste (partie 2) :
+niveaux 1 à 3, rendu des portes, lampes et zones, écrans (sélection, briefing, décompte, bilan, échec),
+branchement dans main.js, spectromètre, culling par cône apparent.
+
 - schéma et validateur, machine à états (menu → briefing → décompte → jeu → bilan) ;
 - livraisons, batterie, délais (étoile « Ponctuel », jamais un échec), collisions, marche arrière, `emissionTimeStatic` ;
 - étoiles, bot et calibrage ;
@@ -687,4 +703,7 @@ Le jeu, les données JSON et la documentation sont en français ; les identifian
 | jauge de vitesse | gauge (`gaugeFraction`) |
 | commandes, HUD, diagnostic, stockage, boucle | `controls`, `hud`, `diag`, `storage`, `loop` |
 | colis, livraison, délai, étoile (J3) | parcel, delivery, deadline, star |
+| retrait, « pas avant », porte à lampe, teinte perçue, reprise (J3) | pickup, not-before (`pasAvant`), door (`portes`), `perceivedLamp`, `applyReprise` |
+| choc, étourdissement, marche arrière (J3) | collision (`stepWithCollisions`), stun (`stunFor`), reverse (`REVERSE_DELAY`) |
+| partie, règles, bilan, progression, pilote de référence (J3) | level state (`createLevel`, `advance`), rules (`update`), score, progress, bot (`runBot`) |
 | bulle (J2), carnet de physique (J5) | bubble, notebook |

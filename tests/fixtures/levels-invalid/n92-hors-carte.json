@@ -1,0 +1,242 @@
+{
+  "schema": "coursier-niveau/1",
+  "id": "n92-hors-carte",
+  "numero": 92,
+  "titre": "Invalide",
+  "notion": "livrer, porte verte, attendre",
+  "briefing": [
+    "Niveau d'exemple du moteur (tests) : une lettre, une porte verte, un client absent.",
+    "Distances en L = 10·c m : le niveau a le meme sens pour tout c."
+  ],
+  "note": "Fixture invalide : lieu hors des limites de la carte",
+  "parametres": {
+    "nord": {
+      "fois": 2,
+      "plus": 60
+    }
+  },
+  "scene": {
+    "titre": "Avenue d'exemple",
+    "graine": 99,
+    "limites": {
+      "min": [
+        -40,
+        -30
+      ],
+      "max": [
+        40,
+        {
+          "fois": 1,
+          "de": "nord"
+        }
+      ]
+    },
+    "rues": [
+      {
+        "id": "avenue",
+        "nom": "Avenue Fizeau",
+        "de": [
+          0,
+          -30
+        ],
+        "a": [
+          0,
+          {
+            "fois": 1,
+            "de": "nord"
+          }
+        ],
+        "largeur": 18
+      }
+    ],
+    "rangees": [
+      {
+        "id": "ouest",
+        "coin": [
+          -68,
+          0
+        ],
+        "ilot": [
+          56,
+          56
+        ],
+        "nombre": {
+          "fois": 0.025,
+          "arrondiInf": 1
+        },
+        "pas": [
+          0,
+          80
+        ],
+        "facades": [
+          "est"
+        ],
+        "largeurs": [
+          15,
+          26
+        ],
+        "profondeurs": [
+          14,
+          22
+        ],
+        "hauteurs": [
+          8,
+          24
+        ],
+        "couleurs": [
+          "rouge",
+          "orange",
+          "jaune",
+          "vert",
+          "cyan",
+          "bleu",
+          "violet"
+        ],
+        "ordreCouleurs": "suite"
+      },
+      {
+        "id": "est",
+        "coin": [
+          12,
+          0
+        ],
+        "ilot": [
+          56,
+          56
+        ],
+        "nombre": {
+          "fois": 0.025,
+          "arrondiInf": 1
+        },
+        "pas": [
+          0,
+          80
+        ],
+        "facades": [
+          "ouest"
+        ],
+        "largeurs": [
+          15,
+          26
+        ],
+        "profondeurs": [
+          14,
+          22
+        ],
+        "hauteurs": [
+          8,
+          24
+        ],
+        "couleurs": [
+          "violet",
+          "bleu",
+          "cyan",
+          "vert",
+          "jaune",
+          "orange",
+          "rouge"
+        ],
+        "ordreCouleurs": "suite"
+      }
+    ],
+    "batiments": [],
+    "lampadaires": [
+      {
+        "rue": "avenue",
+        "pas": 40,
+        "depart": 20
+      }
+    ]
+  },
+  "depart": {
+    "pos": [
+      0,
+      10
+    ],
+    "capDegres": 90
+  },
+  "batterie": {
+    "tauMax": 120
+  },
+  "phiMax": 3,
+  "colis": [
+    {
+      "id": "lettre",
+      "client": "M. Doppler",
+      "nom": "Lettre",
+      "livraison": {
+        "lieu": [
+          0,
+          {
+            "fois": 0.5
+          }
+        ],
+        "rayon": 8
+      },
+      "delai": 30,
+      "obligatoire": true
+    },
+    {
+      "id": "horloge",
+      "client": "Mme Fizeau",
+      "nom": "Horloge",
+      "livraison": {
+        "lieu": [
+          0,
+          {
+            "fois": 5
+          }
+        ],
+        "rayon": 8,
+        "pasAvant": 60
+      },
+      "obligatoire": true
+    }
+  ],
+  "portes": [
+    {
+      "id": "porte-verte",
+      "nom": "Porte verte",
+      "pos": [
+        0,
+        {
+          "fois": 1
+        }
+      ],
+      "capDegres": 90,
+      "largeur": 80,
+      "hauteur": 6,
+      "lampe": {
+        "raie": 640,
+        "hauteur": 7
+      },
+      "teinte": "vert",
+      "portee": [
+        12,
+        {
+          "fois": 0.15,
+          "min": 30
+        }
+      ],
+      "maintien": 0.4,
+      "reprise": "elan"
+    }
+  ],
+  "reprises": [
+    {
+      "id": "elan",
+      "pos": [
+        0,
+        {
+          "fois": 0.7
+        }
+      ],
+      "capDegres": 90,
+      "cout": 3
+    }
+  ],
+  "etoiles": {
+    "batterieMin": 0.3,
+    "tVilleMax": 70
+  }
+}

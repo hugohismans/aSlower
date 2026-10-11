@@ -1,0 +1,122 @@
+{
+  "schema": "coursier-niveau/1",
+  "id": "n99-exemple",
+  "numero": 99,
+  "titre": "Exemple",
+  "notion": "livrer, porte verte, attendre",
+  "briefing": [
+    "Niveau d'exemple du moteur (tests) : une lettre, une porte verte, un client absent.",
+    "Distances en L = 10·c m : le niveau a le meme sens pour tout c."
+  ],
+  "note": "Fixture des tests du moteur de niveaux (jalon 3). Avenue nord-sud de 2 L, porte a lampe rouge (raie 640 nm) a 1 L, a voir verte (beta 0,13 a 0,22).",
+  "parametres": {
+    "nord": { "fois": 2, "plus": 60 }
+  },
+  "scene": {
+    "titre": "Avenue d'exemple",
+    "graine": 99,
+    "limites": { "min": [-40, -30], "max": [40, { "fois": 1, "de": "nord" }] },
+    "rues": [
+      { "id": "avenue", "nom": "Avenue Fizeau", "de": [0, -30], "a": [0, { "fois": 1, "de": "nord" }], "largeur": 18 }
+    ],
+    "rangees": [
+      {
+        "id": "ouest",
+        "coin": [-68, 0],
+        "ilot": [56, 56],
+        "nombre": { "fois": 0.025, "arrondiInf": 1 },
+        "pas": [0, 80],
+        "facades": ["est"],
+        "largeurs": [15, 26],
+        "profondeurs": [14, 22],
+        "hauteurs": [8, 24],
+        "couleurs": ["rouge", "orange", "jaune", "vert", "cyan", "bleu", "violet"],
+        "ordreCouleurs": "suite"
+      },
+      {
+        "id": "est",
+        "coin": [12, 0],
+        "ilot": [56, 56],
+        "nombre": { "fois": 0.025, "arrondiInf": 1 },
+        "pas": [0, 80],
+        "facades": ["ouest"],
+        "largeurs": [15, 26],
+        "profondeurs": [14, 22],
+        "hauteurs": [8, 24],
+        "couleurs": ["violet", "bleu", "cyan", "vert", "jaune", "orange", "rouge"],
+        "ordreCouleurs": "suite"
+      }
+    ],
+    "batiments": [],
+    "lampadaires": [{ "rue": "avenue", "pas": 40, "depart": 20 }]
+  },
+  "depart": { "pos": [0, 10], "capDegres": 90 },
+  "batterie": { "tauMax": 120 },
+  "phiMax": 3,
+  "colis": [
+    {
+      "id": "lettre",
+      "client": "M. Doppler",
+      "nom": "Lettre",
+      "livraison": { "lieu": [0, { "fois": 0.5 }], "rayon": 8 },
+      "delai": 30,
+      "obligatoire": true
+    },
+    {
+      "id": "horloge",
+      "client": "Mme Fizeau",
+      "nom": "Horloge",
+      "livraison": { "lieu": [0, { "fois": 1.6 }], "rayon": 8, "pasAvant": 60 },
+      "obligatoire": true
+    }
+  ],
+  "portes": [
+    {
+      "id": "porte-verte",
+      "nom": "Porte verte",
+      "pos": [0, { "fois": 1 }],
+      "capDegres": 90,
+      "largeur": 80,
+      "hauteur": 6,
+      "lampe": { "raie": 640, "hauteur": 7 },
+      "teinte": "vert",
+      "portee": [12, { "fois": 0.15, "min": 30 }],
+      "maintien": 0.4,
+      "reprise": "elan"
+    }
+  ],
+  "reprises": [{ "id": "elan", "pos": [0, { "fois": 0.7 }], "capDegres": 90, "cout": 3 }],
+  "etoiles": { "batterieMin": 0.3, "tVilleMax": 70 },
+  "bulles": [
+    {
+      "id": "n99-porte",
+      "texte": "La lampe rouge vire au vert quand tu fonces vers elle : garde cette vitesse.",
+      "quand": { "var": "beta", "op": ">", "val": 0.12 }
+    }
+  ],
+  "indices": [
+    { "apresEchecs": 1, "texte": "Relâche quand la lampe devient verte : tu gardes ta vitesse." },
+    { "apresEchecs": 2, "texte": "Lampe rouge : vise à peu près un sixième de c.", "aide": "zoneVitesse" }
+  ],
+  "parcours": {
+    "reference": {
+      "note": "Vite jusqu'a la lettre, ralentir a beta 0,17 avant la porte, puis vite jusqu'a Mme Fizeau et attendre t = 60 s.",
+      "etapes": [
+        { "aller": [0, { "fois": 0.5 }], "beta": 0.6, "arret": true },
+        { "aller": [0, { "fois": 0.75 }], "beta": 0.6 },
+        { "aller": [0, { "fois": 1, "plus": 20 }], "beta": 0.17 },
+        { "aller": [0, { "fois": 1.6 }], "beta": 0.6, "arret": true },
+        { "attendreJusqua": 60 }
+      ]
+    },
+    "naif": {
+      "note": "Prudent : tout a beta 0,15. La lettre arrive en retard et la batterie fond.",
+      "etapes": [
+        { "aller": [0, { "fois": 0.5 }], "beta": 0.15, "arret": true },
+        { "aller": [0, { "fois": 1, "plus": 20 }], "beta": 0.17 },
+        { "aller": [0, { "fois": 1.6 }], "beta": 0.15, "arret": true },
+        { "attendreJusqua": 60 }
+      ]
+    }
+  }
+}

@@ -19,7 +19,14 @@
  *   u et le cap à |u| constant, au taux dθ/dτ = −steer·TURN_RATE (steer > 0 : à droite) ;
  * - quand on roule, le cap suit la direction de u ; à l'arrêt, le volant fait pivoter le cap
  *   sur place à PIVOT_RATE, et la poussée part dans la direction du cap ;
- * - le frein (prioritaire sur la poussée) arrête exactement à v = 0, sans marche arrière ;
+ * - le frein (prioritaire sur la poussée) arrête exactement à v = 0 ;
+ * - marche arrière lente (option `reverse` de createPlayer, jalon 3) : frein maintenu à
+ *   l'arrêt pendant REVERSE_DELAY s de temps propre → recul le long de −cap, accélération
+ *   propre brake·a, plafonné à REVERSE_MAX_BETA·c ; le cap reste celui du véhicule (u et le
+ *   cap sont alors opposés), le volant est inversé comme en voiture (à droite : l'arrière
+ *   part à droite, θ augmente) ; la poussée freine le recul (arrêt exact) puis repart en
+ *   avant ; relâcher : roue libre en arrière. Sans l'option (défaut, jalon 1), le frein
+ *   maintenu à l'arrêt laisse le véhicule immobile ;
  * - la rapidité ne dépasse jamais state.phiMax (ni PHI_MAX_LIMIT).
  *
  * Intégration d'un sous-pas h (schéma de Strang) : demi-rotation, segment hyperbolique
@@ -37,6 +44,8 @@ import {
   PHI_MAX_LIMIT,
   PIVOT_RATE,
   REST_EPSILON,
+  REVERSE_DELAY,
+  REVERSE_MAX_BETA,
   SUBSTEP_MAX_DIST,
   SUBSTEP_MAX_DT,
   TURN_RATE,
@@ -45,10 +54,13 @@ import { gammaFromU, hyperbolicSegment, rapidityFromU } from './relativity.js';
 
 /**
  * @typedef {{x:number, y:number, ux:number, uy:number, hx:number, hy:number,
- *            tau:number, t:number, phiMax:number, c:number, a:number}} PlayerState
+ *            tau:number, t:number, phiMax:number, c:number, a:number,
+ *            reverse?: boolean, brakeHold?: number}} PlayerState
  * x, y : position (m) ; ux, uy : vitesse propre u = γv (m/s) ; hx, hy : cap unitaire ;
  * tau : temps propre (batterie, s) ; t : temps de la ville (s) ; phiMax : plafond de rapidité ;
- * c : vitesse de la lumière (m/s) et a : accélération propre maximale (m/s²) de la partie.
+ * c : vitesse de la lumière (m/s) et a : accélération propre maximale (m/s²) de la partie ;
+ * reverse : marche arrière permise ; brakeHold : temps propre passé à l'arrêt frein maintenu (s).
+ * En marche arrière, u est opposée au cap (u·h < 0).
  */
 
 /** @typedef {{thrust?: number, brake?: number, steer?: number}} DriveCommand */
@@ -59,9 +71,10 @@ const DEFAULT_DRIVE_PHYSICS = Object.freeze({ c: C, a: A });
 /**
  * Crée l'état du joueur, à l'arrêt.
  * @param {{x?: number, y?: number, heading?: number, phiMax?: number,
- *          physics?: {c: number, a: number}}} [options]
+ *          physics?: {c: number, a: number}, reverse?: boolean}} [options]
  *   heading : cap en radians depuis +x vers +y (π/2 = nord) ; physics : constantes de la
- *   partie (`physicsFor(c)` convient ; défaut : c = C, a = A).
+ *   partie (`physicsFor(c)` convient ; défaut : c = C, a = A) ; reverse : marche arrière lente
+ *   (frein maintenu à l'arrêt ; défaut false, comportement du jalon 1).
  * @returns {PlayerState}
  */
 export function createPlayer({
@@ -70,6 +83,7 @@ export function createPlayer({
   heading = Math.PI / 2,
   phiMax = PHI_MAX_DEFAULT,
   physics = DEFAULT_DRIVE_PHYSICS,
+  reverse = false,
 } = {}) {
   if (!(phiMax > 0 && phiMax <= PHI_MAX_LIMIT)) {
     throw new RangeError(`phiMax doit être dans ]0 ; ${PHI_MAX_LIMIT}] (reçu : ${phiMax})`);
@@ -78,8 +92,25 @@ export function createPlayer({
   if (!(c > 0 && Number.isFinite(c) && a > 0 && Number.isFinite(a))) {
     throw new RangeError(`physics : c et a positifs et finis attendus (reçu : c = ${c}, a = ${a})`);
   }
-  return { x, y, ux: 0, uy: 0, hx: Math.cos(heading), hy: Math.sin(heading), tau: 0, t: 0, phiMax, c, a };
+  return {
+    x,
+    y,
+    ux: 0,
+    uy: 0,
+    hx: Math.cos(heading),
+    hy: Math.sin(heading),
+    tau: 0,
+    t: 0,
+    phiMax,
+    c,
+    a,
+    reverse: Boolean(reverse),
+    brakeHold: 0,
+  };
 }
+
+/** Rapidité du plafond de la marche arrière : atanh(REVERSE_MAX_BETA). */
+export const REVERSE_MAX_RAPIDITY = Math.atanh(REVERSE_MAX_BETA);
 
 /**
  * Durée maximale d'un sous-pas : au plus SUBSTEP_MAX_DT et au plus SUBSTEP_MAX_DIST
@@ -112,15 +143,17 @@ function rotateVelocityAndHeading(s, cos, sin) {
 }
 
 /**
- * Ramène le cap à l'unité : direction de u si l'on roule, sinon simple renormalisation.
+ * Ramène le cap à l'unité : direction de u si l'on roule (direction opposée en marche
+ * arrière, u·h < 0), sinon simple renormalisation.
  * Sous REST_EPSILON, la vitesse est remise exactement à zéro (résidu d'arrondi).
  * @param {PlayerState} s
  */
 function settleHeading(s) {
   const U = Math.hypot(s.ux, s.uy);
   if (U > REST_EPSILON) {
-    s.hx = s.ux / U;
-    s.hy = s.uy / U;
+    const sign = s.ux * s.hx + s.uy * s.hy < 0 ? -1 : 1;
+    s.hx = (sign * s.ux) / U;
+    s.hy = (sign * s.uy) / U;
     return;
   }
   s.ux = 0;
@@ -177,15 +210,64 @@ function restPiece(s, steer, h) {
 }
 
 /**
- * Remet la rapidité exactement à φ le long du cap (fin d'une poussée plafonnée).
+ * Remet la rapidité exactement à φ le long du cap (fin d'une poussée plafonnée) ; en marche
+ * arrière (sign = −1), le long de −cap.
  * @param {PlayerState} s
  * @param {number} phi
  * @param {number} c
+ * @param {number} [sign]
  */
-function setRapidity(s, phi, c) {
-  const U = c * Math.sinh(phi);
+function setRapidity(s, phi, c, sign = 1) {
+  const U = sign * c * Math.sinh(phi);
   s.ux = U * s.hx;
   s.uy = U * s.hy;
+}
+
+/**
+ * Sous-pas en marche arrière (u opposée au cap) ou départ en arrière depuis l'arrêt.
+ * Volant inversé (dθ/dτ = +steer·TURN_RATE) ; frein : recul accéléré (brake·a) jusqu'à
+ * REVERSE_MAX_RAPIDITY ; poussée seule : freine le recul, arrêt exact, puis le reste du
+ * sous-pas repart en avant ; ni l'un ni l'autre : roue libre en arrière.
+ * @param {PlayerState} s
+ * @param {number} thrust
+ * @param {number} brake
+ * @param {number} steer
+ * @param {number} h
+ * @param {number} phiCap
+ * @param {number} c
+ * @param {number} a
+ */
+function reverseSubstep(s, thrust, brake, steer, h, phiCap, c, a) {
+  const omega = steer * TURN_RATE;
+  const phi = rapidityFromU(s.ux, s.uy, c);
+  if (brake > 0) {
+    const accel = brake * a;
+    const tauCap = ((REVERSE_MAX_RAPIDITY - phi) * c) / accel;
+    if (tauCap >= h) {
+      movingPiece(s, -accel, omega, h, c);
+      return;
+    }
+    if (tauCap > 0) {
+      movingPiece(s, -accel, omega, tauCap, c);
+      setRapidity(s, REVERSE_MAX_RAPIDITY, c, -1);
+    }
+    movingPiece(s, 0, omega, h - Math.max(tauCap, 0), c);
+    return;
+  }
+  if (thrust > 0) {
+    const accel = thrust * a;
+    const tauStop = (phi * c) / accel;
+    if (tauStop >= h) {
+      movingPiece(s, accel, omega, h, c);
+      return;
+    }
+    movingPiece(s, accel, omega, tauStop, c);
+    s.ux = 0; // arrêt exact, puis départ en avant pour le reste du sous-pas
+    s.uy = 0;
+    substep(s, thrust, 0, steer, h - tauStop, phiCap, c, a);
+    return;
+  }
+  movingPiece(s, 0, omega, h, c);
 }
 
 /**
@@ -203,10 +285,29 @@ function setRapidity(s, phi, c) {
 function substep(s, thrust, brake, steer, h, phiCap, c, a) {
   const atRest = Math.hypot(s.ux, s.uy) <= REST_EPSILON;
   const omega = -steer * TURN_RATE;
+  if (!(brake > 0) || !atRest) s.brakeHold = 0;
+
+  if (!atRest && s.ux * s.hx + s.uy * s.hy < 0) {
+    reverseSubstep(s, thrust, brake, steer, h, phiCap, c, a);
+    return;
+  }
 
   if (brake > 0) {
     if (atRest) {
-      restPiece(s, steer, h);
+      if (!s.reverse) {
+        restPiece(s, steer, h);
+        return;
+      }
+      // Marche arrière : après REVERSE_DELAY s de frein maintenu à l'arrêt.
+      const wait = REVERSE_DELAY - (s.brakeHold ?? 0);
+      if (wait >= h) {
+        s.brakeHold = (s.brakeHold ?? 0) + h;
+        restPiece(s, steer, h);
+        return;
+      }
+      if (wait > 0) restPiece(s, steer, wait);
+      s.brakeHold = REVERSE_DELAY;
+      reverseSubstep(s, thrust, brake, steer, h - Math.max(wait, 0), phiCap, c, a);
       return;
     }
     // Temps propre d'arrêt : la rapidité baisse au taux brake·a/c.
@@ -218,6 +319,7 @@ function substep(s, thrust, brake, steer, h, phiCap, c, a) {
     }
     movingPiece(s, -decel, omega, tauStop, c);
     restPiece(s, steer, h - tauStop); // arrêt exact (u = 0), le reste du sous-pas à l'arrêt
+    s.brakeHold = h - tauStop; // le délai de la marche arrière part de l'arrêt
     return;
   }
 
@@ -295,7 +397,9 @@ export function step(state, cmd, dtau) {
  * @param {PlayerState} state
  * @returns {{x: number, y: number, vx: number, vy: number, speed: number, beta: number,
  *            gamma: number, rapidity: number, tau: number, t: number, ux: number,
- *            uy: number, heading: number, hx: number, hy: number, c: number}}
+ *            uy: number, heading: number, hx: number, hy: number, c: number,
+ *            reversing: boolean}}
+ *   reversing : marche arrière (u opposée au cap ; heading reste le cap du véhicule).
  */
 export function snapshot(state) {
   const { x, y, ux, uy, hx, hy, tau, t } = state;
@@ -319,6 +423,7 @@ export function snapshot(state) {
     hx,
     hy,
     c,
+    reversing: ux * hx + uy * hy < 0,
   };
 }
 

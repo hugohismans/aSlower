@@ -1,0 +1,24 @@
+{
+  "note": "Fichier -> debut du message d'erreur attendu (validateLevel, chemin JSON : raison).",
+  "attendus": {
+    "n80-schema.json": "schema : « \"csl-niveau/1\" » inconnu",
+    "n81-id-different.json": "id : « n81-autre » au lieu du nom de fichier « n81-id-different »",
+    "n82-numero.json": "numero : 7 au lieu de 82",
+    "n83-phimax.json": "phiMax : 4 hors de ]0 ; 3]",
+    "n84-champ-inconnu.json": "etoiles.batterieMn : champ inconnu (faute de frappe ?)",
+    "n85-temps-en-l.json": "colis[0] (lettre).delai : temps en secondes : nombre attendu, pas d'expression en L",
+    "n86-sous-le-sol.json": "portes[0] (porte-verte).lampe.hauteur : lampe à -2 m : sous le sol",
+    "n87-capteur-proche.json": "portes[0] (porte-verte).portee[0] : capteur à 6 m : au moins 12 m",
+    "n88-plage-capteur.json": "portes[0] (porte-verte).portee : plage de 6,0 m : au moins 12 m",
+    "n89-reprise-inconnue.json": "portes[0] (porte-verte).reprise : reprise « nulle-part » inconnue",
+    "n90-colis-dans-batiment.json": "colis[0] (lettre).livraison.lieu : zone de livraison inaccessible depuis le départ",
+    "n91-enclave.json": "colis[1] (horloge).livraison.lieu : zone de livraison inaccessible depuis le départ",
+    "n92-hors-carte.json": "colis[1] (horloge).livraison.lieu : zone de livraison (0,0 ; ",
+    "n93-pas-avant-delai.json": "colis[1] (horloge).livraison.pasAvant : client absent jusqu'à t = 50 s, délai 40 s",
+    "n94-sans-obligatoire.json": "colis : au moins un colis obligatoire attendu",
+    "n95-lampe-double.json": "portes[0] (porte-verte).lampe : donner soit « raie » (nm), soit « corpsNoir » (K)",
+    "n96-bulle.json": "bulles[0] (n96-vite).quand.var : variable « vitesse » inconnue",
+    "n97-scene.json": "scene.depart : le départ se donne au niveau",
+    "n98-chevauchement.json": "scene : Bâtiments qui se chevauchent"
+  }
+}

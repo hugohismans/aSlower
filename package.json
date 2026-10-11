@@ -15,6 +15,7 @@
     "build": "vite build",
     "postbuild": "node scripts/check-dist.mjs",
     "preview": "vite preview",
+    "calibrate": "node scripts/calibrate.mjs",
     "test": "vitest run",
     "test:watch": "vitest"
   },

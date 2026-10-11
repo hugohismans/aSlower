@@ -125,6 +125,7 @@ npm run dev:gsm   # idem, ouvert au réseau local (pour essayer sur un GSM du m�
 npm test          # tests Vitest : physique, couleurs, rendu, formats, stockage, pureté, licences
 npm run build     # construit le site dans dist/, puis vérifie les licences (scripts/check-dist.mjs)
 npm run preview   # sert dist/ : http://localhost:4173/aSlower/
+npm run calibrate # joue les niveaux avec le pilote de référence (c = 10, 30, 100) et suggère les seuils d'étoiles
 ```
 
 Paramètres d'URL (combinables, par exemple `?scene=quartier-test&bench&c=30&dpr=1`) :

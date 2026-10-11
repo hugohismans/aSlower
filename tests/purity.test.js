@@ -196,19 +196,22 @@ function findImports(code) {
 function areaOf(path) {
   if (path === 'src/storage.js') return 'storage';
   if (path === 'src/main.js' || path === 'src/loop.js') return 'entry';
-  const m = /^src\/(physics|game|render|hud|input)\//.exec(path);
+  const m = /^src\/(physics|game|render|hud|input|levels)\//.exec(path);
   return m ? m[1] : null;
 }
 
 /**
  * Imports permis par zone (docs/interfaces.md). Chaque zone peut importer ses propres
  * fichiers. `rawDocs` : documentation Markdown importée en ?raw (écran Crédits).
+ * `files` : fichiers précis permis en plus (game : render/layout.js, fichier pur qui développe
+ * les scènes paramétriques des niveaux).
  * Les feuilles de style sont liées dans index.html, jamais importées depuis hud/ ou input/.
  */
 const RULES = {
   physics: { allowed: ['physics'] },
   storage: { allowed: [] },
-  game: { allowed: ['game', 'physics', 'storage'] },
+  game: { allowed: ['game', 'physics', 'storage'], files: ['src/render/layout.js'] },
+  levels: { allowed: ['levels'] },
   render: { allowed: ['render', 'physics', 'storage', 'three'] },
   hud: { allowed: ['hud', 'physics', 'storage'], rawDocs: true },
   input: { allowed: ['input'] },
@@ -226,6 +229,13 @@ const PURE_FILES = [
   'src/input/tiltMath.js',
   'src/game/conditions.js',
   'src/game/bubbles.js',
+  'src/game/validate.js',
+  'src/game/level.js',
+  'src/game/rules.js',
+  'src/game/score.js',
+  'src/game/states.js',
+  'src/game/bot.js',
+  'src/levels/index.js',
 ];
 const isPure = (path) => path.startsWith('src/physics/') || PURE_FILES.includes(path);
 
@@ -277,7 +287,8 @@ function checkFile(file, source) {
     const target = resolveTarget(file, specifier);
     if (rule && rule.allowed !== '*') {
       const isRawDoc = target.kind === 'file' && /(^|&)raw(&|$)/.test(target.query) && target.path.endsWith('.md');
-      const permitted = rule.allowed.includes(target.area) || (rule.rawDocs && isRawDoc);
+      const isExtraFile = target.kind === 'file' && (rule.files ?? []).includes(target.path);
+      const permitted = rule.allowed.includes(target.area) || (rule.rawDocs && isRawDoc) || isExtraFile;
       if (!permitted) {
         const allowed = rule.allowed.length ? rule.allowed.join(', ') : 'rien';
         problems.push(`${file}:${line} : importe « ${specifier} » (${target.area}) ; ${area} n'a droit qu'à : ${allowed}`);
@@ -404,6 +415,10 @@ describe('les règles détectent les infractions (fichiers fictifs)', () => {
     expect(checkFile('src/main.js', "import * as THREE from 'three';\nimport { local } from './storage.js';")).toEqual([]);
     expect(checkFile('src/render/camera.js', "import { PerspectiveCamera } from 'three';")).toEqual([]);
     expect(checkFile('src/game/x.js', "import { PerspectiveCamera } from 'three';")).toHaveLength(1);
+    // game : render/layout.js (pur) seulement, pas le reste de render/.
+    expect(checkFile('src/game/x.js', "import { expandScene } from '../render/layout.js';")).toEqual([]);
+    expect(checkFile('src/game/x.js', "import { buildCity } from '../render/cityMesher.js';")).toHaveLength(1);
+    expect(checkFile('src/levels/index.js', "import { C } from '../physics/constants.js';")).toHaveLength(1);
     expect(checkFile('src/foo.js', 'export const a = 1;')[0]).toMatch(/hors du contrat/);
   });
 });

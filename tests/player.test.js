@@ -12,10 +12,12 @@ import {
   PHI_MAX_DEFAULT,
   PHI_MAX_LIMIT,
   PIVOT_RATE,
+  REVERSE_DELAY,
+  REVERSE_MAX_BETA,
   TURN_RATE,
   physicsFor,
 } from '../src/physics/constants.js';
-import { clampFrameDt, createPlayer, snapshot, step } from '../src/physics/player.js';
+import { clampFrameDt, createPlayer, REVERSE_MAX_RAPIDITY, snapshot, step } from '../src/physics/player.js';
 
 /** Générateur pseudo-aléatoire à graine fixe (mulberry32) : tests reproductibles. */
 function rng(seed) {
@@ -497,5 +499,77 @@ describe('plafond de rapidité', () => {
     s.phiMax = 1;
     step(s, { thrust: 1 }, 0.5);
     expectNear(snapshot(s).rapidity, 1, 1e-12);
+  });
+});
+
+describe('marche arrière lente (option reverse, jalon 3)', () => {
+  it.each([10, 30, 100])('frein maintenu à l’arrêt : immobile pendant REVERSE_DELAY, puis recul ≤ 0,05·c, cap conservé (c = %i)', (cValue) => {
+    const physics = physicsFor(cValue);
+    const s = createPlayer({ heading: 0, physics, reverse: true });
+    drive(s, { brake: 1 }, REVERSE_DELAY - 0.02);
+    expect(s.x).toBe(0);
+    expect(s.ux).toBe(0);
+    let maxSpeed = 0;
+    let previousX = 0;
+    drive(s, { brake: 1 }, 5, 1 / 60, (st) => {
+      const snap = snapshot(st);
+      maxSpeed = Math.max(maxSpeed, snap.speed);
+      expect(st.x).toBeLessThanOrEqual(previousX); // vers l'arrière (cap à l'est)
+      previousX = st.x;
+      expect(st.hx).toBe(1); // le véhicule regarde toujours devant lui
+    });
+    expect(maxSpeed).toBeLessThanOrEqual(REVERSE_MAX_BETA * physics.c * (1 + 1e-12));
+    expectNear(snapshot(s).speed, REVERSE_MAX_BETA * physics.c, 1e-9 * physics.c);
+    expect(snapshot(s).reversing).toBe(true);
+    expectNear(snapshot(s).heading, 0, 1e-12);
+    // Δt = γΔτ, comme en marche avant (le recul est un mouvement comme un autre).
+    expect(s.t).toBeGreaterThan(s.tau);
+    expectNear(REVERSE_MAX_RAPIDITY, Math.atanh(REVERSE_MAX_BETA), 1e-15);
+  });
+
+  it('sans l’option (défaut, jalon 1) : le frein maintenu laisse le véhicule immobile', () => {
+    const s = createPlayer({ heading: 0 });
+    drive(s, { brake: 1 }, 5);
+    expect(s.x).toBe(0);
+    expect(s.ux).toBe(0);
+    expect(snapshot(s).reversing).toBe(false);
+  });
+
+  it('après un freinage, le délai part de l’arrêt', () => {
+    const s = movingEast(0.1, { reverse: true });
+    const tauStop = (0.1 * C) / A; // 1 s
+    drive(s, { brake: 1 }, tauStop + REVERSE_DELAY - 0.05);
+    const xStop = s.x;
+    expect(s.ux).toBe(0);
+    drive(s, { brake: 1 }, 0.5);
+    expect(s.x).toBeLessThan(xStop);
+  });
+
+  it('relâcher en reculant : roue libre en arrière ; poussée : arrêt exact puis départ en avant', () => {
+    const s = createPlayer({ heading: 0, reverse: true });
+    drive(s, { brake: 1 }, REVERSE_DELAY + 2);
+    const u = s.ux;
+    expect(u).toBeLessThan(0);
+    drive(s, {}, 1);
+    expect(s.ux).toBe(u); // roue libre exacte
+    const xBefore = s.x;
+    // Poussée : la rapidité du recul (≈ 0,05) tombe à 0 en 0,5 s à c = 30, a = 3, puis on repart.
+    drive(s, { thrust: 1 }, 2);
+    expect(s.ux).toBeGreaterThan(0);
+    expect(snapshot(s).reversing).toBe(false);
+    expectNear(snapshot(s).rapidity, (A * (2 - REVERSE_MAX_RAPIDITY * (C / A))) / C, 1e-9);
+    expect(s.x).toBeLessThan(xBefore + C * 2); // repart de l'endroit où le recul s'est arrêté
+    expect(s.hx).toBe(1);
+  });
+
+  it('volant inversé en marche arrière : à droite, l’arrière part à droite (θ augmente)', () => {
+    const s = createPlayer({ heading: Math.PI / 2, reverse: true });
+    drive(s, { brake: 1 }, REVERSE_DELAY + 1);
+    const theta0 = snapshot(s).heading;
+    drive(s, { brake: 1, steer: 1 }, 0.5);
+    expect(snapshot(s).heading).toBeGreaterThan(theta0);
+    // Le recul suit toujours −cap.
+    const snap = snapshot(s);
+    expectNear((snap.vx * snap.hx + snap.vy * snap.hy) / snap.speed, -1, 1e-12);
   });
 });

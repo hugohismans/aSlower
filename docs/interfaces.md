@@ -1,4 +1,4 @@
-# Interfaces entre modules (jalons 1 et 2)
+# Interfaces entre modules (jalons 1 à 3)
 
 Ce document est le contrat entre les modules. Chaque signature ci-dessous doit être
 respectée à la lettre ; un module ne dépend des autres que par ces signatures.
@@ -29,7 +29,10 @@ dans le joueur (`createPlayer({physics})`), la scène (`lengthUnit`), et tout le
 - **Imports permis** (vérifiés par `tests/purity.test.js`) :
   - `src/physics/**` : uniquement `src/physics/**` ;
   - `src/storage.js` : rien ;
-  - `src/game/**` : physics, storage (`game/settings.js` : réglage de c) ;
+  - `src/game/**` : physics, storage (`game/settings.js` : réglage de c, `game/progress.js` :
+    progression), et le seul fichier `src/render/layout.js` (pur : développe les scènes
+    paramétriques des niveaux) ;
+  - `src/levels/**` : rien (données JSON, chargées par `import.meta.glob`) ;
   - `src/render/**` : physics, storage, three ;
   - `src/hud/**` : physics, storage (+ fichiers `?raw` de documentation pour les Crédits) ;
   - `src/input/**` : rien d'autre que le DOM ;
@@ -37,8 +40,10 @@ dans le joueur (`createPlayer({physics})`), la scène (`lengthUnit`), et tout le
   - `localStorage` et `sessionStorage` ne sont utilisés que dans `src/storage.js`.
   - Les fichiers « purs » (`physics/**`, `render/subdivide.js`, `render/lod.js`,
     `render/culling.js`, `render/layout.js`, `render/adaptiveDpr.js`, `hud/format.js`,
-    `input/tiltMath.js`, `game/conditions.js`, `game/bubbles.js`) n'utilisent ni `window`,
-    ni `document`, ni `three`, et n'importent que des fichiers purs (ou du JSON).
+    `input/tiltMath.js`, `game/conditions.js`, `game/bubbles.js`, `game/validate.js`,
+    `game/level.js`, `game/rules.js`, `game/score.js`, `game/states.js`, `game/bot.js`,
+    `levels/index.js`) n'utilisent ni `window`, ni `document`, ni `three`, et n'importent que
+    des fichiers purs (ou du JSON). `game/progress.js` n'est pas pur (stockage).
 
 ## `src/physics/relativity.js` (pur)
 
@@ -68,16 +73,22 @@ emissionTimeStatic(t, d, c = C)    // t − d/c
 
 ```js
 /** @typedef {{x:number, y:number, ux:number, uy:number, hx:number, hy:number,
- *             tau:number, t:number, phiMax:number, c:number, a:number}} PlayerState */
+ *             tau:number, t:number, phiMax:number, c:number, a:number,
+ *             reverse:boolean, brakeHold:number}} PlayerState */
 createPlayer({x = 0, y = 0, heading = Math.PI / 2, phiMax = PHI_MAX_DEFAULT,
-              physics = {c: C, a: A}} = {})  // → PlayerState ; physics : physicsFor(c) de la
+              physics = {c: C, a: A}, reverse = false} = {})
+                                   // → PlayerState ; physics : physicsFor(c) de la
                                    // partie (ou {c: 100, a: 10} des tests du cahier des charges),
-                                   // gardé dans l'état (c, a) ; RangeError si c ou a ≤ 0
+                                   // gardé dans l'état (c, a) ; RangeError si c ou a ≤ 0 ;
+                                   // reverse : marche arrière lente (J3 ; game/level.js l'active)
 step(state, cmd, dtau)             // modifie et renvoie state ; cmd = {thrust, brake, steer}
                                    // (0..1, 0..1, −1..1, valeurs absentes = 0) ; dtau ≥ 0
                                    // sans plafond (sous-pas internes) ; frein prioritaire.
 snapshot(state)                    // → {x, y, vx, vy, speed, beta, gamma, rapidity,
-                                   //    tau, t, ux, uy, heading, hx, hy, c}
+                                   //    tau, t, ux, uy, heading, hx, hy, c, reversing}
+                                   // reversing : marche arrière (u opposée au cap ; heading
+                                   // reste le cap du véhicule)
+REVERSE_MAX_RAPIDITY               // atanh(REVERSE_MAX_BETA)
 clampFrameDt(dtReal)               // min(max(dtReal, 0), MAX_FRAME_DT)
 ```
 
@@ -88,8 +99,40 @@ clampFrameDt(dtReal)               // min(max(dtReal, 0), MAX_FRAME_DT)
   le long du cap (colinéaires à u) ; virage = rotation exacte de u et du cap
   (schéma de Strang : demi-rotation, segment, demi-rotation), dθ/dτ = −steer·TURN_RATE ;
   à l'arrêt, pivot du cap à PIVOT_RATE.
-- Frein : arrêt exact à v = 0, sans marche arrière (jalon 1).
+- Frein : arrêt exact à v = 0. Sans `reverse` (défaut), pas de marche arrière (jalon 1).
+  Avec `reverse` (jalon 3) : frein maintenu à l'arrêt pendant `REVERSE_DELAY` = 0,5 s de τ
+  (délai compté depuis l'arrêt ; il laisse le temps de livrer), puis recul le long de −cap à
+  l'accélération propre brake·a, plafonné à `REVERSE_MAX_BETA`·c = 0,05·c ; volant inversé
+  (à droite : θ augmente) ; relâcher = roue libre en arrière ; poussée = freine le recul
+  (arrêt exact) puis repart en avant ; Δt = γΔτ comme en marche avant.
 - Plafond : la rapidité ne dépasse jamais `state.phiMax` (découpe exacte du sous-pas).
+
+## `src/physics/collisions.js` (pur, jalon 3)
+
+Véhicule = cercle de `PLAYER_RADIUS` = 0,6 m ; obstacles = rectangles alignés
+`Box = {x0, y0, x1, y1, kind?, id?}` (`kind` : 'batiment' | 'porte' | 'limite').
+
+```js
+PLAYER_RADIUS = 0.6 · STUN_PER_GAMMA = 20 (κ, s) · STUN_MAX = 30 · CONTACT_SKIN = 1e-5 · MAX_SLIDES = 4
+boxFromCenter(x, y, width, depth, extra?) · boxesFromBuildings(buildings) // expandScene → Box[]
+boundaryBoxes(bounds, thickness = 50)   // 4 murs juste hors des limites
+distanceToBox(px, py, box)
+createBoxIndex(boxes, cell = 32)        // → {boxes, query(xmin, ymin, xmax, ymax) → Box[]}
+sweepCircleBox(x0, y0, dx, dy, r, box)  // premier contact du cercle balayé (rectangle grossi de r,
+                                        // coins arrondis) → {time ∈ [0, 1], nx, ny, penetration?} | null
+sweepCircle(x0, y0, dx, dy, r, boxes)   // → {time, nx, ny, penetration?, box} | null (le plus tôt)
+stunFor(gammaBefore, gammaAfter, kappa = STUN_PER_GAMMA) // κ·(γ_avant − γ_après), dans [0 ; STUN_MAX]
+resolveMove(from, to, {ux, uy}, obstacles, {radius, c, kappa} = {})   // PURE
+  // → {x, y, ux, uy, hits: [{box, nx, ny, x, y}], gammaBefore, gammaAfter, stun, dTau, dT}
+  // contact : composante normale entrante de u annulée, tangentielle gardée, reste du
+  // déplacement projeté sur la tangente ; dTau = dT = stun (étourdissement à l'arrêt)
+stepWithCollisions(state, cmd, dtau, obstacles, {radius, kappa, applyStun = true} = {})
+  // comme step (modifie state), en morceaux ≤ 1/60 s et ≤ SUBSTEP_MAX_DIST (1 m), chacun passé
+  // à resolveMove ; le cap suit la vitesse après un glissement ; applyStun : ajoute
+  // l'étourdissement à state.tau ET state.t (la batterie reste τ).
+  // → {hits: [{box, kind, id, nx, ny, x, y, gammaBefore, gammaAfter, stun, tau, t}], stun}
+```
+`obstacles` : tableau de `Box` ou source `{query(...)}` (index, ou `level.obstacles`).
 
 ## `src/physics/retarded.js` (pur)
 
@@ -466,6 +509,147 @@ facadeAhead(buildings, x, y, hx, hy, {range = 300, halfAngleDeg = 20, rays = 5})
 validateBubbles(json) · interpolate(template, vars) · chooseText(def, modeVolant)
 formatNumberFr(x, decimals = 1) · createMemoryStore()
 ```
+
+## Niveaux (jalon 3)
+
+### Schéma « coursier-niveau/1 »
+
+Documentation complète en tête de `src/game/validate.js` (source de vérité). Un fichier par
+niveau, `src/levels/nNN-nom.json` (id = nom du fichier). **Unités** : longueurs = nombre (m,
+échelle humaine) ou expression `{fois, de?, plus?, min?, max?, arrondiSup?, arrondiInf?,
+puisPlus?}` en L = 10·c m (ou d'un paramètre de `parametres`) ; temps (s) et vitesses (β) :
+nombres seulement (le validateur refuse une expression dans un temps).
+
+| Clé | Contenu |
+|---|---|
+| `schema`, `id`, `numero`, `titre`, `notion`, `briefing[]`, `note?` | métadonnées (`numero` = chiffres de l'id ; briefing : 1 à 4 lignes ≤ 140 car.) |
+| `parametres?` | `{nom: longueur}` partagés par la scène et le jeu |
+| `scene` | format « coursier-scene/1 » de `render/layout.js` sans `schema`, `id`, `depart`, `parametres` |
+| `depart` | `{pos, capDegres, beta?}` (beta : départ lancé) |
+| `batterie` | `{tauMax}` (s de τ) |
+| `phiMax` | ]0 ; 3] |
+| `colis[]` | `{id, client, nom?, retrait?: {lieu, rayon? (8 m), pasAvant?}, livraison: {lieu, rayon?, pasAvant?}, delai?, obligatoire}` |
+| `portes[]?` | `{id, nom?, pos, capDegres (0/90/180/270 : sens du passage), largeur, hauteur, lampe: {raie (nm) \| corpsNoir (K), intensite?, hauteur? (porte + 1 m), allumee?: [[début, fin[…] (t ville)}, teinte, portee: [min ≥ 12 m, max ≥ min + 12 m], maintien (s de τ), resteOuverte? (s de t), reprise?}` |
+| `reprises[]?` | `{id, pos, capDegres, cout}` (s ajoutées à τ et t) |
+| `etoiles` | `{batterieMin (fraction restante), tVilleMax (s)}` |
+| `bulles[]?` | schéma des bulles (`game/bubbles.js`), langage de `game/conditions.js` ; ids distincts des bulles globales |
+| `indices[]?` | `{apresEchecs, texte, aide?}` (aide ∈ repereFreinage, zoneVitesse, horaire, fantome, diagramme, spectrometre) |
+| `parcours?` | `{reference: {note?, etapes}, naif?: {…}}` ; étapes `{aller: pos, beta, arret?, rayon?}`, `{attendre: s}`, `{attendreJusqua: t}` (bot) |
+
+Exemple complet : `tests/fixtures/levels-valid/n99-exemple.json`.
+
+### `src/game/validate.js` (pur)
+```js
+validateLevel(json, {fileName?, palette, lightSpeeds = [10, 30, 100], globalBubbleIds = []})
+  // → {ok, errors: string[], warnings: string[]} ; messages « fichier.json › chemin : raison » ;
+  // passe 1 structure (clés connues, types, bornes, temps sans expression), passe 2 sémantique
+  // pour chaque c (suffixe « (c = 10 m/s) » si l'erreur n'existe pas pour tous) : id = nom de
+  // fichier, numéro, φmax ≤ 3, scène développable, aucune géométrie sous le sol, capteurs ≥ 12 m
+  // (plage ≥ 12 m), lieux dans la carte et ATTEIGNABLES depuis le départ (grille de 1 m, portes
+  // ouvertes), références (porte → reprise), pasAvant < délai, ≥ 1 colis obligatoire…
+assertValidLevel(json, options, max = 10)   // lève une Error qui liste les erreurs
+levelIdFromFileName(path) · reachabilityGrid(scene, start, radius)
+LEVEL_ID_PATTERN · ID_PATTERN · HUES · AIDS · MIN_SENSOR_DISTANCE = 12 · MIN_SENSOR_SPAN = 12
+VALIDATION_LIGHT_SPEEDS = [10, 30, 100]
+```
+
+### `src/game/level.js` (pur)
+```js
+LEVEL_SCHEMA = 'coursier-niveau/1' · DEFAULT_ZONE_RADIUS = 8 · DOOR_THICKNESS = 1
+resolveLevel(json, lengthUnit)      // expressions → mètres (copie, sans parametres)
+sceneOfLevel(resolved)              // scène « coursier-scene/1 » (pour render/scene.createWorld)
+createLevel(json, physics, palette) // → LevelState (JSON supposé valide) :
+  // {id, numero, titre, json, level (résolu), physics, scene (expandScene), sceneJson, start:
+  //  {x, y, heading, beta}, tauMax, phiMax, etoiles, status: 'enCours'|'reussite'|'echec',
+  //  raison, fin: {t, tau} | null, tau, t, colis[], portes[], reprises[], chocs,
+  //  reprisesFaites, playerRadius, obstacles: {query(...)} (bâtiments, portes FERMÉES, bords)}
+  // colis[i] = {id, client, nom, obligatoire, delai, etat: 'aRetirer'|'aBord'|'livre',
+  //   retrait | null, livraison : {x, y, rayon, pasAvant, timer, inZone, waiting},
+  //   retireA, livreA : {t, tau} | null, enRetard}
+  // portes[i] = {id, nom, x, y, capDegres, largeur, hauteur, box, lampe: {x, y, z, kind:
+  //   'line'|'blackbody', lambda, T, intensity, allumee}, teinte, portee: [min, max] (m),
+  //   maintien, resteOuverte, reprise, ouverte, ouverteA, timer, inRange,
+  //   vue: perceivedLamp(...) | null (spectromètre), history: [{t, ouverte}]}
+createLevelPlayer(level)            // createPlayer(…, reverse: true), départ lancé si beta > 0
+advance(level, player, cmd, dtau)   // UNE IMAGE : stepWithCollisions (sans appliquer
+  // l'étourdissement), étourdissement des chocs ajouté à τ et t (sauf porte à reprise),
+  // rules.update, reprises appliquées → {events, snapshot}
+applyReprise(player, {x, y, heading, cout}) · doorBox(door, id) · headingFromDegrees(deg)
+```
+
+### `src/game/rules.js` (pur)
+```js
+DELIVERY_MAX_BETA = 0.03 · DELIVERY_HOLD = 0.5
+update(level, snapshot, dt, events = []) // → {events, status} ; modifie level. Ordre :
+  // 1. retraits puis livraisons (zone + v ≤ 0,03·c pendant 0,5 s de τ + t ≥ pasAvant) ;
+  // 2. portes (teinte perçue = teinte demandée pendant maintien, dans la portée) ;
+  // 3. chocs reçus ({type: 'choc', kind, id, stun, …}) → reprise si porte à reprise ;
+  // 4. réussite (tous les obligatoires livrés, même en retard) ; 5. échec batterie (τ ≥ tauMax).
+  // Événements produits : {type: 'retrait'|'livraison' (colis, client, t, tau, enRetard?, delai?)},
+  // 'attente' (on se met à attendre dans la zone avant pasAvant), 'porte' (porte, ouverte, t), 'choc', 'reprise'
+  // (reprise, cause: 'choc:<porte>', x, y, heading, cout), 'reussite', 'echec' (raison).
+perceivedLamp(lamp, snapshot)       // → {hue, D, te, on, rgb, distance, lambdaObs} : œil à
+  // EYE_HEIGHT, D = γ + (u·n)/c (géométrie réelle), état allumé vu à t_e = t − d/c,
+  // perceivedColor(…, {exposure: adaptationExposure(e^φ)}) puis classifyHue
+lampOnAt(lamp, te) · seenDoorOpen(door, snapshot) · seenClientPresent(stop, snapshot)
+  // états VUS (rendu, HUD) : à t_e = t − d/c (emissionTimeStatic)
+activeStops(level)                  // arrêts à faire : [{colis, client, kind, x, y, rayon,
+                                    //   pasAvant, delai, obligatoire}]
+```
+
+### `src/game/score.js` (pur)
+```js
+scoreResult({reussite, raison?, tauFin, tFin, retards?}, {tauMax, etoiles}) // → Score
+computeScore(level)                 // → Score = {etoiles 0..3, reussite, raison, econome: {ok,
+  // batterieRestante, seuil, tauFin, tauMax}, ponctuel: {ok, tFin, seuil, retards: [{colis,
+  // client, t, delai}]}, manque: ['econome' | 'ponctuel'], messages: [français]}
+  // étoiles = 0 si échec ; sinon 1 + [batterie restante ≥ batterieMin]
+  //                               + [t_fin ≤ tVilleMax et aucun retard]
+```
+
+### `src/game/states.js` (pur)
+```js
+STATES  // chargement, menu, selection, briefing, decompte, enCours, pause, reprise, bilan, echec
+TRANSITIONS  // table {état: {événement: état}} ; GUARDS {'echec.passer', 'bilan.suivant'}
+SKIP_AFTER_FAILURES = 4
+createStateMachine({initial = 'chargement', onChange(to, from, event), transitions, guards})
+  // → {state, send(event, ctx) → état | null (refusé), can(event, ctx), events(ctx), history}
+nextState(state, event, ctx) · checkTransitions() → [] · clocksRunning(state) (enCours seul)
+```
+
+### `src/game/progress.js` (storage)
+```js
+PROGRESS_KEY = 'progression'        // aslower:v1:progression
+// {version: 1, niveaux: {id: {echecs, passe, parC: {"30": {etoiles, meilleureBatterie,
+//  meilleurTVille, reussites}}}}} : records par niveau ET par c
+emptyProgress() · sanitizeProgress(raw) · loadProgress(store = local) · saveProgress(p, store)
+recordResult(p, levelId, c, score | {reussite, etoiles, batterieRestante, tFin})
+  // → {progress (nouvelle), records: {etoiles, batterie, tVille, premiereReussite}} ; échec : echecs + 1
+recordSkip(p, levelId) · canSkip(p, levelId) · levelSucceeded(p, levelId)
+isUnlocked(p, levelIds, levelId)    // 1er toujours ; sinon précédent réussi (tout c) ou passé
+levelStats(p, levelId, c?)          // → {etoiles (meilleures, tous c), etoilesC, meilleureBatterie,
+                                    //    meilleurTVille, echecs, passe, reussi}
+totalStars(p, levelIds)
+```
+
+### `src/game/bot.js` (pur) et `scripts/calibrate.mjs`
+```js
+BOT_DT = 1/60 · BOT_TURN_RADIUS = 6 · ARRET_PAUSE = 0,65 s
+createBotDriver(route (résolu), physics, {dt, turnRadius}) // → {command(snapshot) → cmd, done, index}
+runBot(json, {c = 30, palette, route = 'reference' | 'naif' | {etapes}, dt, maxTau, onFrame})
+  // vraie physique (level.advance) → {status, score, tau, t, events, frames, level, player, finished}
+```
+`npm run calibrate [-- fichier.json] [-- --c=10,30,100]` : joue `parcours.reference` (et
+`naif`) pour chaque c, affiche les étoiles et des seuils suggérés (batterieMin ≈
+(τmax − 1,15·τ_ref)/τmax aux 0,05 inférieurs, tVilleMax ≈ 1,12·t_ref aux 5 s supérieures) ; n'écrit rien.
+
+### `src/levels/index.js`
+```js
+LEVEL_FILES   // [{id, fileName, json}] : import.meta.glob('./n[0-9][0-9]-*.json', {eager: true}), triés
+LEVEL_IDS · levelJson(id) · levelIdFromPath(path)
+```
+Tests : `tests/levels.test.js` valide chaque niveau (c = 10, 30, 100) et y fait jouer le bot
+(référence ★★★, naïf < 3) dès qu'il a un `parcours`.
 
 ## `src/storage.js`
 
