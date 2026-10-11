@@ -75,7 +75,8 @@ function headingGap(snapshot) {
  * @param {Record<string, {srgb: string, ir?: number, uv?: number}>} palette src/data/palette.json
  * @param {{tier?: 'default' | 'lite', lodSteps?: number[], physics?: {lengthUnit: number},
  *          level?: import('./levelObjects.js').LevelView | null,
- *          groundDetail?: 'full' | 'lite' | 'off', facades?: 0 | 1 | 2}} [options]
+ *          groundDetail?: 'full' | 'lite' | 'off', facades?: 0 | 1 | 2,
+ *          decor?: {enabled?: boolean, density?: number, small?: boolean} | false}} [options]
  *   profil de qualité (choisit la visibilité « lite » ou « defaut » de la scène) ; pas des LOD
  *   (m) ; constantes physiques de la partie (physicsFor(c)) : la scène est développée pour
  *   leur unité de longueur L (défaut : réglage par défaut) ; level : vue statique d'un niveau
@@ -83,12 +84,15 @@ function headingGap(snapshot) {
  *   groundDetail : détail de la carte des rues ('full', 'lite' ou 'off' : voir
  *   streetPlan.groundDetailFor et `?solDetail=0`) ; par défaut, celui du profil ;
  *   facades : détail des motifs de façade (quality.facades : 0 coupés, 1 simplifiés, 2 complets ;
- *   défaut : selon le profil)
+ *   défaut : selon le profil) ;
+ *   decor : réglage d'exécution du décor (decorOptions : `?decor=0`, profil « lite »), le même
+ *   que celui des collisions du niveau (game/level.createLevel)
  */
-export function createWorld(renderer, sceneJson, palette, { tier = 'default', lodSteps, physics, level = null, groundDetail, facades } = {}) {
+export function createWorld(renderer, sceneJson, palette, { tier = 'default', lodSteps, physics, level = null, groundDetail, facades, decor } = {}) {
   const city = buildCity(sceneJson, palette, {
     ...(lodSteps ? { lodSteps } : {}),
     ...(physics ? { lengthUnit: physics.lengthUnit } : {}),
+    ...(decor === undefined ? {} : { decor }),
   });
   const steps = lodSteps ?? [...DEFAULT_LOD_STEPS];
   const coarsest = steps.length - 1;

@@ -491,7 +491,7 @@ describe('cityMesher', () => {
   });
 
   it('donne la distance au bâtiment le plus proche et une sphère englobante', () => {
-    const city = buildCity(avenue, palette);
+    const city = buildCity(avenue, palette, { decor: false }); // murs seuls (décor : tests/decor.test.js)
     const chunk = city.chunks.find((c) => c.id === 'ouest-0');
     expect(chunk.nearestDistance(0, 20)).toBe(12); // façade sur l'avenue à x = −12
     const layout = expandScene(avenue, palette);
@@ -537,7 +537,7 @@ describe('cityMesher', () => {
   });
 
   it('maille les îlots de l\'avenue sans jonction en T, vers l\'extérieur, à tous les LOD', () => {
-    const city = buildCity(avenue, palette);
+    const city = buildCity(avenue, palette, { decor: false });
     const layout = expandScene(avenue, palette);
     const sample = ['ouest-0', 'est-0', 'ouest-7', 'est-13', 'depot', 'butee', 'panneau-ir-1', 'panneau-uv-1'];
     for (const id of sample) {
@@ -547,7 +547,7 @@ describe('cityMesher', () => {
   });
 
   it('maille les îlots fermés du quartier (murs mitoyens, angles) sans jonction en T', () => {
-    const city = buildCity(quartier, palette);
+    const city = buildCity(quartier, palette, { decor: false });
     const layout = expandScene(quartier, palette);
     // c = 30 : 10 × 10 îlots (coin, milieu, coin opposé).
     for (const id of ['quartier-0-0', 'quartier-4-5', 'quartier-9-9']) {

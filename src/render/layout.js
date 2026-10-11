@@ -34,6 +34,15 @@
  *                  hauteur? (6), temperature? (2700), intensite? (1), retrait? (1,5 m : distance
  *                  du bord de la chaussée au lampadaire, sur le trottoir),
  *                  cotes? ("deux" | "gauche" | "droite")}
+ *   decor        {actif?: true, densite?: 1}                (facultatif) mobilier urbain et
+ *                végétation (render/decorLayout.js) : platanes d'alignement, bancs, colonnes
+ *                Morris, kiosques, terrasses, jardinières, potelets, fontaines sur les places.
+ *                Placés sur les trottoirs (3 m entre le bord de la chaussée et la façade) et
+ *                les places, jamais sur une chaussée ni près d'un carrefour ; densite (0 à 3)
+ *                multiplie les probabilités de placement ; actif: false = pas de décor
+ *   decorExclusions[] {pos: [x, y], rayon} | {de: [x, y], a: [x, y], rayon}   (facultatif)
+ *                disques ou couloirs sans décor (lieux à voir ou à atteindre : game/level.js
+ *                sceneOfLevel y met les zones, portes, reprises, départ et itinéraires du niveau)
  *
  * Longueurs de jeu (scènes paramétriques) : la vitesse de la lumière est un réglage du
  * joueur, et les distances « de jeu » (longueur d'une avenue, départ, butée, taille d'un
@@ -59,6 +68,7 @@
  * et centre ± demi-taille les redonne exactement en virgule flottante.
  */
 import { BLACKBODY_TEMPERATURES, EYE_HEIGHT, LENGTH_UNIT } from '../physics/constants.js';
+import { decorSettings, filterDecor, placeDecor } from './decorLayout.js';
 
 export const SCENE_SCHEMA = 'coursier-scene/1';
 
@@ -614,20 +624,25 @@ export function resolveSceneLengths(scene, lengthUnit) {
  *   color : sRGB « #rrggbb » (converti en linéaire par cityMesher).
  * @typedef {{x: number, y: number, height: number, temperature: number, intensity: number}} Lamp
  * @typedef {{from: {x: number, y: number}, to: {x: number, y: number}, width: number}} Street
+ * @typedef {import('./decorLayout.js').DecorItem} DecorItem
  */
 
 /**
  * Développe une scène JSON pour l'unité de longueur L de la partie.
  * @param {any} sceneJson contenu d'un fichier de src/data/scenes/
  * @param {Record<string, {srgb: string, ir?: number, uv?: number}>} palette src/data/palette.json
- * @param {{lengthUnit?: number}} [options] L = 10·c (m) ; défaut : LENGTH_UNIT (réglage par défaut)
- * @returns {{buildings: Building[], lamps: Lamp[], streets: Street[],
+ * @param {{lengthUnit?: number, decor?: {enabled?: boolean, density?: number, small?: boolean} | false}} [options]
+ *   L = 10·c (m) ; défaut : LENGTH_UNIT (réglage par défaut). decor : réglage d'exécution du
+ *   décor (decorLayout.decorSettings) : false ou enabled: false = aucun ; density ∈ [0, 1] =
+ *   fraction gardée ; small: false = sans petits objets. Le décor réduit est un sous-ensemble
+ *   exact du décor complet.
+ * @returns {{buildings: Building[], lamps: Lamp[], streets: Street[], decor: DecorItem[],
  *            start: {x: number, y: number, heading: number},
  *            visibility: {lite: number, default: number},
  *            bounds: {xmin: number, ymin: number, xmax: number, ymax: number},
  *            lengthUnit: number}}
  */
-export function expandScene(sceneJson, palette, { lengthUnit = LENGTH_UNIT } = {}) {
+export function expandScene(sceneJson, palette, { lengthUnit = LENGTH_UNIT, decor: decorOption } = {}) {
   need(sceneJson && typeof sceneJson === 'object', 'Scène absente');
   const name = sceneJson.id ?? 'scène';
   need(sceneJson.schema === SCENE_SCHEMA, `Scène « ${name} » : schéma « ${sceneJson.schema} » au lieu de « ${SCENE_SCHEMA} »`);
@@ -661,5 +676,16 @@ export function expandScene(sceneJson, palette, { lengthUnit = LENGTH_UNIT } = {
       ? { xmin: lim.min[0], ymin: lim.min[1], xmax: lim.max[0], ymax: lim.max[1] }
       : contentBounds(buildings, streets, lamps);
 
-  return { buildings, lamps, streets, start, visibility, bounds, lengthUnit };
+  const settings = decorSettings(scene.decor, decorOption);
+  const decor = settings.enabled
+    ? filterDecor(
+        placeDecor(
+          { buildings, streets, lamps, bounds, start },
+          { seed: hashSeed(seed, 'decor'), density: settings.density, exclusions: scene.decorExclusions ?? [] },
+        ),
+        settings,
+      )
+    : [];
+
+  return { buildings, lamps, streets, decor, start, visibility, bounds, lengthUnit };
 }

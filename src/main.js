@@ -13,6 +13,8 @@
  * - ?dpr= : rapport de pixels imposé (render/quality.js ; coupe le DPR adaptatif) ;
  * - ?facades=0|1|2 : motifs de façade coupés (mesures), simplifiés (défaut du profil « lite »)
  *   ou complets (render/facades.js) ;
+ * - ?decor=0 : sans décor statique (mobilier, platanes : mesures ; render/quality.decorOptions,
+ *   rendu et collisions du niveau) ;
  * - ?c=n : vitesse de la lumière (entier de 10 à 100 m/s), prioritaire sur le réglage mémorisé
  *   (game/settings.js) et jamais mémorisée ;
  * - ?debug : panneau de l'inclinaison (hud/tiltDebug.js : α, β, γ, angle, neutre, volant) ;
@@ -1284,13 +1286,14 @@ function levelView(level) {
  */
 async function createSession(renderer, { sceneJson = null, levelDef = null }, c) {
   const physics = physicsFor(c);
-  const level = levelDef ? createLevel(levelDef, physics, palette) : null;
+  const level = levelDef ? createLevel(levelDef, physics, palette, { decor: quality.decor }) : null;
   const world = createWorld(renderer, level ? level.sceneJson : sceneJson, palette, {
     tier: quality.tier,
     groundDetail: groundDetailFor(window.location.search, quality.tier),
     facades: quality.facades,
     physics,
     level: level ? levelView(level) : null,
+    decor: quality.decor,
   });
   const { width, height } = viewportSize();
   const camera = createCamera({ aspect: width / height, visibility: world.visibilityFar });
@@ -1467,7 +1470,7 @@ async function replaceSession(what, c) {
 /** Remet le niveau en cours au départ (même monde : même c). */
 function resetLevelState() {
   const g = game;
-  const level = createLevel(g.levelDef, g.physics, palette);
+  const level = createLevel(g.levelDef, g.physics, palette, { decor: quality.decor });
   const player = createLevelPlayer(level);
   const first = snapshot(player);
   Object.assign(g, {

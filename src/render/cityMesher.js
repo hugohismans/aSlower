@@ -32,6 +32,7 @@
 import { BufferAttribute, BufferGeometry, Sphere, Vector3 } from 'three';
 import { blackbodyRow } from '../physics/constants.js';
 import { encodeFacade, facadeStyle } from './facades.js';
+import { decorPaletteEntries, meshDecor } from './decorMesher.js';
 import { expandScene, footprint } from './layout.js';
 import { splitRange, uniqueSorted, zipperStrip } from './subdivide.js';
 
@@ -55,6 +56,9 @@ export const ROOF_STEP = 15;
 /** Tête de lampadaire : boîte émissive de LAMP_SIZE × LAMP_SIZE × LAMP_HEIGHT (m). */
 export const LAMP_SIZE = 0.8;
 export const LAMP_HEIGHT = 0.5;
+
+/** Rayon du pied d'arbre (grille de terre) dessiné sur la carte du sol sous chaque platane (m). */
+export const TREE_PIT_RADIUS = 0.9;
 
 /** LOD par défaut : pas de grille (m), du plus fin au plus grossier. */
 export const DEFAULT_LOD_STEPS = Object.freeze([1.5, 5, 15]);
@@ -379,6 +383,74 @@ export function meshLamps(lamps) {
   return { positions, emits, indices };
 }
 
+/* ------------------------------------------------------------------------- */
+/* Décor statique fusionné dans les îlots                                     */
+/* ------------------------------------------------------------------------- */
+/*
+ * Décor (render/decorLayout.js, render/decorMesher.js) : chaque objet est rattaché à l'îlot
+ * du bâtiment le plus proche ; la géométrie du LOD k d'un îlot = murs (meshBlock) + décor de
+ * l'îlot au même LOD, concaténés dans UN SEUL BufferGeometry (aucun appel de dessin en plus).
+ * Les emprises du décor (houppiers compris) entrent dans la distance au plus proche, le
+ * centre et le rayon du chunk. Un objet loin de tout bâtiment forme un chunk de décor seul.
+ * Attribut aFacade (vec4 : style, u, z, W) : le décor écrit (0, 0, 0, 0) ; si meshBlock ne
+ * fournit pas de tableau `facades`, la partie murs reçoit aussi des zéros (style 0 : aucun
+ * motif) ; s'il en fournit un, il est recopié tel quel.
+ */
+
+/**
+ * Concatène le maillage des murs et celui du décor (pur) : un seul jeu d'attributs, indices
+ * décalés, aFacade nul là où les murs n'en fournissent pas.
+ * @param {{positions: Float32Array, colors: Float32Array, specs: Float32Array,
+ *          facades?: Float32Array, indices: Uint16Array | Uint32Array, vertexCount: number,
+ *          triangleCount: number} | null} walls
+ * @param {ReturnType<typeof meshDecor> | null} decor
+ */
+export function mergeChunkMeshes(walls, decor) {
+  const parts = [walls, decor].filter((m) => m && m.vertexCount > 0);
+  const vertexCount = parts.reduce((n, m) => n + m.vertexCount, 0);
+  const indexCount = parts.reduce((n, m) => n + m.indices.length, 0);
+  const positions = new Float32Array(3 * vertexCount);
+  const colors = new Float32Array(3 * vertexCount);
+  const specs = new Float32Array(3 * vertexCount);
+  const facades = new Float32Array(4 * vertexCount);
+  const indices = vertexCount <= 65535 ? new Uint16Array(indexCount) : new Uint32Array(indexCount);
+  let v = 0;
+  let t = 0;
+  for (const m of parts) {
+    positions.set(m.positions, 3 * v);
+    colors.set(m.colors, 3 * v);
+    specs.set(m.specs, 3 * v);
+    if (m.facades) facades.set(m.facades, 4 * v);
+    for (let k = 0; k < m.indices.length; k++) indices[t + k] = m.indices[k] + v;
+    v += m.vertexCount;
+    t += m.indices.length;
+  }
+  return {
+    positions,
+    colors,
+    specs,
+    facades,
+    indices,
+    vertexCount,
+    triangleCount: indexCount / 3,
+    wallTriangles: walls ? walls.triangleCount : 0,
+    decorTriangles: decor ? decor.triangleCount : 0,
+  };
+}
+
+/**
+ * Style du décor (decorMesher) : matériaux de la palette en linéaire, ombrages des façades.
+ * @param {Record<string, {srgb: string, ir?: number, uv?: number}>} palette
+ * @returns {import('./decorMesher.js').DecorStyle}
+ */
+export function decorStyle(palette) {
+  const materials = {};
+  for (const [name, c] of Object.entries(decorPaletteEntries(palette))) {
+    materials[name] = { rgb: hexToLinearRgb(c.srgb), ir: c.ir, uv: c.uv };
+  }
+  return { materials, faceShade: FACE_SHADE, aoHeight: AO_HEIGHT, aoStrength: AO_STRENGTH };
+}
+
 /** Sphère englobante (repère Three) d'une boîte du jeu. */
 function boundingSphere(center, radius) {
   return new Sphere(new Vector3(center.x, center.z, -center.y), radius);
@@ -389,14 +461,16 @@ function boundingSphere(center, radius) {
  * @param {string} id
  * @param {Box[]} boxes
  * @param {number[]} lodSteps
+ * @param {import('./decorLayout.js').DecorItem[]} [decor] objets du décor rattachés à l'îlot
+ * @param {import('./decorMesher.js').DecorStyle | null} [style] style du décor (decorStyle)
  */
-function createChunk(id, boxes, lodSteps) {
+function createChunk(id, boxes, lodSteps, decor = [], style = null) {
   let xmin = Infinity;
   let ymin = Infinity;
   let xmax = -Infinity;
   let ymax = -Infinity;
   let hmax = 0;
-  const rects = new Float64Array(boxes.length * 4);
+  const rects = new Float64Array((boxes.length + decor.length) * 4);
   boxes.forEach((b, i) => {
     rects.set([b.x0, b.y0, b.x1, b.y1], 4 * i);
     xmin = Math.min(xmin, b.x0);
@@ -404,6 +478,18 @@ function createChunk(id, boxes, lodSteps) {
     xmax = Math.max(xmax, b.x1);
     ymax = Math.max(ymax, b.y1);
     hmax = Math.max(hmax, b.h);
+  });
+  // Emprises du décor : « proches » pour la distance au plus proche (decorLayout : DecorItem.near),
+  // totales (houppiers compris) pour le centre et le rayon.
+  decor.forEach((d, i) => {
+    const e = d.extent;
+    const n = d.near ?? e;
+    rects.set([n.x0, n.y0, n.x1, n.y1], 4 * (boxes.length + i));
+    xmin = Math.min(xmin, e.x0);
+    ymin = Math.min(ymin, e.y0);
+    xmax = Math.max(xmax, e.x1);
+    ymax = Math.max(ymax, e.y1);
+    hmax = Math.max(hmax, d.height);
   });
   const center = { x: (xmin + xmax) / 2, y: (ymin + ymax) / 2, z: hmax / 2 };
   const radius = Math.hypot((xmax - xmin) / 2, (ymax - ymin) / 2, hmax / 2);
@@ -415,10 +501,12 @@ function createChunk(id, boxes, lodSteps) {
     center,
     radius,
     buildingCount: boxes.length,
+    decorCount: decor.length,
     /**
      * Distance horizontale (m) du point (px, py) du jeu à l'emprise la plus proche
-     * des bâtiments de l'îlot (0 à l'intérieur). Les murs partent du sol et
-     * dépassent l'œil : c'est aussi la distance 3D depuis l'œil.
+     * des bâtiments et du décor de l'îlot (0 à l'intérieur). Les murs partent du sol et
+     * dépassent l'œil : c'est aussi la distance 3D depuis l'œil ; pour le décor (houppiers en
+     * hauteur), c'est une borne basse : le LOD choisi n'est jamais trop grossier.
      */
     nearestDistance(px, py) {
       let best = Infinity;
@@ -439,7 +527,9 @@ function createChunk(id, boxes, lodSteps) {
       const level = levelOf(k);
       let geometry = cache.get(level);
       if (!geometry) {
-        const m = meshBlock(boxes, lodSteps[level]);
+        const walls = boxes.length > 0 ? meshBlock(boxes, lodSteps[level]) : null;
+        const props = decor.length > 0 && style ? meshDecor(decor, level, style) : null;
+        const m = mergeChunkMeshes(walls, props);
         geometry = new BufferGeometry();
         geometry.setAttribute('position', new BufferAttribute(m.positions, 3));
         geometry.setAttribute('color', new BufferAttribute(m.colors, 3));
@@ -448,7 +538,14 @@ function createChunk(id, boxes, lodSteps) {
         geometry.setIndex(new BufferAttribute(m.indices, 1));
         geometry.boundingSphere = boundingSphere(center, radius);
         geometry.name = `ilot:${id}:lod${level}`;
-        geometry.userData = { chunk: id, lod: level, step: lodSteps[level], triangles: m.triangleCount };
+        geometry.userData = {
+          chunk: id,
+          lod: level,
+          step: lodSteps[level],
+          triangles: m.triangleCount,
+          wallTriangles: m.wallTriangles,
+          decorTriangles: m.decorTriangles,
+        };
         cache.set(level, geometry);
       }
       return geometry;
@@ -500,15 +597,20 @@ function createEmitters(lamps) {
  * Construit la ville d'une scène.
  * @param {any} scene JSON de src/data/scenes/
  * @param {Record<string, {srgb: string, ir?: number, uv?: number}>} palette src/data/palette.json
- * @param {{lodSteps?: number[], lengthUnit?: number}} [options] pas des LOD (m), croissants ;
- *   unité de longueur L = 10·c de la partie (m), pour les longueurs de jeu de la scène
- *   (layout.expandScene ; défaut : réglage par défaut)
+ * @param {{lodSteps?: number[], lengthUnit?: number,
+ *          decor?: {enabled?: boolean, density?: number, small?: boolean} | false}} [options]
+ *   pas des LOD (m), croissants ; unité de longueur L = 10·c de la partie (m), pour les
+ *   longueurs de jeu de la scène (layout.expandScene ; défaut : réglage par défaut) ; réglage
+ *   d'exécution du décor (layout.expandScene : `?decor=0`, profil « lite »)
  */
-export function buildCity(scene, palette, { lodSteps = [...DEFAULT_LOD_STEPS], lengthUnit } = {}) {
+export function buildCity(scene, palette, { lodSteps = [...DEFAULT_LOD_STEPS], lengthUnit, decor } = {}) {
   if (!Array.isArray(lodSteps) || lodSteps.length === 0 || lodSteps.some((s, i) => !(s > 0) || (i > 0 && s < lodSteps[i - 1]))) {
     throw new Error(`lodSteps : pas positifs et croissants attendus (${lodSteps})`);
   }
-  const layout = expandScene(scene, palette, lengthUnit === undefined ? undefined : { lengthUnit });
+  const layout = expandScene(scene, palette, {
+    ...(lengthUnit === undefined ? {} : { lengthUnit }),
+    ...(decor === undefined ? {} : { decor }),
+  });
   const groups = new Map();
   const colorCache = new Map();
   for (const b of layout.buildings) {
@@ -518,7 +620,15 @@ export function buildCity(scene, palette, { lodSteps = [...DEFAULT_LOD_STEPS], l
     if (!groups.has(b.blockId)) groups.set(b.blockId, []);
     groups.get(b.blockId).push(box);
   }
-  const chunks = [...groups].map(([id, boxes]) => createChunk(id, boxes, lodSteps));
+  // Décor : par îlot de rattachement ; un blockId sans bâtiment fait un chunk de décor seul.
+  const decorGroups = new Map();
+  for (const d of layout.decor) {
+    if (!decorGroups.has(d.blockId)) decorGroups.set(d.blockId, []);
+    decorGroups.get(d.blockId).push(d);
+    if (!groups.has(d.blockId)) groups.set(d.blockId, []);
+  }
+  const style = layout.decor.length > 0 ? decorStyle(palette) : null;
+  const chunks = [...groups].map(([id, boxes]) => createChunk(id, boxes, lodSteps, decorGroups.get(id) ?? [], style));
   return {
     chunks,
     emitters: createEmitters(layout.lamps),
@@ -527,6 +637,9 @@ export function buildCity(scene, palette, { lodSteps = [...DEFAULT_LOD_STEPS], l
     visibility: layout.visibility,
     bounds: layout.bounds,
     buildings: layout.buildings, // emprises développées (ombres de streetMap.createStreetMap)
+    decor: layout.decor, // objets du décor (decorLayout.js), déjà rattachés aux chunks
+    // Pieds des platanes : disques de terre sur la carte du sol (streetMap, canal végétation).
+    vegetation: layout.decor.filter((d) => d.kind === 'platane').map((d) => ({ x: d.x, y: d.y, r: TREE_PIT_RADIUS })),
     lengthUnit: layout.lengthUnit,
   };
 }

@@ -186,9 +186,10 @@ Paramètres d'URL (combinables, par exemple `?scene=quartier-test&bench&c=30&dpr
 | `?bench` | parcours de mesure automatique et déterministe (aucune entrée, pas fixe de 1/60 s par image), avec le panneau de diagnostic. Sur `avenue-test` : poussée pleine jusqu'à γ ≈ 2,5, puis freinage jusqu'à l'arrêt. Sur `quartier-test` : caméra scriptée le long d'une rue, β imposé de 0 à 0,92. À la fin, le panneau affiche p50/p95 des temps d'image, le CPU du rendu, les appels de dessin et triangles maximaux ; le résultat complet est dans `window.__benchResult` (et la console). Ajouter `&sansciel` mesure le même parcours sans la passe ciel/sol (coût de la passe par différence) |
 | `?dpr=1.5` | impose le rapport de pixels (de 0,25 à 4) ; sinon min(devicePixelRatio, 2), plafonné à 2,2 millions de pixels, puis ajusté en jeu par le DPR adaptatif (baisse de 0,25 quand le jeu rame, jusqu'à 1 ; remontée quand il est fluide depuis 10 s). `?dpr=` et `?bench` coupent le DPR adaptatif |
 | `?debug` | panneau de l'inclinaison (angles α, β, γ du capteur, angle de l'écran, angle de volant, neutre calibré, volant), pour vérifier les signes sur un vrai GSM |
+| `?qualite=normale` | oublie un plantage mémorisé et quitte le profil « lite » (DPR 0,75, sans anticrénelage, décor allégé) |
 | `?solDetail=0` | carte du sol d'avant le jalon « ville vivante » (trottoirs, chaussées, tirets et ombres seulement), pour comparer et mesurer. Par défaut, la carte des rues (`src/render/streetMap.js`) dessine aussi bordures de trottoir, caniveaux, trottoirs dallés, passages piétons zébrés et lignes d'arrêt aux carrefours, places dallées en éventail, pelouses et pieds d'arbres (canal « végétation » : réflectance infrarouge de la végétation) ; le profil « lite » garde tout sauf les motifs de dalles et de pavés |
-| `?qualite=normale` | oublie un plantage mémorisé et quitte le profil « lite » (DPR 0,75, sans anticrénelage) |
 | `?facades=0` (ou `1`, `2`) | motifs de façade (fenêtres, volets, balcons, mansardes) : `0` coupés (murs unis, pour mesurer leur coût, par exemple `?bench&facades=0`), `1` simplifiés (fenêtres, encadrements, mansardes ; ni volets, ni balcons, ni joints : réglage du profil « lite »), `2` complets (par défaut) |
+| `?decor=0` | sans décor statique (platanes, mobilier urbain, fontaines), pour mesurer son coût (`?bench&decor=0`) ; vaut aussi pour les obstacles des niveaux (on ne heurte que ce qu'on voit) |
 | `?autopilote` ou `?autopilote=naif` | en niveau, le pilote de référence (`src/game/bot.js`) conduit à ta place sur l'itinéraire `parcours.reference` (ou `parcours.naif`) du niveau, à pas fixes de 1/60 s : démonstration et tests automatisés (Playwright). Sans effet sans ce paramètre ; avec lui (comme avec `?diag` ou `?debug`), `window.__coursier` donne l'état en lecture seule (`etat`, `niveau()`, `progression()`…) |
 
 **Publication** : chaque push sur `main` lance le workflow
@@ -219,7 +220,7 @@ src/
   physics/              PUR (ni DOM ni three) : constantes, relativité, véhicule,
                         couleurs (spectrum.js), temps retardé
   render/               Three.js : renderer, caméra, uniformes partagés, matériaux,
-                        LUT Doppler, maillage de la ville, LOD, culling, shaders GLSL
+                        LUT Doppler, maillage de la ville et du décor, LOD, culling, shaders GLSL
   input/                clavier, tactile, inclinaison → {thrust, brake, steer, classic, pause} ;
                         plein écran et écran allumé
   game/                 réglages (c, direction, options), conditions et bulles d'aide, niveaux
@@ -266,6 +267,18 @@ docs/                   conception (plan, décisions, glossaire) et contrat d'in
   linéaire), et il est filtré à la taille du pixel (il se fond dans sa couleur moyenne au loin,
   sans moiré). Quatre styles européens : haussmannien, coloré, brique, boutiques.
 - **Ciel, sol et brouillard** : une passe plein écran avec l'aberration inverse exacte.
+- **Décor de ville européenne** (statique) : platanes d'alignement en quinconce avec les
+  lampadaires, bancs, colonnes Morris, kiosques à journaux, terrasses de café (parasols ou
+  stores rayés), jardinières fleuries, potelets, fontaine sur les places. Placé par un module
+  pur et déterministe (`render/decorLayout.js`) sur les trottoirs (3 m entre la chaussée et la
+  façade) et les places, jamais sur une chaussée ni à moins de 10 à 14 m d'un carrefour, à
+  l'écart des lieux du niveau (zones, portes, reprises, départ, itinéraires du pilote) ; maillé
+  en « low-poly » (`render/decorMesher.js`, trois niveaux de détail) et fusionné dans la
+  géométrie des îlots : aucun appel de dessin en plus. Les objets solides (troncs, bancs,
+  colonnes, kiosques, tables, jardinières, potelets, fontaines) sont des obstacles des niveaux.
+  Le feuillage garde son « red edge » (infrarouge fort, ir = 0,6) : en fonçant, le Doppler le
+  ramène dans le visible et les arbres s'illuminent. Profil « lite » : 60 % du décor, sans les
+  petits objets. Clé de scène facultative `decor: {actif, densite}` (`render/layout.js`).
 
 Détails et justifications : [`docs/conception.md`](docs/conception.md).
 

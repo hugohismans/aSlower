@@ -27,6 +27,17 @@ export const DEFAULT_ZONE_RADIUS = 8;
 export const DOOR_THICKNESS = 1;
 /** Hauteur de la lampe au-dessus du haut de la porte, par défaut (m). */
 export const DEFAULT_LAMP_ABOVE_DOOR = 1;
+/**
+ * Exclusions du décor (render/decorLayout.js) autour des lieux du niveau (m) : marge ajoutée
+ * au rayon des zones de retrait et de livraison ; rayon autour des reprises et du départ ;
+ * demi-largeur des couloirs le long des itinéraires du pilote (`parcours`) : au moins
+ * DECOR_ROUTE_HALF_WIDTH, et DECOR_ROUTE_WIDTH_PER_L · L · β (le rayon de virage croît comme
+ * L·β : à c = 100 m/s et β = 0,86, le pilote du Grand Boulevard s'écarte de 11 m de son axe).
+ */
+export const DECOR_ZONE_MARGIN = 4;
+export const DECOR_POINT_RADIUS = 8;
+export const DECOR_ROUTE_HALF_WIDTH = 4;
+export const DECOR_ROUTE_WIDTH_PER_L = 0.014;
 
 /**
  * Remplace toutes les expressions de longueur du niveau par leur valeur (m) pour l'unité L.
@@ -40,18 +51,63 @@ export function resolveLevel(json, lengthUnit) {
 }
 
 /**
- * Scène « coursier-scene/1 » d'un niveau RÉSOLU (pour expandScene et render/scene.js) :
- * la scène du niveau, avec le schéma, l'id et le départ du niveau.
+ * Lieux que le décor doit laisser libres (`decorExclusions` de la scène) : zones de retrait et
+ * de livraison (rayon + DECOR_ZONE_MARGIN : le client se tient au bord de la zone), portes
+ * (portée minimale + demi-largeur : le battant et l'approche), points de reprise et départ
+ * (DECOR_POINT_RADIUS), et couloirs le long des itinéraires du pilote (parcours de référence
+ * et naïf, demi-largeur selon DECOR_ROUTE_HALF_WIDTH et DECOR_ROUTE_WIDTH_PER_L) : tout ce
+ * que le joueur doit voir ou atteindre.
  * @param {any} level niveau résolu (resolveLevel)
+ * @param {number} [lengthUnit] L = 10·c (m) de la partie (couloirs des itinéraires rapides)
+ * @returns {({pos: number[], rayon: number} | {de: number[], a: number[], rayon: number})[]}
  */
-export function sceneOfLevel(level) {
+export function levelDecorExclusions(level, lengthUnit = 0) {
+  const out = [];
+  for (const p of level.colis ?? []) {
+    for (const stop of [p.retrait, p.livraison]) {
+      if (stop) out.push({ pos: stop.lieu, rayon: (stop.rayon ?? DEFAULT_ZONE_RADIUS) + DECOR_ZONE_MARGIN });
+    }
+  }
+  for (const d of level.portes ?? []) out.push({ pos: d.pos, rayon: d.portee[0] + d.largeur / 2 });
+  for (const r of level.reprises ?? []) out.push({ pos: r.pos, rayon: DECOR_POINT_RADIUS });
+  out.push({ pos: level.depart.pos, rayon: DECOR_POINT_RADIUS });
+  for (const name of ['reference', 'naif']) {
+    let last = level.depart.pos;
+    for (const s of level.parcours?.[name]?.etapes ?? []) {
+      if (!s.aller) continue;
+      out.push({ de: last, a: s.aller, rayon: Math.max(DECOR_ROUTE_HALF_WIDTH, DECOR_ROUTE_WIDTH_PER_L * lengthUnit * (s.beta ?? 0)) });
+      last = s.aller;
+    }
+  }
+  return out;
+}
+
+/**
+ * Scène « coursier-scene/1 » d'un niveau RÉSOLU (pour expandScene et render/scene.js) :
+ * la scène du niveau, avec le schéma, l'id et le départ du niveau, et les exclusions du décor
+ * (celles de la scène, puis levelDecorExclusions).
+ * @param {any} level niveau résolu (resolveLevel)
+ * @param {number} [lengthUnit] L = 10·c (m) pour lequel le niveau a été résolu
+ */
+export function sceneOfLevel(level, lengthUnit) {
   return {
     schema: SCENE_SCHEMA,
     id: level.id,
     titre: level.titre,
     ...level.scene,
     depart: { pos: level.depart.pos, capDegres: level.depart.capDegres ?? 90 },
+    decorExclusions: [...(level.scene.decorExclusions ?? []), ...levelDecorExclusions(level, lengthUnit)],
   };
+}
+
+/**
+ * Obstacles du décor (troncs, bancs, colonnes, kiosques, tables, jardinières, potelets,
+ * fontaines) : boîtes indulgentes de render/decorLayout.js, `kind` 'decor', `id` = sorte.
+ * @param {{decor?: {kind: string, collision: {x0: number, y0: number, x1: number, y1: number} | null}[]}} scene
+ *   scène développée (expandScene)
+ */
+export function decorBoxes(scene) {
+  return (scene.decor ?? []).filter((d) => d.collision).map((d) => ({ ...d.collision, kind: 'decor', id: d.kind }));
 }
 
 /** Cap (rad) depuis des degrés « capDegres » (0 = est, 90 = nord, sens trigonométrique). */
@@ -111,7 +167,7 @@ function makeStop(stop) {
  * @property {number} chocs nombre de chocs
  * @property {number} reprisesFaites
  * @property {number} playerRadius
- * @property {import('../physics/collisions.js').BoxSource} obstacles bâtiments, portes
+ * @property {import('../physics/collisions.js').BoxSource} obstacles bâtiments, décor, portes
  *   fermées et bords (requête dynamique)
  */
 
@@ -120,17 +176,20 @@ function makeStop(stop) {
  * @param {any} json niveau « coursier-niveau/1 »
  * @param {{c: number, a: number, lengthUnit: number}} physics physicsFor(c) de la partie
  * @param {Record<string, {srgb: string, ir?: number, uv?: number}>} palette src/data/palette.json
+ * @param {{decor?: {enabled?: boolean, density?: number, small?: boolean} | false}} [options]
+ *   réglage d'exécution du décor (le même que le rendu : render/quality.decorOptions) ;
+ *   défaut : décor complet (pilote de référence, validateur)
  * @returns {LevelState}
  */
-export function createLevel(json, physics, palette) {
+export function createLevel(json, physics, palette, { decor } = {}) {
   if (!json || json.schema !== LEVEL_SCHEMA) {
     throw new Error(`Niveau : schéma « ${LEVEL_SCHEMA} » attendu (reçu : ${json?.schema})`);
   }
   const L = physics.lengthUnit;
   const level = resolveLevel(json, L);
-  const sceneJson = sceneOfLevel(level);
-  const scene = expandScene(sceneJson, palette, { lengthUnit: L });
-  const buildingIndex = createBoxIndex(boxesFromBuildings(scene.buildings));
+  const sceneJson = sceneOfLevel(level, L);
+  const scene = expandScene(sceneJson, palette, { lengthUnit: L, ...(decor === undefined ? {} : { decor }) });
+  const buildingIndex = createBoxIndex([...boxesFromBuildings(scene.buildings), ...decorBoxes(scene)]);
   const walls = boundaryBoxes(scene.bounds);
 
   const colis = level.colis.map((p) => ({
