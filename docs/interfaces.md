@@ -271,7 +271,7 @@ buildCity(scene, palette, {lodSteps = [1.5, 5, 15], lengthUnit = LENGTH_UNIT, de
   // decor : réglage d'exécution du décor (expandScene ; quality.decorOptions)
   // → {chunks, emitters, streets, start, visibility, bounds, buildings, decor}
   //   chunks[i] = {id, center: {x, y, z} (jeu), radius, buildingCount, decorCount,
-  //                nearestDistance(px, py) → m (bâtiments ET emprises du décor),
+  //                nearestDistance(px, py) → m (bâtiments ET emprises « near » du décor),
   //                lod(k) → THREE.BufferGeometry (créée à la demande, mise en cache : murs
   //                  de meshBlock + décor de l'îlot au même LOD, UN SEUL BufferGeometry ;
   //                  userData {triangles, wallTriangles, decorTriangles}),
@@ -320,7 +320,8 @@ MIN_BUILDING_HEIGHT                // 3 m : l'œil (EYE_HEIGHT) reste sous tous 
 placeDecor({buildings, streets, lamps, bounds, start?}, {seed, density = 1, exclusions = []})
   // → DecorItem[] = {kind, x, y, cap, variant, length?, radius?, awning?, blockId,
   //    collision: {x0, y0, x1, y1} | null (boîte indulgente : tronc 0,5 m), extent (emprise au
-  //    sol, houppier compris), height, small, keep}
+  //    sol, houppier compris : sphère du chunk), near (emprise pour nearestDistance : extent,
+  //    sauf platane : tronc ± 1,2 m), height, small, keep}
   // kind ∈ platane, banc, colonne (Morris), kiosque, parasol (table de terrasse), store,
   //   jardiniere, potelet, fontaine (DECOR_KINDS : rayons, hauteurs, boîtes)
   // Règles : trottoirs (SIDEWALK_WIDTH = 3 m) bordant une façade (≤ FRONTAGE_DISTANCE) et

@@ -451,10 +451,12 @@ function createChunk(id, boxes, lodSteps, decor = [], style = null) {
     ymax = Math.max(ymax, b.y1);
     hmax = Math.max(hmax, b.h);
   });
-  // Emprises du décor (houppiers compris) : distance au plus proche, centre et rayon justes.
+  // Emprises du décor : « proches » pour la distance au plus proche (decorLayout : DecorItem.near),
+  // totales (houppiers compris) pour le centre et le rayon.
   decor.forEach((d, i) => {
     const e = d.extent;
-    rects.set([e.x0, e.y0, e.x1, e.y1], 4 * (boxes.length + i));
+    const n = d.near ?? e;
+    rects.set([n.x0, n.y0, n.x1, n.y1], 4 * (boxes.length + i));
     xmin = Math.min(xmin, e.x0);
     ymin = Math.min(ymin, e.y0);
     xmax = Math.max(xmax, e.x1);

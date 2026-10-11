@@ -2,7 +2,7 @@
  * Placement du décor statique (mobilier urbain et végétation) : module pur (ni DOM, ni three).
  *
  * Appelé par layout.expandScene, qui range le résultat dans `layout.decor` : une liste
- * d'objets {kind, x, y, cap, …, blockId, collision, extent, height, small}. Ambiance de ville
+ * d'objets {kind, x, y, cap, …, blockId, collision, extent, near, height, small}. Ambiance de ville
  * européenne : platanes d'alignement, bancs, colonnes Morris, kiosques à journaux, terrasses
  * de café (parasols ou stores bannes), jardinières fleuries, potelets, fontaines sur les places.
  * Le maillage est fait par render/decorMesher.js, les collisions par game/level.js.
@@ -63,7 +63,7 @@ export const TREE_SPACING = 10.5;
 /** Distance du bord de chaussée à l'axe des arbres et du mobilier (m). */
 export const FURNITURE_SETBACK = 1.3;
 /** Probabilité qu'une rue soit plantée (la rue du départ l'est toujours). */
-export const TREE_STREET_PROBABILITY = 0.45;
+export const TREE_STREET_PROBABILITY = 0.4;
 /** Distance maximale d'un objet de trottoir à la façade la plus proche (m). */
 export const FRONTAGE_DISTANCE = 6;
 /**
@@ -264,11 +264,19 @@ export function normalizeExclusions(list) {
  * @property {string} blockId îlot de rattachement (chunk)
  * @property {{x0: number, y0: number, x1: number, y1: number} | null} collision obstacle
  * @property {{x0: number, y0: number, x1: number, y1: number}} extent emprise au sol totale
- *   (houppier compris), pour la distance et la sphère du chunk
+ *   (houppier compris), pour la sphère englobante du chunk
+ * @property {{x0: number, y0: number, x1: number, y1: number}} near emprise « proche » pour la
+ *   distance au plus proche du chunk (coupe et LOD) : l'emprise totale, sauf pour le platane
+ *   (tronc et bas du houppier, NEAR_TREE_REACH : le houppier est à plus de 2 m au-dessus de
+ *   l'œil et ses arêtes ont la même longueur aux LOD 0 et 1 ; l'emprise totale ferait passer
+ *   des îlots entiers au LOD 0 sans gain de justesse)
  * @property {number} height hauteur maximale (m)
  * @property {boolean} small petit objet (retiré du profil « lite »)
  * @property {number} keep tirage uniforme dans [0, 1[ : l'objet est gardé si keep < fraction
  */
+
+/** Demi-côté de l'emprise « proche » d'un platane (m). */
+export const NEAR_TREE_REACH = 1.2;
 
 /** Emprise au sol (rayon horizontal maximal autour du centre, m) pour l'étendue du chunk. */
 function reachOf(kind, item) {
@@ -403,6 +411,8 @@ export function placeDecor(city, { seed = 0, density = 1, exclusions = [] } = {}
     });
     const reach = reachOf(kind, item);
     item.extent = { x0: x - reach, y0: y - reach, x1: x + reach, y1: y + reach };
+    const near = kind === 'platane' ? NEAR_TREE_REACH : reach;
+    item.near = { x0: x - near, y0: y - near, x1: x + near, y1: y + near };
     items.push(item);
     if (foot > 0) placedGrid.add({ x, y, foot }, { x0: x - foot, y0: y - foot, x1: x + foot, y1: y + foot });
     return item;

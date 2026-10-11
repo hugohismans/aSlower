@@ -127,12 +127,22 @@ export function decorFaceShade(nx, ny, nz, table) {
  * @param {DecorStyle} style
  */
 function createBuilder(style) {
-  const pos = [];
-  const col = [];
-  const spec = [];
-  const idx = [];
+  // Tableaux typés agrandis au besoin (capacité doublée) : peu d'allocations par îlot.
+  let pos = new Float32Array(3 * 1024);
+  let col = new Float32Array(3 * 1024);
+  let spec = new Float32Array(3 * 1024);
+  let idx = new Uint32Array(3 * 1024);
   let nv = 0;
-  const ao = (z) => 1 - style.aoStrength * Math.max(0, 1 - z / style.aoHeight);
+  let ni = 0;
+  const grow = (array, size) => {
+    if (size <= array.length) return array;
+    const next = new array.constructor(Math.max(size, 2 * array.length));
+    next.set(array);
+    return next;
+  };
+  const aoStrength = style.aoStrength;
+  const aoHeight = style.aoHeight;
+  const NO_TINT = [1, 1, 1, 1];
 
   return {
     /**
@@ -145,6 +155,7 @@ function createBuilder(style) {
     face(pts, name, o) {
       const m = style.materials[name];
       if (!m) throw new Error(`Décor : matériau « ${name} » absent de la palette`);
+      const n = pts.length;
       // Normale de Newell.
       let nx = 0;
       let ny = 0;
@@ -152,9 +163,9 @@ function createBuilder(style) {
       let cx = 0;
       let cy = 0;
       let cz = 0;
-      for (let i = 0; i < pts.length; i++) {
+      for (let i = 0; i < n; i++) {
         const p = pts[i];
-        const q = pts[(i + 1) % pts.length];
+        const q = pts[i + 1 === n ? 0 : i + 1];
         nx += (p[1] - q[1]) * (p[2] + q[2]);
         ny += (p[2] - q[2]) * (p[0] + q[0]);
         nz += (p[0] - q[0]) * (p[1] + q[1]);
@@ -162,36 +173,51 @@ function createBuilder(style) {
         cy += p[1];
         cz += p[2];
       }
-      const ln = Math.hypot(nx, ny, nz);
+      const ln = Math.sqrt(nx * nx + ny * ny + nz * nz);
       if (!(ln > 1e-12)) return; // face dégénérée
       nx /= ln;
       ny /= ln;
       nz /= ln;
-      cx /= pts.length;
-      cy /= pts.length;
-      cz /= pts.length;
-      const away = (cx - o.ref[0]) * nx + (cy - o.ref[1]) * ny + (cz - o.ref[2]) * nz;
-      let list = pts;
-      if ((away < 0) !== Boolean(o.inward)) {
-        list = [...pts].reverse();
+      const away = (cx / n - o.ref[0]) * nx + (cy / n - o.ref[1]) * ny + (cz / n - o.ref[2]) * nz;
+      const flip = (away < 0) !== Boolean(o.inward);
+      if (flip) {
         nx = -nx;
         ny = -ny;
         nz = -nz;
       }
       const base = decorFaceShade(nx, ny, nz, style.faceShade);
-      const t = o.tint ?? [1, 1, 1, 1];
+      const t = o.tint ?? NO_TINT;
       const r = m.rgb[0] * t[0];
       const g = m.rgb[1] * t[1];
       const b = m.rgb[2] * t[2];
       const ir = m.ir * (t[3] ?? 1);
+      const shadeOf = o.shade;
+      if (3 * (nv + n) > pos.length) {
+        pos = grow(pos, 3 * (nv + n));
+        col = grow(col, 3 * (nv + n));
+        spec = grow(spec, 3 * (nv + n));
+      }
       const first = nv;
-      for (const p of list) {
-        pos.push(p[0], p[1], p[2]);
-        col.push(r, g, b);
-        spec.push(ir, m.uv, base * ao(p[2]) * (o.shade ? o.shade(p) : 1));
+      for (let k = 0; k < n; k++) {
+        const p = pts[flip ? n - 1 - k : k];
+        const j = 3 * nv;
+        pos[j] = p[0]; // X = x
+        pos[j + 1] = p[2]; // Y = z
+        pos[j + 2] = -p[1]; // Z = −y
+        col[j] = r;
+        col[j + 1] = g;
+        col[j + 2] = b;
+        spec[j] = ir;
+        spec[j + 1] = m.uv;
+        spec[j + 2] = base * (1 - aoStrength * Math.max(0, 1 - p[2] / aoHeight)) * (shadeOf ? shadeOf(p) : 1);
         nv++;
       }
-      for (let i = 1; i + 1 < list.length; i++) idx.push(first, first + i, first + i + 1);
+      if (ni + 3 * (n - 2) > idx.length) idx = grow(idx, ni + 3 * (n - 2));
+      for (let i = 1; i + 1 < n; i++) {
+        idx[ni++] = first;
+        idx[ni++] = first + i;
+        idx[ni++] = first + i + 1;
+      }
     },
 
     /**
@@ -218,21 +244,14 @@ function createBuilder(style) {
     },
 
     finish() {
-      const n = nv;
-      const positions = new Float32Array(3 * n);
-      for (let i = 0; i < n; i++) {
-        positions[3 * i] = pos[3 * i]; // X = x
-        positions[3 * i + 1] = pos[3 * i + 2]; // Y = z
-        positions[3 * i + 2] = -pos[3 * i + 1]; // Z = −y
-      }
       return {
-        positions,
-        colors: new Float32Array(col),
-        specs: new Float32Array(spec),
-        facades: new Float32Array(4 * n), // (0, 0, 0, 0) : pas de motif
-        indices: new Uint32Array(idx),
-        vertexCount: n,
-        triangleCount: idx.length / 3,
+        positions: pos.slice(0, 3 * nv),
+        colors: col.slice(0, 3 * nv),
+        specs: spec.slice(0, 3 * nv),
+        facades: new Float32Array(4 * nv), // (0, 0, 0, 0) : pas de motif
+        indices: idx.slice(0, ni),
+        vertexCount: nv,
+        triangleCount: ni / 3,
       };
     },
   };
@@ -422,7 +441,7 @@ function platane(B, it, lod) {
   const lobeShift = 0.7 + 0.4 * rand();
 
   const bark = (i, j) => BARK[Math.floor(hash01((i + 1) * 12.9898 + (j + 1) * 78.233 + barkSeed * 100) * BARK.length)];
-  prism(B, F, { z0: 0, z1: fork, r0: rt * 1.2, r1: rt * 0.85, b1: lean, sides: [5, 4, 3][lod], segs: lod === 0 ? 2 : 1, mat: bark, rot: trunkRot });
+  prism(B, F, { z0: 0, z1: fork, r0: rt * 1.2, r1: rt * 0.85, b1: lean, sides: [6, 4, 3][lod], segs: lod === 0 ? 2 : 1, mat: bark, rot: trunkRot });
 
   // Maîtresses branches (fourche) : visibles sous le houppier, de près.
   if (lod === 0) {
@@ -462,7 +481,7 @@ function platane(B, it, lod) {
   const detail = [
     { seg: 8, bands: 4 },
     { seg: 7, bands: 3 },
-    { seg: 5, bands: 3 },
+    { seg: 4, bands: 3 },
   ][lod];
   // Bosses : suites propres (leur nombre de tirages dépend du LOD).
   const bumps = createRandom(it.variant ^ 0x5bd1e995);
