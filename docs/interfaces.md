@@ -41,8 +41,8 @@ dans le joueur (`createPlayer({physics})`), la scène (`lengthUnit`), et tout le
   - `src/main.js`, `src/loop.js` : tout.
   - `localStorage` et `sessionStorage` ne sont utilisés que dans `src/storage.js`.
   - Les fichiers « purs » (`physics/**`, `render/subdivide.js`, `render/lod.js`,
-    `render/culling.js`, `render/layout.js`, `render/adaptiveDpr.js`, `render/streetPlan.js`,
-    `hud/format.js`,
+    `render/culling.js`, `render/facades.js`, `render/layout.js`, `render/adaptiveDpr.js`,
+    `render/streetPlan.js`, `hud/format.js`,
     `hud/levelFormat.js`,
     `input/tiltMath.js`, `game/conditions.js`, `game/bubbles.js`, `game/validate.js`,
     `game/level.js`, `game/rules.js`, `game/score.js`, `game/states.js`, `game/bot.js`,
@@ -214,6 +214,16 @@ exact jusqu'à D = 8), `TONEMAP_KNEE`, `ADAPTATION_REFERENCE = [0.6, 0.6, 0.6, 0
 - `position` (vec3, repère Three).
 - `color` (vec3) : réflectance r, g, b **linéaire** (palette convertie depuis sRGB).
 - `aSpec` (vec3) : (ir, uv, ombrage cuit ∈ [0, 1]).
+- `aFacade` (vec4) : (style, u, z, W), motif de façade dessiné par le shader des surfaces
+  (`shaders/rel_facade.glsl`, voir `render/facades.js`) :
+  - style : partie entière = style (0 = pas de motif : toits, murs touchés par un voisin
+    — mitoyens, pignons —, décor, objets des niveaux ; 1 haussmannien, 2 coloré, 3 brique,
+    4 boutiques) ; partie fractionnaire = code du bâtiment, 32·round(H/0,25) + graine (0 à 31),
+    divisé par 2¹⁶ (exact en float32 ; lu en `flat` par le shader) ;
+  - u : abscisse le long du mur (m) depuis son bord gauche vu de dehors ; z : hauteur (m) ;
+  - W : longueur du mur du bâtiment (m).
+  Une géométrie sans `aFacade` reçoit (0, 0, 0, 0) (`material.defaultAttributeValues`) ; le
+  décor fusionné écrit (0, 0, 0, 0).
 - Émetteurs (lampadaires) : géométrie séparée avec `position` et `aEmit` (vec2) :
   (ligne de LUT du corps noir, intensité).
 
@@ -244,7 +254,13 @@ setStreetMap(texture, bounds)      // branche la carte des rues sur la passe d'e
 
 ### `render/materials.js`
 ```js
-createSurfaceMaterial()            // façades, sol maillé éventuel (attributs color + aSpec)
+createSurfaceMaterial({facades = 2, palette} = {})
+                                   // façades, sol maillé éventuel (attributs color, aSpec,
+                                   // aFacade) ; define FACADES = facades (0 motifs coupés,
+                                   // 1 simplifiés, 2 complets) ; palette : pose le chunk
+                                   // rel_facade (shaders/index.setFacadePalette : constantes
+                                   // GLSL FAC_* des matériaux de façade générées depuis la
+                                   // palette), à donner avant la première compilation
 createEmitterMaterial()            // lampadaires corps noir (attribut aEmit)
 createEnvironmentMaterial({vegetation} = {})
                                    // passe plein écran ciel + sol + brouillard (renderOrder 1) ;
@@ -258,7 +274,8 @@ createLampMaterial()               // lampe de porte (jalon 3) : aberration ; co
                                    // avec game/rules.perceivedLamp (même chaîne que la règle) ;
                                    // pas de brouillard ; un matériau par lampe (shaders/lamp.*.glsl)
 createClassicVariant(material)     // même pipeline compilé sans effets (define REL_CLASSIC),
-                                   // pour le critère « vision classique » du jalon 1
+                                   // pour le critère « vision classique » du jalon 1 (mêmes
+                                   // defines, dont FACADES, et mêmes defaultAttributeValues)
 ```
 Tous les `ShaderMaterial` partagent `REL` par référence (jamais `clone()`).
 
@@ -276,7 +293,43 @@ buildCity(scene, palette, {lodSteps = [1.5, 5, 15], lengthUnit = LENGTH_UNIT} = 
   //   start = {x, y, heading} ; visibility = {lite, default} (m) ; bounds = {xmin, ymin, xmax, ymax}
   //   lengthUnit = L utilisé
   //   buildings = emprises développées (expandScene), pour les ombres de streetMap
+  // Chaque bâtiment reçoit un style et une graine de façade (facades.facadeStyle) ; meshBlock
+  // écrit aFacade (murs : style codé, u, z, W ; toits et murs touchés par un voisin : style 0).
+meshBlock(boxes, step)             // pur : → {positions, colors, specs, facades, indices,
+                                   //   vertexCount, triangleCount} ; boxes : {x0, y0, x1, y1, h,
+                                   //   rgb, ir, uv, style?, seed?} (repère du jeu)
 ```
+
+### `render/facades.js` (pur)
+```js
+FACADE_STYLE                       // {aucun: 0, haussmannien: 1, colore: 2, brique: 3, boutiques: 4}
+facadeStyle(footprint, height)     // → {style, seed} déterministe (hachage de l'emprise) ;
+                                   // emprise < 4 m de large : style 0 ; haussmannien (≈ 40 %)
+                                   // seulement à partir de 12 m de haut
+encodeFacade(style, height, seed)  // → aFacade.x = style + (32·round(h/0,25) + graine)/2¹⁶
+decodeFacade(x)                    // → {style, height, seed} (miroir du décodage GLSL)
+FACADE_MATERIALS                   // constante GLSL → entrée de palette.json (facade-verre,
+                                   // -pierre, -ardoise, -fer, -porte, -volet-sauge, -volet-gris,
+                                   // -enseigne-bordeaux, -enseigne-verte, -enseigne-bleue)
+facadeGlslConstants(palette)       // « const vec3 FAC_VERRE = vec3(…); const vec2 FAC_VERRE_IU
+                                   // = vec2(ir, uv); » … (r, g, b linéaire), ASCII
+facadeDetail(search, tier)         // ?facades=0|1|2, sinon 1 en « lite », 2 sinon
+```
+Styles (shaders/rel_facade.glsl) : travées de pas régulier en nombre entier, centrées sur le
+mur, marges aux angles ; rez-de-chaussée puis étages alignés sur la hauteur réelle du toit
+(bâtiment de moins de 6 m : un seul niveau). Haussmannien : rez-de-chaussée haut (≈ 4 à
+4,5 m) à refends, vitrines et porte cochère, bandeau, hautes fenêtres (≈ 1,1 × 1,9 m)
+encadrées de pierre, garde-corps, balcons filants en fer forgé au 2e et au dernier étage
+courant, corniche, mansarde d'ardoise à lucarnes. Coloré : enduit de la couleur de base,
+soubassement, appuis clairs, volets vert sauge ou gris-bleu à persiennes (environ 1 sur 4
+fermés). Brique : joints de mortier, pierres d'angle, fenêtres à encadrement et croisillons
+blancs. Boutiques : devantures et enseignes colorées (une boutique pour deux travées) à
+lettres claires, fenêtres encadrées à garde-corps. Variations par bâtiment (graine : hauteurs
+d'étage, pas, largeur des fenêtres, porte, couleur des volets) et par fenêtre (hachage de
+bâtiment, travée, étage : volets, reflets, enseignes). Anticrénelage : créneaux filtrés
+analytiquement sur la boîte du pixel (fwidth(u), fwidth(z)) ; variations par fenêtre fondues
+dans leur moyenne dès qu'une fenêtre tient dans un pixel. FACADES = 1 (« lite ») : ni volets,
+ni balcons ni garde-corps, ni joints, ni croisillons, ni lettres, ni refends.
 
 ### `render/layout.js` (pur)
 ```js
@@ -321,6 +374,8 @@ isChunkVisible(chunk, camera {x, y, z}, visibilityFar) // coupe à la distance d
   `gl-tier-v2` en local, via `storage.js` ; `?qualite=normale` les remet à zéro) : `createQuality()` lit l'état à l'ouverture ; `armBootGuard()` pose le
   drapeau juste avant la création du renderer (pas sur l'écran titre) ; `confirmBoot()` le
   retire après 30 images. Le profil « lite » d'après plantage expire au bout de 3 jours.
+  `quality.facades` (0, 1 ou 2) : détail des motifs de façade (`facades.facadeDetail` :
+  `?facades=`, sinon 1 en « lite », 2 sinon), passé à `createWorld`.
 - `adaptiveDpr.js` (pur) : `createAdaptiveDpr({max, min = DPR_FLOOR, initial = max})` →
   `{sample(frameMs, cpuMs) → nouveau DPR | null, reset(), setMax(max) → dpr, dpr, max, min,
   changes}`. Baisse de `DPR_STEP` = 0,25 quand l'intervalle moyen des 90 dernières images
@@ -356,7 +411,8 @@ isChunkVisible(chunk, camera {x, y, z}, visibilityFar) // coupe à la distance d
 - `cockpit.js` : `createCockpit()` → Object3D attaché à la caméra (renderOrder −1).
 - `scene.js` : assemble tout pour une scène de `src/data/scenes/` ;
   `createWorld(renderer, sceneJson, palette, {tier = 'default', lodSteps, physics, level,
-  groundDetail} = {})` (groundDetail : détail de la carte des rues, défaut celui du profil) →
+  groundDetail, facades} = {})` (groundDetail : détail de la carte des rues, défaut celui du
+  profil ; facades : détail des motifs de façade, défaut 1 en « lite », 2 sinon) →
   `{update(snapshot, k, dtReal), render(camera), stats(), dispose()}`, plus
   `scene`, `start`, `bounds`, `streets`, `buildings` (emprises au sol {x, y, width, depth, …},
   pour `game/bubbles.facadeAhead`), `visibilityFar`, `warmup(camera)` (préchauffage, variantes
@@ -793,7 +849,8 @@ export const session               // idem pour sessionStorage
 - Paramètres d'URL : `?c=n` (vitesse de la lumière, entier de 10 à 100, prioritaire sur le
   réglage mémorisé), `?scene=avenue-test|quartier-test` (défaut : avenue-test), `?diag`,
   `?bench` (résultat dans `window.__benchResult`, avec `c` et `lengthUnit`), `?sansciel` (avec `?diag` ou `?bench` : passe
-  ciel/sol coupée dès le départ), `?dpr=` (coupe le DPR adaptatif), `?debug` (panneau de
+  ciel/sol coupée dès le départ), `?dpr=` (coupe le DPR adaptatif), `?facades=0|1|2` (motifs
+  de façade coupés, simplifiés ou complets ; défaut : selon le profil), `?debug` (panneau de
   l'inclinaison), `?autopilote[=reference|naif]` (en niveau, le pilote de référence conduit,
   à pas fixes de 1/60 s ; sans effet sinon). Avec `?diag`, `?bench`, `?debug` ou
   `?autopilote`, `window.__coursier` donne l'état en lecture seule (`mode`, `etat` (machine

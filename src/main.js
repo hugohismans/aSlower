@@ -11,6 +11,8 @@
  *   avec #diag ; résultat affiché dans #diag et exposé dans window.__benchResult ;
  * - ?sansciel (avec ?diag ou ?bench) : passe ciel/sol coupée dès la première image ;
  * - ?dpr= : rapport de pixels imposé (render/quality.js ; coupe le DPR adaptatif) ;
+ * - ?facades=0|1|2 : motifs de façade coupés (mesures), simplifiés (défaut du profil « lite »)
+ *   ou complets (render/facades.js) ;
  * - ?c=n : vitesse de la lumière (entier de 10 à 100 m/s), prioritaire sur le réglage mémorisé
  *   (game/settings.js) et jamais mémorisée ;
  * - ?debug : panneau de l'inclinaison (hud/tiltDebug.js : α, β, γ, angle, neutre, volant) ;
@@ -1286,6 +1288,7 @@ async function createSession(renderer, { sceneJson = null, levelDef = null }, c)
   const world = createWorld(renderer, level ? level.sceneJson : sceneJson, palette, {
     tier: quality.tier,
     groundDetail: groundDetailFor(window.location.search, quality.tier),
+    facades: quality.facades,
     physics,
     level: level ? levelView(level) : null,
   });

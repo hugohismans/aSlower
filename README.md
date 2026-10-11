@@ -188,6 +188,7 @@ Paramètres d'URL (combinables, par exemple `?scene=quartier-test&bench&c=30&dpr
 | `?debug` | panneau de l'inclinaison (angles α, β, γ du capteur, angle de l'écran, angle de volant, neutre calibré, volant), pour vérifier les signes sur un vrai GSM |
 | `?solDetail=0` | carte du sol d'avant le jalon « ville vivante » (trottoirs, chaussées, tirets et ombres seulement), pour comparer et mesurer. Par défaut, la carte des rues (`src/render/streetMap.js`) dessine aussi bordures de trottoir, caniveaux, trottoirs dallés, passages piétons zébrés et lignes d'arrêt aux carrefours, places dallées en éventail, pelouses et pieds d'arbres (canal « végétation » : réflectance infrarouge de la végétation) ; le profil « lite » garde tout sauf les motifs de dalles et de pavés |
 | `?qualite=normale` | oublie un plantage mémorisé et quitte le profil « lite » (DPR 0,75, sans anticrénelage) |
+| `?facades=0` (ou `1`, `2`) | motifs de façade (fenêtres, volets, balcons, mansardes) : `0` coupés (murs unis, pour mesurer leur coût, par exemple `?bench&facades=0`), `1` simplifiés (fenêtres, encadrements, mansardes ; ni volets, ni balcons, ni joints : réglage du profil « lite »), `2` complets (par défaut) |
 | `?autopilote` ou `?autopilote=naif` | en niveau, le pilote de référence (`src/game/bot.js`) conduit à ta place sur l'itinéraire `parcours.reference` (ou `parcours.naif`) du niveau, à pas fixes de 1/60 s : démonstration et tests automatisés (Playwright). Sans effet sans ce paramètre ; avec lui (comme avec `?diag` ou `?debug`), `window.__coursier` donne l'état en lecture seule (`etat`, `niveau()`, `progression()`…) |
 
 **Publication** : chaque push sur `main` lance le workflow
@@ -259,6 +260,11 @@ docs/                   conception (plan, décisions, glossaire) et contrat d'in
   partir des fonctions colorimétriques de Wyman et al. donne la couleur vue pour chaque
   facteur Doppler D. S'y ajoutent l'effet projecteur en D⁴ (exact jusqu'à D = 8), une
   adaptation de l'exposition, comme celle de l'œil, et une compression qui garde la teinte.
+- **Façades procédurales.** Fenêtres, encadrements de pierre, volets, balcons en fer forgé,
+  mansardes d'ardoise et devantures sont dessinés par le shader : le motif ne fait que
+  choisir les cinq réflectances avant le brouillard et le Doppler (exact, car le décalage est
+  linéaire), et il est filtré à la taille du pixel (il se fond dans sa couleur moyenne au loin,
+  sans moiré). Quatre styles européens : haussmannien, coloré, brique, boutiques.
 - **Ciel, sol et brouillard** : une passe plein écran avec l'aberration inverse exacte.
 
 Détails et justifications : [`docs/conception.md`](docs/conception.md).
