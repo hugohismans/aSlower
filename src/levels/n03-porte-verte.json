@@ -326,8 +326,8 @@
     }
   ],
   "etoiles": {
-    "batterieMin": 0.45,
-    "tVilleMax": 70
+    "batterieMin": 0.5,
+    "tVilleMax": 65
   },
   "bulles": [
     {

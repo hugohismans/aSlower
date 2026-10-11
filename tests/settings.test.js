@@ -10,7 +10,8 @@ import {
   DEFAULT_PHYSICS,
   LENGTH_UNIT,
   STORAGE_PREFIX,
-  TIME_UNIT,
+  ACCEL_TIME,
+  LENGTH_TIME,
   physicsFor,
 } from '../src/physics/constants.js';
 import {
@@ -43,23 +44,23 @@ function fakeStore() {
 }
 
 describe('physicsFor', () => {
-  it('plage 10–100 m/s, défaut 30, c/a = 10 s', () => {
-    expect([C_MIN, C_DEFAULT, C_MAX, TIME_UNIT]).toEqual([10, 30, 100, 10]);
-    expect(DEFAULT_PHYSICS).toEqual({ c: 30, a: 3, lengthUnit: 300 });
-    expect([C, A, LENGTH_UNIT]).toEqual([30, 3, 300]);
+  it('plage 10–100 m/s, défaut 30, c/a = 5 s, L/c = 10 s', () => {
+    expect([C_MIN, C_DEFAULT, C_MAX, ACCEL_TIME, LENGTH_TIME]).toEqual([10, 30, 100, 5, 10]);
+    expect(DEFAULT_PHYSICS).toEqual({ c: 30, a: 6, lengthUnit: 300 });
+    expect([C, A, LENGTH_UNIT]).toEqual([30, 6, 300]);
   });
 
-  it('a = c/10 et L = c²/a = 10·c pour chaque entier de la plage', () => {
+  it('a = c/5 et L = 10·c = 2·c²/a pour chaque entier de la plage', () => {
     for (let c = C_MIN; c <= C_MAX; c++) {
       const p = physicsFor(c);
       expect(p.c).toBe(c);
-      expect(p.a).toBe(c / 10);
+      expect(p.a).toBe(c / 5);
       expect(p.lengthUnit).toBe(10 * c);
-      expect(p.c / p.a).toBeCloseTo(TIME_UNIT, 12);
-      expect((p.c * p.c) / p.a).toBeCloseTo(p.lengthUnit, 9);
+      expect(p.c / p.a).toBeCloseTo(ACCEL_TIME, 12);
+      expect(p.lengthUnit / p.c).toBeCloseTo(LENGTH_TIME, 12);
       expect(Object.isFrozen(p)).toBe(true);
     }
-    expect(physicsFor(100)).toEqual({ c: 100, a: 10, lengthUnit: 1000 }); // cahier des charges
+    expect(physicsFor(100)).toEqual({ c: 100, a: 20, lengthUnit: 1000 }); // a = 10 du cahier des charges : injecté (player.test.js)
   });
 
   it('refuse un c hors plage ou non entier (RangeError)', () => {

@@ -26,7 +26,7 @@
  *
  * Vitesse de la lumière : réglage du joueur (menu, ou « Changer c » dans le menu pause, qui
  * redémarre la partie). Toute la partie lit ses constantes dans physicsFor(c) : joueur, scène
- * (longueurs en L = c²/a), niveau, butée, ?bench ; le HUD et le rendu lisent snapshot.c. La
+ * (longueurs en L = 10·c), niveau, butée, ?bench ; le HUD et le rendu lisent snapshot.c. La
  * progression (game/progress.js) est gardée par niveau et par c.
  *
  * Direction tactile (jalon 2) : inclinaison du GSM (input/tilt.js) ou glisser, réglage
@@ -150,7 +150,7 @@ const BENCH_DT = 1 / 60;
 const BENCH_AVENUE_GAMMA = 2.5;
 /**
  * Quartier : caméra scriptée le long de la rue x = 0, β de 0 à betaMax en rampS, puis holdS ;
- * départ à y = startL·L (L = c²/a). Parcours : (betaMax/2·rampS + betaMax·holdS)·c ≈ 1,2·L,
+ * départ à y = startL·L (L = 10·c). Parcours : (betaMax/2·rampS + betaMax·holdS)·c ≈ 1,2·L,
  * de −0,6·L à +0,6·L, dans le quartier (demi-côté ≥ visibilité + 12 m ≥ 0,65·L).
  */
 const BENCH_QUARTIER = Object.freeze({ x: 0, startL: -0.6, betaMax: 0.92, rampS: 16, holdS: 5 });
@@ -204,7 +204,7 @@ function exitDistance(x, y, dx, dy, limits) {
  * Freinage automatique quand le bord de la zone roulable approche : si la distance d'arrêt
  * au frein plein, (c²/a)(γ − 1) (exacte, avec c et a de la partie), atteint SOFT_STOP_RATIO
  * de la distance au bord le long de la vitesse, le frein remplace la poussée. Le moteur suffit
- * (a = c/10) : l'arrêt est doux, sans pénalité, et la physique reste exacte.
+ * (a = c/5) : l'arrêt est doux, sans pénalité, et la physique reste exacte.
  * @param {import('./physics/player.js').PlayerState} player
  * @param {{thrust?: number, brake?: number, steer?: number}} cmd
  * @param {{xmin: number, ymin: number, xmax: number, ymax: number}} limits
@@ -1273,7 +1273,7 @@ function levelView(level) {
 
 /**
  * Partie pour la vitesse de la lumière c : constantes physiques, monde (scène développée pour
- * L = c²/a), caméra, joueur ; en niveau, l'état de partie (game/level.js) et ses objets ; en
+ * L = 10·c), caméra, joueur ; en niveau, l'état de partie (game/level.js) et ses objets ; en
  * conduite libre, la butée et ?bench ; préchauffage des programmes.
  * @param {import('three').WebGLRenderer} renderer
  * @param {{sceneJson?: any, levelDef?: any}} what scène de conduite libre, ou niveau (JSON)

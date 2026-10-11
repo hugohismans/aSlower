@@ -329,7 +329,7 @@
     }
   ],
   "etoiles": {
-    "batterieMin": 0.2,
+    "batterieMin": 0.3,
     "tVilleMax": 115
   },
   "bulles": [
@@ -407,7 +407,7 @@
   ],
   "parcours": {
     "reference": {
-      "note": "A fond sur le boulevard jusqu'a l'hotel, puis un tour et demi de la place de l'Horloge a beta 0,85 et retour a fond par le boulevard : arrivee chez Mme FitzGerald vers t = 91-99 s, sans attendre.",
+      "note": "A fond sur le boulevard jusqu'a l'hotel, puis un tour et demi de la place de l'Horloge a beta 0,85 et retour par le boulevard (beta 0,8 dans la diagonale, pour prendre le virage) : arrivee chez Mme FitzGerald juste avant t = 90 s.",
       "etapes": [
         {
           "aller": [
@@ -850,7 +850,7 @@
               "fois": 1.4
             }
           ],
-          "beta": 0.9
+          "beta": 0.8
         },
         {
           "aller": [

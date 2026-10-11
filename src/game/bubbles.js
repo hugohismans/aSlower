@@ -37,6 +37,7 @@
  * - 5 s d'affichage, ou toucher pour fermer (dismiss) ;
  * - chaque bulle n'est montrée qu'une fois par profil (mémorisée dès son apparition).
  */
+import { ACCEL_TIME } from '../physics/constants.js';
 import { EVENTS, VARIABLES, compileCondition, conditionReferences, validateCondition } from './conditions.js';
 
 /** Clé de stockage (sans le préfixe aslower:v1:, ajouté par storage.js). */
@@ -483,7 +484,7 @@ const RELEASE_MIN_BETA = 0.01;
  *     niveau?: LevelBubbleInput | null
  *   }): Record<string, any>, reset(): void}}
  *   command : commande appliquée (après la butée douce) ; a : accélération propre maximale
- *   (défaut c/10) ; butee : vrai quand la butée douce freine à la place du joueur ;
+ *   (défaut c/ACCEL_TIME) ; butee : vrai quand la butée douce freine à la place du joueur ;
  *   niveau : variables de la partie de niveau (jalon 3), absentes en conduite libre (valeurs
  *   neutres : enNiveau faux, distances infinies, batterie 1, teintePorte « aucune »).
  */
@@ -524,7 +525,7 @@ export function createBubbleVariables() {
       if (turning) turned = true;
 
       // Distance d'arrêt au frein plein (c²/a)(γ − 1) = (c²/a)(γβ)²/(γ + 1), sans annulation.
-      const accel = a > 0 ? a : s.c / 10;
+      const accel = a > 0 ? a : s.c / ACCEL_TIME;
       const gb = s.gamma * s.beta;
       const distanceFreinage = ((s.c * s.c) / accel) * ((gb * gb) / (s.gamma + 1));
       const lv = niveau ?? {};

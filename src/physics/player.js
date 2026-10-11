@@ -11,7 +11,7 @@
  *
  * Constantes physiques : c et a sont ceux de la partie (réglage du joueur, physicsFor),
  * injectés à la création (`createPlayer({physics: {c, a}})`) et gardés dans l'état ; par
- * défaut, ceux du réglage par défaut (C = 30 m/s, A = 3 m/s²).
+ * défaut, ceux du réglage par défaut (C = 30 m/s, A = 6 m/s²).
  *
  * Modèle « voiture arcade » (choix de l'auteur) :
  * - poussée et frein (|accélération propre| ≤ a) le long du cap ;

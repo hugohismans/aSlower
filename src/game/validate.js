@@ -9,11 +9,11 @@
  * (x vers l'est, y vers le nord, mètres). UNITÉS :
  * - LONGUEUR : un nombre = mètres (échelle humaine : rues, îlots, rayons de zone, hauteurs) ;
  *   une EXPRESSION {fois, de?, plus?, min?, max?, arrondiSup?, arrondiInf?, puisPlus?} = en
- *   unités de L = c²/a = 10·c m (ou d'un paramètre ; render/layout.js). Toutes les distances
+ *   unités de L = 10·c m (ou d'un paramètre ; render/layout.js). Toutes les distances
  *   « de jeu » (lieux de livraison, portées, départ…) s'écrivent en L, pour que le niveau
  *   garde le même sens pour tout c (10 à 100 m/s).
  * - TEMPS (s) : nombres seulement (délais, batterie, « pas avant », maintien, coûts) : ils ne
- *   dépendent pas de c (c/a = 10 s pour tout c). Temps de la ville t ou temps propre τ, selon
+ *   dépendent pas de c (c/a = 5 s et L/c = 10 s pour tout c). Temps de la ville t ou temps propre τ, selon
  *   le champ.
  * - VITESSE : fraction de c (β), nombre seulement.
  *

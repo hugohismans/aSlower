@@ -25,6 +25,7 @@
  * `step`, elle modifie l'état).
  */
 import {
+  ACCEL_TIME,
   C,
   PHI_MAX_LIMIT,
   REST_EPSILON,
@@ -378,7 +379,7 @@ export function stepWithCollisions(state, cmd, dtau, obstacles, { radius = PLAYE
     throw new RangeError(`stepWithCollisions : dtau doit être un nombre fini ≥ 0 (reçu : ${dtau})`);
   }
   const c = state.c ?? C;
-  const a = state.a ?? c / 10;
+  const a = state.a ?? c / ACCEL_TIME;
   const phiCap = Math.min(state.phiMax, PHI_MAX_LIMIT);
   /** @type {CollisionHit[]} */
   const hits = [];

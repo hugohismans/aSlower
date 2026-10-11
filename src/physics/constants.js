@@ -8,35 +8,42 @@
 /**
  * Vitesse de la lumière : un RÉGLAGE DU JOUEUR (décision du 2026-10-11), entier de C_MIN à
  * C_MAX m/s, C_DEFAULT par défaut. Toute la partie lit ses constantes physiques dans
- * `physicsFor(c)` ; le moteur garde c/a = TIME_UNIT = 10 s (même rythme de jeu quel que soit
- * c), si bien que a = c/10 et que l'unité de longueur vaut L = c²/a = 10·c mètres.
+ * `physicsFor(c)`, qui garde les rapports au même c : même rythme et même ville, à l'échelle,
+ * quel que soit c.
+ * - Accélération propre du moteur : a = c/ACCEL_TIME (0,76·c en ACCEL_TIME s de temps propre).
+ * - Unité de longueur des niveaux : L = c·LENGTH_TIME = 10·c mètres. C'était c²/a quand
+ *   a valait c/10 (jalons 1 à 3) ; depuis l'accélération « franche » (a = c/5), L = 2·c²/a :
+ *   la ville garde sa taille et l'on y va deux fois plus vite.
  */
 export const C_DEFAULT = 30;
 export const C_MIN = 10;
 export const C_MAX = 100;
 
-/** Unité naturelle de temps c/a (s), la même pour tous les réglages de c. */
-export const TIME_UNIT = 10;
+/** Temps c/a (s) : la poussée à fond donne la rapidité φ = τ/ACCEL_TIME. */
+export const ACCEL_TIME = 5;
+
+/** Temps de lumière de l'unité de longueur, L/c (s). */
+export const LENGTH_TIME = 10;
 
 /**
  * @typedef {{c: number, a: number, lengthUnit: number}} PhysicsConstants
  * c : vitesse de la lumière (m/s) ; a : accélération propre maximale du moteur (m/s²) ;
- * lengthUnit : L = c²/a (m).
+ * lengthUnit : L = c·LENGTH_TIME (m).
  */
 
 /**
  * Constantes physiques d'une partie pour la vitesse de la lumière c.
  * @param {number} c entier de C_MIN à C_MAX (m/s)
- * @returns {Readonly<PhysicsConstants>} {c, a = c/TIME_UNIT, lengthUnit = c·TIME_UNIT}
+ * @returns {Readonly<PhysicsConstants>} {c, a = c/ACCEL_TIME, lengthUnit = c·LENGTH_TIME}
  */
 export function physicsFor(c) {
   if (!(Number.isInteger(c) && c >= C_MIN && c <= C_MAX)) {
     throw new RangeError(`Vitesse de la lumière : entier de ${C_MIN} à ${C_MAX} m/s attendu (reçu : ${c})`);
   }
-  return Object.freeze({ c, a: c / TIME_UNIT, lengthUnit: c * TIME_UNIT });
+  return Object.freeze({ c, a: c / ACCEL_TIME, lengthUnit: c * LENGTH_TIME });
 }
 
-/** Constantes physiques du réglage par défaut (c = 30 m/s, a = 3 m/s², L = 300 m). */
+/** Constantes physiques du réglage par défaut (c = 30 m/s, a = 6 m/s², L = 300 m). */
 export const DEFAULT_PHYSICS = physicsFor(C_DEFAULT);
 
 /**

@@ -517,8 +517,8 @@ describe('createBubbleVariables', () => {
     expect(v1.dejaParti).toBe(true);
     expect(v1.evenements).toEqual(['depart']);
     expect(v1.vitessePropre).toBeCloseTo(g * b * 30, 12);
-    expect(v1.distanceFreinage).toBeCloseTo(300 * (g - 1), 9); // (c²/a)(γ − 1), a = c/10
-    expect(v1.margeFreinage).toBeCloseTo(100 / (300 * (g - 1)), 9);
+    expect(v1.distanceFreinage).toBeCloseTo(150 * (g - 1), 9); // (c²/a)(γ − 1), a = c/5
+    expect(v1.margeFreinage).toBeCloseTo(100 / (150 * (g - 1)), 9);
     expect(v1.facadeDevant).toBe(false);
     expect(v1.regardArriere).toBe(false);
 
@@ -563,7 +563,7 @@ describe('createBubbleVariables : variables des niveaux (jalon 3)', () => {
       niveau: { distanceArret: 60, porteProche: true, teintePorte: 'vert', teinteVoulue: true, batterie: 0.4, margeDelai: 12, colisLivres: 1, evenements: ['livraison', 'porteOuverte'] },
     });
     expect(v.enNiveau).toBe(true);
-    expect(v.margeArret).toBeCloseTo(60 / (300 * (g - 1)), 9);
+    expect(v.margeArret).toBeCloseTo(60 / (150 * (g - 1)), 9);
     expect(v).toMatchObject({ porteProche: true, teintePorte: 'vert', teinteVoulue: true, batterie: 0.4, margeDelai: 12, colisLivres: 1 });
     expect(v.evenements).toEqual(['livraison', 'porteOuverte']);
     // Les bulles des niveaux citent ces variables et événements (validées par le schéma).

@@ -3,7 +3,9 @@
 // a = 3 m/s²) sauf mention ; vitesses écrites en fractions de c. Un groupe vérifie aussi
 // l'injection de c (paramètre facultatif) avec les valeurs du cahier des charges (c = 100).
 import { describe, expect, it } from 'vitest';
-import { A, C } from '../src/physics/constants.js';
+// Constantes des tests : c = 30 m/s, a = 3 m/s² (c/a = 10 s, rapidité 1 après 10 s de poussée).
+const C = 30;
+const A = 3;
 import {
   aberrate,
   aberrateInverse,

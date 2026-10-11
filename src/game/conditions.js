@@ -56,7 +56,7 @@ export const VARIABLES = Object.freeze({
   depuisDebut: { type: 'number', description: 'τ écoulé depuis le départ de la partie (s)', calcul: 'snapshot.tau − τ au départ' },
   k: { type: 'number', description: 'vision : 1 relativiste, 0 classique', calcul: 'game.k (main.js, nextK)' },
   vitessePropre: { type: 'number', description: 'γv : mètres de ville par seconde de ta montre (m/s)', calcul: 'snapshot.gamma × snapshot.speed' },
-  distanceFreinage: { type: 'number', description: 'distance d’arrêt au frein plein (m)', calcul: '(c²/a)(γ − 1), a = c/10' },
+  distanceFreinage: { type: 'number', description: 'distance d’arrêt au frein plein (m)', calcul: '(c²/a)(γ − 1), a = c/5' },
   distanceDevant: { type: 'number', description: 'distance au bord de la zone roulable, le long du cap (m)', calcul: 'exitDistance(x, y, hx, hy, limits) de main.js' },
   margeFreinage: { type: 'number', description: 'distanceDevant ÷ distanceFreinage (Infinity à l’arrêt)', calcul: 'distanceDevant / distanceFreinage' },
   accelere: { type: 'boolean', description: 'poussée appliquée', calcul: 'commande.thrust > 0 (après la butée douce)' },

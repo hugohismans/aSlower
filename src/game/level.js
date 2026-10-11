@@ -3,7 +3,7 @@
  * src/game/validate.js et docs/interfaces.md) à l'état de partie, et l'avancée d'une image.
  * Module pur (ni DOM, ni stockage, ni three) : utilisable par un script Node (bot, calibrage).
  *
- * Unités : les longueurs « de jeu » du JSON sont des expressions en L = c²/a = 10·c m
+ * Unités : les longueurs « de jeu » du JSON sont des expressions en L = 10·c m
  * ({fois, de?, plus?, …}, voir render/layout.js) ou des mètres (échelle humaine) ; les temps
  * (délais, batterie, « pas avant », maintien, coûts) sont des secondes, indépendants de c ;
  * les vitesses sont des fractions de c (β). `resolveLevel` remplace les expressions par des
@@ -32,7 +32,7 @@ export const DEFAULT_LAMP_ABOVE_DOOR = 1;
  * Remplace toutes les expressions de longueur du niveau par leur valeur (m) pour l'unité L.
  * Les paramètres (`parametres`, à la racine) servent à la scène comme au jeu.
  * @param {any} json niveau « coursier-niveau/1 »
- * @param {number} lengthUnit L = c²/a (m)
+ * @param {number} lengthUnit L = 10·c (m)
  * @returns {any} copie résolue (sans `parametres`)
  */
 export function resolveLevel(json, lengthUnit) {

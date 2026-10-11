@@ -37,7 +37,7 @@
  *
  * Longueurs de jeu (scènes paramétriques) : la vitesse de la lumière est un réglage du
  * joueur, et les distances « de jeu » (longueur d'une avenue, départ, butée, taille d'un
- * quartier) suivent l'unité naturelle L = c²/a = 10·c m. Partout où un nombre est attendu
+ * quartier) suivent l'unité de longueur L = 10·c m. Partout où un nombre est attendu
  * (coordonnée, longueur, nombre de répétitions), la scène peut donner une EXPRESSION :
  *   {fois: k, de?: "L" | nom d'un paramètre, plus?: b, min?: m, max?: M,
  *    arrondiSup?: p, arrondiInf?: p, puisPlus?: b2}
@@ -93,7 +93,7 @@ export const VISIBILITY_LITE_RATIO = 0.7;
 
 /**
  * Visibilité par défaut pour l'unité de longueur L (m).
- * @param {number} lengthUnit L = c²/a (m)
+ * @param {number} lengthUnit L = 10·c (m)
  * @returns {{lite: number, default: number}}
  */
 export function visibilityFor(lengthUnit) {
@@ -620,7 +620,7 @@ export function resolveSceneLengths(scene, lengthUnit) {
  * Développe une scène JSON pour l'unité de longueur L de la partie.
  * @param {any} sceneJson contenu d'un fichier de src/data/scenes/
  * @param {Record<string, {srgb: string, ir?: number, uv?: number}>} palette src/data/palette.json
- * @param {{lengthUnit?: number}} [options] L = c²/a (m) ; défaut : LENGTH_UNIT (réglage par défaut)
+ * @param {{lengthUnit?: number}} [options] L = 10·c (m) ; défaut : LENGTH_UNIT (réglage par défaut)
  * @returns {{buildings: Building[], lamps: Lamp[], streets: Street[],
  *            start: {x: number, y: number, heading: number},
  *            visibility: {lite: number, default: number},

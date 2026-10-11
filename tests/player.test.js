@@ -1,13 +1,15 @@
 // Tests de src/physics/player.js : intégrateur exact, modèle « voiture arcade », plafond.
-// Constantes physiques : celles du réglage par défaut (C = 30 m/s, A = 3 m/s², L = c²/a = 300 m)
-// sauf mention contraire ; les tests obligatoires du cahier des charges sont exécutés avec
-// c = 100, a = 10 injectées (createPlayer({physics})), puis avec c = 30 et c = 10.
+// Constantes physiques : sauf mention contraire, c = 30 m/s et a = 3 m/s² INJECTÉES (c/a = 10 s,
+// L = c²/a = 300 m : rapidité 1 après 10 s de poussée, valeurs en clair du plan) ; le réglage
+// par défaut du jeu (a = c/5) est vérifié à part. Les tests obligatoires du cahier des charges
+// sont exécutés avec c = 100, a = 10 injectées (createPlayer({physics})), puis avec c = 30 et
+// c = 10 à c/a = 10 s et avec le réglage par défaut.
 import { describe, expect, it } from 'vitest';
 import {
-  A,
-  C,
+  A as A_DEFAULT,
+  C as C_GAME,
   C_DEFAULT,
-  LENGTH_UNIT,
+  LENGTH_UNIT as LENGTH_UNIT_DEFAULT,
   MAX_FRAME_DT,
   PHI_MAX_DEFAULT,
   PHI_MAX_LIMIT,
@@ -17,7 +19,16 @@ import {
   TURN_RATE,
   physicsFor,
 } from '../src/physics/constants.js';
-import { clampFrameDt, createPlayer, REVERSE_MAX_RAPIDITY, snapshot, step } from '../src/physics/player.js';
+import { clampFrameDt, createPlayer as createDefaultPlayer, REVERSE_MAX_RAPIDITY, snapshot, step } from '../src/physics/player.js';
+
+/** Constantes des tests (c/a = 10 s), injectées par défaut dans createPlayer ci-dessous. */
+const ORACLE = Object.freeze({ c: 30, a: 3 });
+const C = ORACLE.c;
+const A = ORACLE.a;
+const LENGTH_UNIT = (C * C) / A;
+
+/** createPlayer avec les constantes ORACLE, sauf `physics` passé (même undefined : défaut du jeu). */
+const createPlayer = (options = {}) => createDefaultPlayer({ physics: ORACLE, ...options });
 
 /** Générateur pseudo-aléatoire à graine fixe (mulberry32) : tests reproductibles. */
 function rng(seed) {
@@ -86,33 +97,39 @@ function arc(phi0, k, theta0, omega, T, c = C) {
 }
 
 /**
- * Valeurs attendues après τ = 10 s de poussée pleine depuis l'arrêt (rapidité a·τ/c = 1 car
- * c/a = 10 s) : v = c·tanh 1, t = (c/a)·sinh 1, x = (c²/a)(cosh 1 − 1).
+ * Valeurs attendues après τ = 10 s de poussée pleine depuis l'arrêt, rapidité φ = a·τ/c
+ * (φ = 1 quand c/a = 10 s) : v = c·tanh φ, t = (c/a)·sinh φ, x = (c²/a)(cosh φ − 1).
  */
-const expected10 = ({ c, a }) => ({ v: c * Math.tanh(1), t: (c / a) * Math.sinh(1), x: ((c * c) / a) * (Math.cosh(1) - 1) });
+const expected10 = ({ c, a }) => {
+  const phi = (a * 10) / c;
+  return { v: c * Math.tanh(phi), t: (c / a) * Math.sinh(phi), x: ((c * c) / a) * (Math.cosh(phi) - 1) };
+};
 
 /** Constantes du cahier des charges, injectées (le jeu les obtient avec ?c=100). */
 const SPEC = Object.freeze({ c: 100, a: 10 });
 
-// Réglage par défaut (c = 30 m/s, a = 3 m/s²).
+// Constantes ORACLE (c = 30 m/s, a = 3 m/s²).
 const { v: V_10, t: T_10, x: X_10 } = expected10({ c: C, a: A });
 
 /**
  * Jeux de constantes des tests de référence : valeurs attendues en clair (contrôle des
- * formules) ; physics = undefined : constantes par défaut de createPlayer.
+ * formules) ; physics = undefined : constantes par défaut de createPlayer. Les deux premiers
+ * (c/a = 10 s, φ = 1 après 10 s) servent aussi aux tests de frein et des jumeaux.
  */
 const PHYSICS_CASES = [
   { label: 'c = 100, a = 10 injectées (cahier des charges)', physics: SPEC, literal: { v: 76.159416, t: 11.752012, x: 543.080635 } },
-  { label: 'c = 30, a = 3 (réglage par défaut, sans injection)', physics: undefined, literal: { v: 22.847825, t: 11.752012, x: 162.924190 } },
-  { label: 'c = 10, a = 1 (physicsFor(10))', physics: physicsFor(10), literal: { v: 7.615942, t: 11.752012, x: 54.308063 } },
+  { label: 'c = 30, a = 3 injectées (c/a = 10 s)', physics: Object.freeze({ c: 30, a: 3 }), literal: { v: 22.847825, t: 11.752012, x: 162.924190 } },
+  { label: 'c = 10, a = 1 injectées (c/a = 10 s)', physics: Object.freeze({ c: 10, a: 1 }), literal: { v: 7.615942, t: 11.752012, x: 54.308063 } },
+  { label: 'c = 30, a = 6 (réglage par défaut, sans injection)', physics: undefined, literal: { v: 28.920827, t: 18.134302, x: 414.329354 } },
+  { label: 'c = 10, a = 2 (physicsFor(10))', physics: physicsFor(10), literal: { v: 9.640276, t: 18.134302, x: 138.109785 } },
 ];
-const constantsOf = (physics) => physics ?? { c: C, a: A };
+const constantsOf = (physics) => physics ?? { c: C_GAME, a: A_DEFAULT };
 
 describe('createPlayer et clampFrameDt', () => {
   it('crée un joueur à l’arrêt, cap nord par défaut, constantes du réglage par défaut', () => {
-    expect([C, A, LENGTH_UNIT, C_DEFAULT]).toEqual([30, 3, 300, 30]);
-    const s = createPlayer();
-    expect(s).toMatchObject({ x: 0, y: 0, ux: 0, uy: 0, tau: 0, t: 0, phiMax: PHI_MAX_DEFAULT, c: 30, a: 3 });
+    expect([C_GAME, A_DEFAULT, LENGTH_UNIT_DEFAULT, C_DEFAULT]).toEqual([30, 6, 300, 30]);
+    const s = createDefaultPlayer();
+    expect(s).toMatchObject({ x: 0, y: 0, ux: 0, uy: 0, tau: 0, t: 0, phiMax: PHI_MAX_DEFAULT, c: 30, a: 6 });
     expectNear(s.hx, 0, 1e-15);
     expect(s.hy).toBe(1);
     const p = createPlayer({ x: 5, y: -3, heading: Math.PI, phiMax: 2 });
@@ -124,7 +141,7 @@ describe('createPlayer et clampFrameDt', () => {
 
   it('garde les constantes physiques injectées ; refuse des constantes invalides', () => {
     expect(createPlayer({ physics: SPEC })).toMatchObject({ c: 100, a: 10 });
-    expect(createPlayer({ physics: physicsFor(57) })).toMatchObject({ c: 57, a: 5.7 });
+    expect(createPlayer({ physics: physicsFor(57) })).toMatchObject({ c: 57, a: 11.4 });
     expect(snapshot(createPlayer({ physics: physicsFor(57) })).c).toBe(57);
     expect(() => createPlayer({ physics: { c: 0, a: 1 } })).toThrow(RangeError);
     expect(() => createPlayer({ physics: { c: 30, a: -3 } })).toThrow(RangeError);

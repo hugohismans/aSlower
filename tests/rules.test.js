@@ -62,7 +62,7 @@ describe('createLevel : du JSON (en L) à l’état de partie', () => {
     expect(level.colis[1].livraison.pasAvant).toBe(60);
     expect(level.status).toBe('enCours');
     expect(level.colis.map((p) => p.etat)).toEqual(['aBord', 'aBord']); // sans retrait : à bord
-    expect(player).toMatchObject({ x: 0, y: 10, ux: 0, uy: 0, reverse: true, c, a: c / 10, phiMax: 3 });
+    expect(player).toMatchObject({ x: 0, y: 10, ux: 0, uy: 0, reverse: true, c, a: c / 5, phiMax: 3 });
   });
 
   it('scène du niveau : schéma et départ ajoutés, sans parametres', () => {

@@ -137,7 +137,10 @@ export function createBotDriver(route, physics, { dt = BOT_DT, turnRadius = BOT_
         const d = Math.hypot(dx, dy);
         const radius = s.rayon ?? (s.arret ? 1.5 : 4);
         if (phase.stopped) {
-          if (moving) return { thrust: 0, ...speedCommand(snap.rapidity, 0), steer: 0 };
+          if (moving) {
+            phase.stopTau = snap.tau; // la pause compte depuis l'arrêt effectif
+            return { thrust: 0, ...speedCommand(snap.rapidity, 0), steer: 0 };
+          }
           if (snap.tau - phase.stopTau >= ARRET_PAUSE) {
             next();
             continue;

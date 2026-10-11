@@ -475,7 +475,7 @@ function createEmitters(lamps) {
  * @param {any} scene JSON de src/data/scenes/
  * @param {Record<string, {srgb: string, ir?: number, uv?: number}>} palette src/data/palette.json
  * @param {{lodSteps?: number[], lengthUnit?: number}} [options] pas des LOD (m), croissants ;
- *   unité de longueur L = c²/a de la partie (m), pour les longueurs de jeu de la scène
+ *   unité de longueur L = 10·c de la partie (m), pour les longueurs de jeu de la scène
  *   (layout.expandScene ; défaut : réglage par défaut)
  */
 export function buildCity(scene, palette, { lodSteps = [...DEFAULT_LOD_STEPS], lengthUnit } = {}) {
