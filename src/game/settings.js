@@ -77,3 +77,39 @@ export function initialLightSpeed(search, store = local) {
   if (c === null) return { c: saved, source: 'reglage', message: `Paramètre ?c= ignoré. ${message}` };
   return { c, source: 'url', message };
 }
+
+/* ------------------------------------------------------------------------- */
+/* Direction tactile (jalon 2) : inclinaison ou glisser                       */
+/* ------------------------------------------------------------------------- */
+
+/** Clé de stockage de la direction tactile (sans le préfixe) : aslower:v1:commandes → {mode}. */
+export const CONTROLS_KEY = 'commandes';
+
+/** Modes de direction tactile : inclinaison du GSM, ou glisser le pouce. */
+export const CONTROL_MODES = Object.freeze(['tilt', 'drag']);
+
+/**
+ * Direction tactile préférée : celle mémorisée, sinon 'tilt' sur un appareil tactile
+ * ((any-pointer: coarse), évalué par main.js) et 'drag' ailleurs.
+ * @param {{touch?: boolean}} [device] touch : écran tactile
+ * @param {{get(key: string, fallback?: any): any}} [store]
+ * @returns {'tilt' | 'drag'}
+ */
+export function loadControlMode({ touch = false } = {}, store = local) {
+  const saved = store.get(CONTROLS_KEY, null);
+  const mode = saved && typeof saved === 'object' ? saved.mode : undefined;
+  if (CONTROL_MODES.includes(mode)) return mode;
+  return touch ? 'tilt' : 'drag';
+}
+
+/**
+ * Mémorise la direction tactile choisie par le joueur (pas un repli automatique : un refus
+ * de la permission ne change pas la préférence, l'inclinaison est retentée à la partie suivante).
+ * @param {'tilt' | 'drag'} mode
+ * @param {{set(key: string, value: any): boolean}} [store]
+ * @returns {boolean} vrai si l'écriture est durable
+ */
+export function saveControlMode(mode, store = local) {
+  if (!CONTROL_MODES.includes(mode)) throw new RangeError(`Direction inconnue : ${mode}`);
+  return store.set(CONTROLS_KEY, { mode });
+}

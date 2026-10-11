@@ -262,7 +262,7 @@ Position des objets à l'instant t de la **ville**, passée par la même aberrat
 - **Caméra** : première personne, œil à 1,6 m, avant du véhicule en bas de l'écran, **hFOV 90°** en paysage.
 - **Cible** : 60 i/s sur un GSM moyen (classe Mali-G68 / Adreno 710), plancher de 30 i/s stables sur entrée de gamme (Mali-G52 / Adreno 610).
 - **Appareil de test de l'auteur** (décision 7) : iPhone 14 Pro Max, Safari iOS, DPR 3 (rendu à DPR 2 par défaut, plafonné à 2,2 Mpx), `requestAnimationFrame` limité à 60 Hz par défaut malgré l'écran ProMotion à 120 Hz. C'est sur lui que se mesure le critère de performance du J1 ; un Android moyen reste souhaitable en J2.
-- **Profils lite / mid / full** inspirés du portfolio. DPR adaptatif recalé sur 60 i/s : on baisse de 0,25 au-delà de 18,5 ms d'intervalle moyen sur 90 images. On remonte sur un autre critère, puisqu'à 60 Hz l'intervalle ne descend jamais sous 16,7 ms : au moins 98 % des images à ≤ 17,5 ms pendant 10 s, et un temps de travail CPU (performance.now() autour de step + render) bas. On utilise `EXT_disjoint_timer_query_webgl2` quand elle existe. `powerPreference: 'high-performance'`.
+- **Profils lite / mid / full** inspirés du portfolio. DPR adaptatif (livré en J2, `render/adaptiveDpr.js`) recalé sur 60 i/s : on baisse de 0,25 au-delà de 18,5 ms d'intervalle moyen sur 90 images. On remonte sur un autre critère, puisqu'à 60 Hz l'intervalle ne descend jamais sous 16,7 ms : au moins 98 % des images à ≤ 17,5 ms pendant 10 s, et un temps de travail CPU (performance.now() autour de step + render) bas. On utilise `EXT_disjoint_timer_query_webgl2` quand elle existe. `powerPreference: 'high-performance'`.
 - **Garde-fou de démarrage** :
   - clés `aslower:v1:gl-boot`, `…:gl-crash` et `…:gl-tier` (stockage local et de session), jamais `hh-*` puisque l'origine est partagée avec le portfolio ;
   - après un 1er plantage : lite, DPR 0,75 ;
@@ -287,7 +287,7 @@ Position des objets à l'instant t de la **ville**, passée par la même aberrat
 - `DeviceOrientationEvent.requestPermission()` est appelé en premier dans le geste « Jouer », sans `await` avant.
 - On attend ensuite un vrai événement pendant 1 s, faute de quoi on passe au mode glisser.
 - L'angle de volant est calculé à partir de β, γ et `screen.orientation.angle`, exact dans les deux paysages (90° et 270°), seuls permis.
-- Calibrage pendant le décompte, zone morte de 3°, saturation à 25°, lissage de 60 ms. HTTPS requis (assuré par Pages).
+- Calibrage pendant le décompte (en J2, sans décompte : ≈ 0,5 s au départ, quand le capteur répond ; « Recentrer le volant » au menu pause), zone morte de 3°, saturation à 25°, lissage de 60 ms. HTTPS requis (assuré par Pages).
 - Panneau `?debug` pour vérifier les signes sur un vrai iPhone et un vrai Android.
 
 **Clavier** (`event.code`, position physique des touches : W/A/S/D en QWERTY sont Z/Q/S/D en AZERTY) :
@@ -561,6 +561,49 @@ Un seul jalon à valider. Chaque étape est publiée sur Pages et jouable sur le
 - profils mid/full et DPR adaptatif ;
 - matrice d'appareils (l'iPhone 14 Pro Max de l'auteur, plus un Mali ou Adreno moyen ou d'entrée de gamme si possible, avec `?bench`) ;
 - accessibilité.
+
+**Statut (2026-10-11) : intégré, à valider sur l'iPhone 14 Pro Max** (et un Android moyen si possible).
+Tests Vitest verts (modules purs : `tiltMath`, `conditions`, `bubbles`, `adaptiveDpr` ; faux capteur pour `tilt` ;
+réglages, appareil, manifeste) ; parcours Playwright sur Chromium (SwiftShader, GSM simulé 932×430) : volant dans le bon
+sens (θ diminue en penchant à droite, écran à 90°), repli annoncé sur refus et sans capteur, bulles qui
+apparaissent puis ne reviennent qu'après « Revoir les bulles », menu pause, `?bench` identique au J1 (mêmes images et
+même état final).
+
+Ce qui a été fait :
+- **Inclinaison** (`input/tilt.js`, `input/tiltMath.js`) branchée : la permission est demandée en toute première
+  ligne du clic « Jouer » (puis le plein écran, puis le chargement), et au choix « Inclinaison » du réglage
+  Direction (écran titre et menu pause : c'est aussi un geste). Préférence mémorisée dans `aslower:v1:commandes`
+  (défaut : inclinaison sur écran tactile) ; un repli automatique ne la change pas. Calibrage d'≈ 0,5 s quand le
+  capteur répond en jeu (message « Tiens ton GSM comme un volant… ») ; « Recentrer le volant » au menu pause.
+  Repli en glisser annoncé (aria-live) et affiché : « Inclinaison refusée… iOS ne repose la question qu'après un
+  rechargement » ou « Pas de capteur d'inclinaison… » ; « Réessayer l'inclinaison » dans le réglage Direction.
+  En mode inclinaison : pas de zone volant, frein 88×88 px en bas à gauche. `controls.read().lastSource` choisit la
+  variante clavier / inclinaison / glisser des textes. Panneau `?debug`.
+- **Bulles** (`game/bubbles.js`, `game/conditions.js`, `hud/bubbles.js`, `hud/announcer.js`) branchées : horloge
+  réelle de jeu arrêtée en pause, variables calculées à chaque image (commande après la butée douce, butée,
+  façade dans l'axe à 5 Hz sur les emprises exposées par `scene.js`), « Revoir les bulles » au menu pause, file
+  vidée à chaque nouvelle partie (vues gardées).
+- **Menu pause complet** : Reprendre, Recentrer le volant (inclinaison active), Direction (écran tactile),
+  Changer c, Revoir les bulles, Recommencer, Crédits ; cibles de 48 px, tenu dans 430 px de haut ; clavier
+  (Tab, Entrée, Échap ou P) avec focus visible. Le panneau « Tourne ton GSM » reste strict (Reprendre refusé en
+  portrait).
+- **Appareil** : plein écran au clic « Jouer » et « Reprendre » sur écran tactile quand l'API existe (Android ;
+  rien sur iPhone, sans erreur), puis verrouillage du paysage tenté ; Wake Lock en jeu, rendu en pause, repris
+  au retour ; manifeste (`display: fullscreen`, paysage, icônes 180/192/512 et maskable générées depuis le favicon)
+  et balises iOS ; sur iPhone, une ligne discrète de l'écran titre propose « Sur l'écran d'accueil ».
+- **DPR adaptatif** (`render/adaptiveDpr.js`, règle du §4) : −0,25 si l'intervalle moyen des 90 dernières images
+  dépasse 18,5 ms (plancher 1, 0,75 en lite), +0,25 jusqu'au DPR du profil si ≥ 98 % des images ≤ 17,5 ms
+  pendant 10 s et CPU (step + render) ≤ 8 ms pour 95 % d'entre elles, jamais dans les 30 s qui suivent une baisse ;
+  coupé par `?bench` et `?dpr=` ; DPR courant dans `#diag`. Appliqué à l'image suivante, avant le rendu.
+- **Accessibilité** : annonceur aria-live (bulles, replis, calibrage), `prefers-reduced-motion` respecté (bulles
+  sans animation, vision classique instantanée), focus visible partout, libellés aria des boutons icônes.
+
+Reste à faire ou à mesurer :
+- sur l'iPhone : signe du volant dans les deux paysages, dialogue de permission au clic « Jouer », refus puis
+  rechargement, calibrage, frein en bas à gauche avec le pouce, ajout à l'écran d'accueil (plein écran, icône),
+  Wake Lock (iOS 16.4+), lisibilité des bulles au soleil, réglage des seuils (zone morte 3°, saturation 25°) ;
+- `?bench` sur un Android moyen (matrice d'appareils) ;
+- profils mid/full (seul le DPR adaptatif est livré ; pas de mesure GPU par `EXT_disjoint_timer_query_webgl2`).
 
 ### J3 : moteur de niveaux et niveaux 1 à 3
 - schéma et validateur, machine à états (menu → briefing → décompte → jeu → bilan) ;

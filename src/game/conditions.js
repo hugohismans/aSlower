@@ -200,7 +200,7 @@ export function validateCondition(cond, { path = 'quand', variables = VARIABLES,
       return;
     }
     const spec = variables ? variables[name] : null;
-    if (variables && !Object.hasOwn(variables, name)) {
+    if (variables && !Object.prototype.hasOwnProperty.call(variables, name)) {
       errors.push(`${at}.var : variable « ${name} » inconnue (connues : ${Object.keys(variables).join(', ')})`);
       return;
     }

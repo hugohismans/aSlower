@@ -9,7 +9,10 @@
  * - classic (booléen) : vision classique maintenue ;
  * - pause   (booléen) : vrai une seule fois par appui sur Échap ou P (le front est
  *   consommé par la lecture), y compris quand les commandes sont coupées, pour
- *   pouvoir reprendre au clavier.
+ *   pouvoir reprendre au clavier ;
+ * - lastSource ('clavier' | 'tactile' | 'inclinaison') : dernière source qui a donné une
+ *   commande (pour la variante du texte des bulles, variable modeVolant). Avant toute
+ *   commande : 'tactile' sur un écran tactile ((any-pointer: coarse)), sinon 'clavier'.
  *
  * Perte du focus ou onglet caché : tout est relâché (aucune touche « collée »).
  *
@@ -31,6 +34,35 @@ const MAX_READ_DT = 0.1;
 /** Modes tactiles connus. */
 export const CONTROL_MODES = Object.freeze(['drag', 'tilt']);
 
+/** Au-delà de ce braquage, l'inclinaison compte comme une commande (lastSource). */
+const TILT_SOURCE_THRESHOLD = 0.15;
+
+/**
+ * Source active de cette image, ou null si aucune ne commande rien : le clavier d'abord, puis
+ * le tactile (accélérateur, frein, vision classique, volant en mode glisser), puis
+ * l'inclinaison (braquage au-delà de 0,15).
+ * @param {{thrust: number, brake: number, steer: number, classic: boolean}} keys
+ * @param {{thrust: number, brake: number, steer: number, classic: boolean}} fingers
+ * @param {number} tiltSteer volant de l'inclinaison (0 hors du mode inclinaison)
+ * @param {'drag' | 'tilt'} mode
+ * @returns {'clavier' | 'tactile' | 'inclinaison' | null}
+ */
+export function activeSource(keys, fingers, tiltSteer, mode) {
+  if (keys.thrust > 0 || keys.brake > 0 || keys.steer !== 0 || keys.classic) return 'clavier';
+  if (fingers.thrust > 0 || fingers.brake > 0 || fingers.classic || (mode === 'drag' && fingers.steer !== 0)) return 'tactile';
+  if (mode === 'tilt' && Math.abs(tiltSteer) > TILT_SOURCE_THRESHOLD) return 'inclinaison';
+  return null;
+}
+
+/** Source supposée avant toute commande : 'tactile' sur un écran tactile, sinon 'clavier'. */
+function defaultSource() {
+  try {
+    return globalThis.matchMedia?.('(any-pointer: coarse)').matches ? 'tactile' : 'clavier';
+  } catch {
+    return 'clavier';
+  }
+}
+
 /** États du capteur d'inclinaison qui imposent le repli en mode glisser. */
 const TILT_FAILED_STATES = new Set(['refuse', 'indisponible']);
 
@@ -46,7 +78,8 @@ const TILT_FAILED_STATES = new Set(['refuse', 'indisponible']);
  *   pour le mode 'tilt' ; onFallback : appelé quand le mode 'tilt' retombe en 'drag' (l'interface
  *   l'annonce), avec l'état du capteur ('indisponible' aussi si aucun capteur n'est fourni)
  * @returns {{
- *   read(): {thrust: number, brake: number, steer: number, classic: boolean, pause: boolean},
+ *   read(): {thrust: number, brake: number, steer: number, classic: boolean, pause: boolean,
+ *            lastSource: 'clavier' | 'tactile' | 'inclinaison'},
  *   setEnabled(on: boolean): void, setMode(mode: 'drag' | 'tilt'): 'drag' | 'tilt',
  *   getMode(): 'drag' | 'tilt', dispose(): void
  * }}
@@ -58,6 +91,8 @@ export function createControls(rootElement, { mode = 'drag', tilt = null, onFall
   const touch = createTouch(rootElement, { mode: 'drag' });
   let enabled = true;
   let lastRead = 0;
+  /** @type {'clavier' | 'tactile' | 'inclinaison'} */
+  let lastSource = defaultSource();
   /** @type {'drag' | 'tilt'} */
   let currentMode = 'drag';
 
@@ -132,17 +167,20 @@ export function createControls(rootElement, { mode = 'drag', tilt = null, onFall
       const dt = lastRead ? Math.min((now - lastRead) / 1000, MAX_READ_DT) : 0;
       lastRead = now;
       const keys = keyboard.read(dt);
-      if (!enabled) return { thrust: 0, brake: 0, steer: 0, classic: false, pause: keys.pause };
+      if (!enabled) return { thrust: 0, brake: 0, steer: 0, classic: false, pause: keys.pause, lastSource };
       const fingers = touch.read();
       const brake = Math.max(keys.brake, fingers.brake);
       // Le capteur est lu (et lissé) à chaque image, même quand le volant vient du clavier.
-      const handSteer = currentMode === 'tilt' && tilt ? tilt.read() : fingers.steer;
+      const tiltSteer = currentMode === 'tilt' && tilt ? tilt.read() : 0;
+      const handSteer = currentMode === 'tilt' ? tiltSteer : fingers.steer;
+      lastSource = activeSource(keys, fingers, tiltSteer, currentMode) ?? lastSource;
       return {
         thrust: brake > 0 ? 0 : Math.max(keys.thrust, fingers.thrust),
         brake,
         steer: Math.max(-1, Math.min(1, keys.steer + handSteer)),
         classic: keys.classic || fingers.classic,
         pause: keys.pause,
+        lastSource,
       };
     },
 

@@ -1,4 +1,4 @@
-# Interfaces entre modules (jalon 1)
+# Interfaces entre modules (jalons 1 et 2)
 
 Ce document est le contrat entre les modules. Chaque signature ci-dessous doit être
 respectée à la lettre ; un module ne dépend des autres que par ces signatures.
@@ -36,8 +36,9 @@ dans le joueur (`createPlayer({physics})`), la scène (`lengthUnit`), et tout le
   - `src/main.js`, `src/loop.js` : tout.
   - `localStorage` et `sessionStorage` ne sont utilisés que dans `src/storage.js`.
   - Les fichiers « purs » (`physics/**`, `render/subdivide.js`, `render/lod.js`,
-    `render/culling.js`, `render/layout.js`, `hud/format.js`) n'utilisent ni `window`,
-    ni `document`, ni `three`.
+    `render/culling.js`, `render/layout.js`, `render/adaptiveDpr.js`, `hud/format.js`,
+    `input/tiltMath.js`, `game/conditions.js`, `game/bubbles.js`) n'utilisent ni `window`,
+    ni `document`, ni `three`, et n'importent que des fichiers purs (ou du JSON).
 
 ## `src/physics/relativity.js` (pur)
 
@@ -261,10 +262,21 @@ isChunkVisible(chunk, camera {x, y, z}, visibilityFar) // coupe à la distance d
   de `object.userData.r`, en cm entiers ; résultat −1, 0 ou 1),
   perte et restauration du contexte, préchauffage des programmes.
 - `quality.js` : DPR (défaut min(devicePixelRatio, 2), plafond de pixels), paramètre d'URL
-  `?dpr=`, garde-fou de démarrage (clés `aslower:v1:gl-boot-v2` en session, `gl-crash-v2` et
+  `?dpr=`, `profilePixelRatio(quality, w, h)` (DPR du profil : `?dpr=` ou DPR plafonné ; plafond
+  du DPR adaptatif), `resolvePixelRatio(quality, w, h)` (le même, abaissé par
+  `quality.adaptiveDpr` s'il est posé, jamais avec `?dpr=`), garde-fou de démarrage (clés `aslower:v1:gl-boot-v2` en session, `gl-crash-v2` et
   `gl-tier-v2` en local, via `storage.js` ; `?qualite=normale` les remet à zéro) : `createQuality()` lit l'état à l'ouverture ; `armBootGuard()` pose le
   drapeau juste avant la création du renderer (pas sur l'écran titre) ; `confirmBoot()` le
   retire après 30 images. Le profil « lite » d'après plantage expire au bout de 3 jours.
+- `adaptiveDpr.js` (pur) : `createAdaptiveDpr({max, min = DPR_FLOOR, initial = max})` →
+  `{sample(frameMs, cpuMs) → nouveau DPR | null, reset(), setMax(max) → dpr, dpr, max, min,
+  changes}`. Baisse de `DPR_STEP` = 0,25 quand l'intervalle moyen des 90 dernières images
+  dépasse 18,5 ms (plancher `DPR_FLOOR` = 1, `DPR_FLOOR_LITE` = 0,75 en « lite ») ; remonte de
+  0,25 (jusqu'à `max`) après une fenêtre de 10 s où ≥ 98 % des images sont à ≤ 17,5 ms et
+  ≥ 95 % ont un CPU (step + render) ≤ 8 ms, jamais dans les 30 s qui suivent une baisse ;
+  30 images ignorées après un départ, une reprise (`reset`) ou un changement ; intervalles
+  plafonnés à 100 ms. main.js ne le crée ni avec `?bench` ni avec `?dpr=`, lui passe une
+  mesure par image de jeu et applique le DPR renvoyé à l'image suivante, avant le rendu.
 - `camera.js` : caméra première personne, œil à EYE_HEIGHT, hFOV 90° en paysage.
 - `dopplerLut.js` : `createDopplerLutTexture()` → DataTexture HalfFloat RGBA, LinearFilter,
   sans mipmaps, à partir de `buildDopplerLutData()`.
@@ -274,7 +286,8 @@ isChunkVisible(chunk, camera {x, y, z}, visibilityFar) // coupe à la distance d
 - `scene.js` : assemble tout pour une scène de `src/data/scenes/` ;
   `createWorld(renderer, sceneJson, palette, {tier = 'default', lodSteps, physics} = {})` →
   `{update(snapshot, k, dtReal), render(camera), stats(), dispose()}`, plus
-  `scene`, `start`, `bounds`, `streets`, `visibilityFar`, `warmup(camera)` (préchauffage, variantes
+  `scene`, `start`, `bounds`, `streets`, `buildings` (emprises au sol {x, y, width, depth, …},
+  pour `game/bubbles.facadeAhead`), `visibilityFar`, `warmup(camera)` (préchauffage, variantes
   « vision classique » comprises) et `setEnvironmentEnabled(on)` (diagnostic). `update` choisit
   les variantes `REL_CLASSIC` quand k = 0 ; `stats()` → `{calls, triangles, chunks,
   visibleChunks, lodCounts, generated, generationMs, renderMs}`. `physics` (physicsFor(c)) :
@@ -285,9 +298,42 @@ isChunkVisible(chunk, camera {x, y, z}, visibilityFar) // coupe à la distance d
 
 ```js
 // controls.js
-createControls(rootElement, {mode = 'drag'} = {})
-  // → {read() → {thrust, brake, steer, classic, pause}, setEnabled(bool), dispose()}
-  // fusionne clavier (keyboard.js) et tactile (touch.js).
+createControls(rootElement, {mode = 'drag', tilt = null, onFallback} = {})
+  // → {read(), setEnabled(bool), setMode('drag' | 'tilt') → mode effectif, getMode(), dispose()}
+  // read() → {thrust, brake, steer, classic, pause, lastSource}
+  //   lastSource : 'clavier' | 'tactile' | 'inclinaison', dernière source qui a commandé
+  //   (avant toute commande : 'tactile' sur écran tactile, sinon 'clavier') ;
+  //   main.js en tire la variable modeVolant des bulles ('clavier', sinon getMode()).
+  // fusionne clavier (keyboard.js), tactile (touch.js) et inclinaison (tilt : createTilt).
+  // setMode('tilt') sans capteur, ou capteur 'refuse' / 'indisponible' : repli en 'drag' et
+  // onFallback('refuse' | 'indisponible') ; idem si le capteur échoue en cours de partie.
+  // Le mode est écrit dans rootElement.dataset.mode (la feuille de style s'y adapte).
+activeSource(keys, fingers, tiltSteer, mode) // source active d'une image, ou null (pure)
+
+// tilt.js — direction par inclinaison (deviceorientation)
+createTilt({onState, win = window, now = performance.now, autoRecalibrate = true} = {})
+  // → {state, neutral, requestPermission(), start(), stop(), calibrate(ms = CALIBRATION_MS),
+  //    read() → steer lissé ∈ [−1, 1], debugInfo(), subscribe(fn) → désabonnement, dispose()}
+  // state : 'inconnu' | 'demande' | 'actif' | 'refuse' | 'indisponible'.
+  // requestPermission() → Promise<'accorde' | 'refuse' | 'indisponible'> : À APPELER EN PREMIER,
+  //   de façon synchrone, dans un gestionnaire `click` (iOS vérifie le geste à l'appel) ;
+  //   puis `.then(r => r === 'accorde' && tilt.start())`. Sans événement non nul 1 s après
+  //   start() : 'indisponible'. Recalibrage auto 300 ms après un changement d'orientation.
+  // Constantes : DETECTION_TIMEOUT_MS = 1000, CALIBRATION_MS = 500, RECALIBRATE_DELAY_MS = 300.
+
+// tiltMath.js (pur) — angle de volant depuis β, γ et screen.orientation.angle
+normalizeScreenAngle(angle) · wrapDegrees(deg) · isValidOrientation(event) · upVector(β, γ)
+steeringAngleDetail({beta, gamma}, screenAngle) // → {angle (° , + = penché à droite), held, sx, sy}
+steeringAngle(orientation, screenAngle)
+steerFromAngle(angleDeg, neutralDeg = 0, {deadZone = 3, saturation = 25, exponent = 1.3})
+smoothToward(previous, target, dt, tau = 0.06) · meanAngle(anglesDeg)
+
+// device.js — appareil
+enterFullscreen(doc = document) // → Promise<boolean> ; sans API (iPhone) : false, sans erreur ;
+                                // tente ensuite screen.orientation.lock('landscape') (Android)
+createWakeLock({nav = navigator} = {}) // → {acquire() → Promise<boolean>, release(), active}
+                                // try/catch partout ; une demande qui aboutit après release()
+                                // est aussitôt rendue
 ```
 
 Clavier (`event.code`, indépendant de la disposition) : ArrowUp/KeyW accélérer ;
@@ -300,6 +346,10 @@ flottante (R = 56 px) ; bouton vision classique (60 px) à mi-hauteur du bord ga
 exclu de la zone volant. Cibles ≥ 48 px, à ≥ 24 px des bords. Un doigt de l'accélérateur
 qui glisse sur la pédale freine (et réaccélère s'il en ressort) ; un doigt posé sur la pédale
 puis glissé hors d'elle continue de freiner (cas sûr).
+
+Tactile (mode inclinaison, `#controls[data-mode='tilt']`) : volant = inclinaison du GSM ;
+moitié droite maintenue = accélérer ; frein 88×88 px en bas à gauche ; vision classique à
+mi-hauteur à gauche ; ni zone volant ni repère.
 
 ## `src/hud/` (DOM)
 
@@ -327,7 +377,29 @@ gapState(previous, gamma, gap)     // état de la pastille d'écart, avec hysté
 createCredits(dialogElement)       // ouvre THIRD_PARTY_NOTICES.md (?raw) dans un <dialog>
 // diag.js
 createDiag(rootElement)            // panneau #diag : p50/p95, CPU render, appels de dessin,
-                                   // triangles, première image, extensions, GPU, DPR
+                                   // triangles, première image, extensions, GPU, DPR (courant,
+                                   // et « adaptatif 1–2 », « fixe (?bench) » ou « imposé (?dpr=) »)
+// direction.js
+createDirectionControl(container, {value = 'drag', onChange, onRetry} = {})
+                                   // réglage « Direction : [Inclinaison] [Glisser] » (aria-pressed),
+                                   // aide, message de repli, bouton « Réessayer l'inclinaison » ;
+                                   // onChange(mode) appelé SYNCHRONEMENT dans le `click` (geste) ;
+                                   // → {value, setValue(mode), setMessage(text), setRetry(bool), element}
+// tiltDebug.js
+tiltDebugFromUrl(search)           // vrai avec ?debug
+createTiltDebug(container)         // → {update(info, now), show(), hide(), dispose(), element} ;
+                                   // info = {...tilt.debugInfo(), mode} (12 Hz, aria-hidden)
+formatTiltDebug(info)              // texte du panneau
+// bubbles.js (styles : hud/bubbles.css)
+createBubbleView(hudRoot, {onDismiss, announcer} = {})
+                                   // bulle sous les horloges ; un toucher la ferme (onDismiss),
+                                   // sans atteindre le jeu ; non focalisable ; annoncée par announcer
+                                   // → {show({id, text, blocking}), hide(), dispose(), element}
+// announcer.js
+createAnnouncer(parent = document.body, {minIntervalMs = 3000, now} = {})
+                                   // région role="status" aria-live="polite", hors du HUD, une
+                                   // annonce par 3 s au plus (la plus récente gagne)
+                                   // → {announce(text), clear(), dispose(), element}
 ```
 
 ## `src/game/settings.js` (physics, storage)
@@ -343,6 +415,56 @@ loadSettings(store = local)        // → {c} (valeur abîmée ou absente : C_DE
 saveSettings({c}, store = local)   // RangeError si c invalide
 initialLightSpeed(search, store = local) // → {c, source: 'url' | 'reglage', message} :
                                    // ?c= prioritaire (jamais mémorisé), sinon le réglage
+CONTROLS_KEY = 'commandes'         // stockage local : aslower:v1:commandes → {mode}
+CONTROL_MODES                      // ['tilt', 'drag']
+loadControlMode({touch} = {}, store = local) // direction mémorisée, sinon 'tilt' sur écran tactile
+                                   // ((any-pointer: coarse)) et 'drag' ailleurs
+saveControlMode(mode, store = local) // choix du joueur (un repli automatique n'est pas mémorisé)
+```
+
+## `src/game/conditions.js` (pur)
+
+Langage déclaratif des déclencheurs (bulles, plus tard niveaux), évalué sans `eval` :
+`{var, op, val}` (op ∈ <, <=, ==, !=, >, >=), `{var}` (booléen), `{tous: […]}`, `{un: […]}`,
+`{non: c}`, `{pendant: {cond, s}}` (s de temps propre), `{evenement: nom}`, `{apres: idBulle}`.
+Toutes les branches sont évaluées (pas de court-circuit) ; variable absente ou NaN : faux.
+
+```js
+OPERATORS, MAX_DEPTH = 16, MAX_PENDANT_S = 3600
+VARIABLES                          // {nom: {type, valeurs?, entier?, description, calcul}} :
+                                   // beta, gamma, speed, c, tau, t, ecart, depuisDebut, k,
+                                   // vitessePropre, distanceFreinage, distanceDevant, margeFreinage,
+                                   // accelere, freine, relache, tourne, dejaParti, dejaTourne,
+                                   // regardArriere, facadeDevant, modeVolant ('tilt'|'drag'|'clavier')
+EVENTS                             // depart, relache, frein, butee, visionClassique, regardArriere
+validateCondition(cond, {path, variables, events, bubbleIds}) // → liste d'erreurs (chemin JSON)
+compileCondition(cond, options)    // → {evaluate(ctx, dt) → bool, reset()} ; lève si invalide
+evaluateCondition(cond, ctx)       // évaluation ponctuelle (sans état)
+conditionReferences(cond)          // → {variables, events, bubbles} (ensembles de noms)
+```
+
+## `src/game/bubbles.js` (pur, stockage injecté)
+
+Bulles « une seule fois » : textes et déclencheurs dans `src/data/bubbles.json` (schéma
+`coursier-bulles/1`, textes ≤ 100 caractères, variantes `texteDesktop`/`texteTilt`/`texteDrag`,
+variables `{gamma}`… interpolées en français). Une bulle visible, file de 2 au plus (oubli après
+20 s), 8 s entre deux apparitions, 5 s d'affichage ou toucher ; vues mémorisées sous
+`aslower:v1:bulles` → `{vues: [ids]}`.
+
+```js
+createBubbleEngine({definitions, store = mémoire, now = Date.now, key = 'bulles'})
+  // now : horloge (ms) qui S'ARRÊTE EN PAUSE (main.js : playClockMs, temps réel de jeu cumulé)
+  // → {update(vars, dt) (à chaque image de jeu ; conditions à 5 Hz ; dt = temps propre),
+  //    emit(name), onShow(cb → bulle | null) → désabonnement, dismiss(), current(), seen(id),
+  //    reset() (« Revoir les bulles » : oublie les vues, stockage compris),
+  //    clearPending() (nouvelle partie : ferme et vide la file, garde les vues), list()}
+createBubbleVariables()            // → {compute({snapshot, command, k, a, modeVolant,
+                                   //    distanceDevant, facadeDevant, regardArriere, butee}) → vars,
+                                   //    reset()} (mémoire : τ au départ, dejaParti, fronts)
+facadeAhead(buildings, x, y, hx, hy, {range = 300, halfAngleDeg = 20, rays = 5})
+                                   // façade dans l'axe (lancer de rayons, à appeler à 5 Hz)
+validateBubbles(json) · interpolate(template, vars) · chooseText(def, modeVolant)
+formatNumberFr(x, decimals = 1) · createMemoryStore()
 ```
 
 ## `src/storage.js`
@@ -356,9 +478,17 @@ export const session               // idem pour sessionStorage
 
 ## `src/main.js` et `src/loop.js`
 
-- `main.js` : écran titre (réglage de c, Jouer, Crédits), menu pause (Reprendre, « Changer c »
-  → nouvelle partie au départ avec le nouveau c), panneau « Tourne ton GSM » en portrait
-  (appareils tactiles, strictement imposé), création du monde, des commandes et du HUD.
+- `main.js` : écran titre (réglage de c, réglage Direction sur écran tactile, Jouer, Crédits,
+  ligne « Sur l'écran d'accueil » sur iPhone), menu pause (Reprendre ; Recentrer le volant si
+  l'inclinaison est active ; Direction ; « Changer c » → nouvelle partie au départ avec le
+  nouveau c ; Revoir les bulles ; Recommencer ; Crédits ; tout au clavier et au toucher),
+  panneau « Tourne ton GSM » en portrait (appareils tactiles, strictement imposé), création du
+  monde, des commandes, du HUD et des bulles. Clic « Jouer », dans cet ordre :
+  `tilt.requestPermission()` (synchrone, en premier), `enterFullscreen()` (écran tactile),
+  puis le chargement. Wake Lock pris en jeu, rendu en pause. DPR adaptatif.
+- Application installable : `public/manifest.webmanifest` (start_url et scope `/aSlower/`,
+  `display: fullscreen`, paysage, icônes `public/icons/` générées par
+  `scripts/generate-icons.mjs`), balises iOS dans `index.html`.
 - `loop.js` : `createLoop(frame, {onError} = {})` → `{start(), stop(), running, dispose()}` ;
   rAF, `frame(dtReal, dt, now)` avec `dtReal` mesuré (s) et `dt = clampFrameDt(dtReal)` ; pause
   sur `visibilitychange` (la boucle s'arrête et l'horloge est réinitialisée à la reprise). Une
@@ -367,6 +497,7 @@ export const session               // idem pour sessionStorage
 - Paramètres d'URL : `?c=n` (vitesse de la lumière, entier de 10 à 100, prioritaire sur le
   réglage mémorisé), `?scene=avenue-test|quartier-test` (défaut : avenue-test), `?diag`,
   `?bench` (résultat dans `window.__benchResult`, avec `c` et `lengthUnit`), `?sansciel` (avec `?diag` ou `?bench` : passe
-  ciel/sol coupée dès le départ), `?dpr=`. Avec `?diag` ou `?bench`,
-  `window.__coursier` donne l'état en lecture seule (`mode`, `k`, `c`, `snapshot()`, `stats()`)
-  pour les tests automatisés.
+  ciel/sol coupée dès le départ), `?dpr=` (coupe le DPR adaptatif), `?debug` (panneau de
+  l'inclinaison). Avec `?diag`, `?bench` ou `?debug`, `window.__coursier` donne l'état en lecture
+  seule (`mode`, `k`, `c`, `controlMode`, `tiltState`, `tiltNeutral`, `bubble`, `dpr`,
+  `snapshot()`, `stats()`) pour les tests automatisés.

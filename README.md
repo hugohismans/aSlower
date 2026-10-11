@@ -36,19 +36,21 @@ Plus c est bas, plus les effets arrivent tôt. Le réglage est mémorisé dans l
 
 ## État du projet
 
-**Jalon 1 en cours** : socle physique et rendu. Sont prévus dans ce jalon :
+**Jalon 1 terminé** (socle physique et rendu) : physique exacte et testée, rendu relativiste
+(aberration, Doppler, effet projecteur, ciel et brouillard), HUD (les deux horloges et leur
+écart, une phrase sur γ, la jauge de vitesse), deux scènes de test dont les longueurs suivent
+c²/a (une avenue droite de 4·c²/a, soit 1 200 m à c = 30 m/s, et un quartier qui contient tout
+le disque de visibilité, 0,8 × 0,8 km à c = 30 m/s).
 
-- la physique exacte et testée (horloges, poussée, frein, virage, plafond de vitesse) ;
-- le rendu relativiste (aberration, Doppler, effet projecteur, ciel et brouillard) ;
-- un HUD minimal (les deux horloges et leur écart, une phrase sur γ, la jauge de vitesse) ;
-- les commandes au clavier et au toucher, et deux scènes de test dont les longueurs suivent
-  c²/a (une avenue droite de 4·c²/a, soit 1 200 m à c = 30 m/s, et un quartier qui contient
-  tout le disque de visibilité, 0,8 × 0,8 km à c = 30 m/s).
+**Jalon 2 intégré** (contrôles mobiles et pédagogie, à valider sur le GSM) : direction par
+inclinaison du GSM, bulles d'aide « une seule fois », menu pause complet, plein écran et écran
+maintenu allumé, application installable (écran d'accueil), DPR adaptatif, annonces pour
+lecteurs d'écran.
 
 Pas encore de colis, de délais ni de batterie limitée : ils arrivent avec les niveaux.
 Feuille de route complète dans [`docs/conception.md`](docs/conception.md) (§ 9) :
-gyroscope et bulles d'aide (J2), niveaux 1 à 3 (J3), lumière retardée et objets mobiles
-(J4), horizon de Rindler et paradoxe des jumeaux (J5).
+niveaux 1 à 3 (J3), lumière retardée et objets mobiles (J4), horizon de Rindler et paradoxe
+des jumeaux (J5).
 
 ## Commandes
 
@@ -67,12 +69,35 @@ clavier AZERTY et sur un clavier QWERTY.
 
 ### Tactile (GSM, tablette)
 
-- **Maintiens la moitié droite** de l'écran pour accélérer.
-- **Pédale de frein** en bas de la moitié droite (le frein l'emporte sur l'accélérateur).
-  Tu peux y glisser le pouce depuis l'accélérateur : il freine tant qu'il est sur la pédale.
-- **Glisse le pouce dans la moitié gauche** pour tourner : le volant naît là où tu poses
-  le doigt.
-- **Bouton 👁** à mi-hauteur à gauche : vision classique, tant que tu le maintiens.
+Deux façons de tourner, au choix sur l'écran titre et au menu pause (« Direction ») ; le
+choix est mémorisé. Par défaut, l'inclinaison.
+
+- **Inclinaison** : tiens le GSM en paysage comme un volant et penche-le pour tourner. Au
+  départ, un court message « Tiens ton GSM comme un volant… » : la position tenue devient
+  « tout droit » (calibrage d'une demi-seconde) ; le menu pause propose « Recentrer le volant ».
+  Sur iPhone, Safari demande l'autorisation d'accéder au mouvement au moment où tu touches
+  « Jouer ». Si tu refuses, ou sans capteur, le jeu passe tout seul en mode glisser et le dit
+  (iOS ne repose la question qu'après un rechargement de la page) ; « Réessayer
+  l'inclinaison » est alors proposé dans le réglage Direction. Le **frein** est en bas à gauche.
+- **Glisser** : glisse le pouce dans la moitié gauche pour tourner (le volant naît là où tu
+  poses le doigt) ; la **pédale de frein** est en bas de la moitié droite, et tu peux y glisser
+  le pouce depuis l'accélérateur : il freine tant qu'il est sur la pédale.
+- Dans les deux modes : **maintiens la moitié droite** pour accélérer (le frein l'emporte) ;
+  **bouton 👁** à mi-hauteur à gauche : vision classique, tant que tu le maintiens.
+
+**Plein écran** : sur Android, le jeu passe en plein écran quand tu touches « Jouer ». Sur
+iPhone, Safari ne le permet pas aux pages : ajoute le jeu à l'écran d'accueil (Partager, puis
+« Sur l'écran d'accueil ») pour l'ouvrir en plein écran, comme une application. Pendant la
+partie, l'écran reste allumé (sauf en pause).
+
+**Menu pause** (Échap ou P au clavier, ou quand tu quittes l'onglet) : Reprendre, Recentrer le
+volant (inclinaison), Direction, Changer c (nouvelle partie), Revoir les bulles (les bulles
+d'aide, montrées une seule fois, reviendront), Recommencer, Crédits. Les deux horloges
+s'arrêtent.
+
+**Bulles d'aide** : en jouant, de courtes bulles expliquent ce que tu vois (horloges, effet
+Doppler, vision classique, inertie…), une à la fois et une seule fois ; touche une bulle pour
+la fermer. Elles sont aussi annoncées aux lecteurs d'écran.
 
 **Le paysage est obligatoire** sur un appareil tactile : en portrait, le panneau « Tourne
 ton GSM » masque le jeu. Il faut le champ de vision horizontal de 90° du paysage pour voir
@@ -110,7 +135,8 @@ Paramètres d'URL (combinables, par exemple `?scene=quartier-test&bench&c=30&dpr
 | `?scene=avenue-test` ou `?scene=quartier-test` | scène de développement à charger (`src/data/scenes/`) ; `avenue-test` par défaut |
 | `?diag` | panneau de diagnostic : images par seconde, temps d'image p50 et p95, temps CPU du rendu, appels de dessin, triangles, durée de la première image, GPU, DPR. La touche E (ou la case du panneau) coupe et rétablit la passe ciel/sol, pour mesurer son coût |
 | `?bench` | parcours de mesure automatique et déterministe (aucune entrée, pas fixe de 1/60 s par image), avec le panneau de diagnostic. Sur `avenue-test` : poussée pleine jusqu'à γ ≈ 2,5, puis freinage jusqu'à l'arrêt. Sur `quartier-test` : caméra scriptée le long d'une rue, β imposé de 0 à 0,92. À la fin, le panneau affiche p50/p95 des temps d'image, le CPU du rendu, les appels de dessin et triangles maximaux ; le résultat complet est dans `window.__benchResult` (et la console). Ajouter `&sansciel` mesure le même parcours sans la passe ciel/sol (coût de la passe par différence) |
-| `?dpr=1.5` | impose le rapport de pixels (de 0,25 à 4) ; sinon min(devicePixelRatio, 2), plafonné à 2,2 millions de pixels |
+| `?dpr=1.5` | impose le rapport de pixels (de 0,25 à 4) ; sinon min(devicePixelRatio, 2), plafonné à 2,2 millions de pixels, puis ajusté en jeu par le DPR adaptatif (baisse de 0,25 quand le jeu rame, jusqu'à 1 ; remontée quand il est fluide depuis 10 s). `?dpr=` et `?bench` coupent le DPR adaptatif |
+| `?debug` | panneau de l'inclinaison (angles α, β, γ du capteur, angle de l'écran, angle de volant, neutre calibré, volant), pour vérifier les signes sur un vrai GSM |
 | `?qualite=normale` | oublie un plantage mémorisé et quitte le profil « lite » (DPR 0,75, sans anticrénelage) |
 
 **Publication** : chaque push sur `main` lance le workflow
@@ -141,13 +167,16 @@ src/
                         couleurs (spectrum.js), temps retardé
   render/               Three.js : renderer, caméra, uniformes partagés, matériaux,
                         LUT Doppler, maillage de la ville, LOD, culling, shaders GLSL
-  input/                clavier et tactile → {thrust, brake, steer, classic, pause}
-  hud/                  horloges, jauge, diagnostic (?diag), Crédits
-  data/                 palette et scènes de test (JSON)
+  input/                clavier, tactile, inclinaison → {thrust, brake, steer, classic, pause} ;
+                        plein écran et écran allumé
+  game/                 réglages (c, direction), conditions et bulles d'aide (purs)
+  hud/                  horloges, jauge, bulles, annonces, réglages, diagnostic (?diag, ?debug), Crédits
+  data/                 palette, bulles d'aide et scènes de test (JSON)
   styles/               feuilles de style
 tests/                  tests Vitest (Node, sans navigateur)
 scripts/check-dist.mjs  vérifie les licences dans dist/ après le build
-public/                 favicon et textes de licence servis avec le jeu
+scripts/generate-icons.mjs  génère les icônes PNG depuis le favicon (Playwright global)
+public/                 favicon, manifeste, icônes et textes de licence servis avec le jeu
 docs/                   conception (plan, décisions, glossaire) et contrat d'interfaces
 ```
 

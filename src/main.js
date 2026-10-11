@@ -9,36 +9,64 @@
  * - ?bench : parcours de mesure automatique, sans entrée (voir createBench), avec #diag ;
  *   résultat affiché dans #diag et exposé dans window.__benchResult ;
  * - ?sansciel (avec ?diag ou ?bench) : passe ciel/sol coupée dès la première image ;
- * - ?dpr= : rapport de pixels imposé (render/quality.js) ;
+ * - ?dpr= : rapport de pixels imposé (render/quality.js ; coupe le DPR adaptatif) ;
  * - ?c=n : vitesse de la lumière (entier de 10 à 100 m/s), prioritaire sur le réglage mémorisé
- *   (game/settings.js) et jamais mémorisée.
+ *   (game/settings.js) et jamais mémorisée ;
+ * - ?debug : panneau de l'inclinaison (hud/tiltDebug.js : α, β, γ, angle, neutre, volant).
  *
  * Vitesse de la lumière : réglage du joueur (écran titre, ou « Changer c » dans le menu pause,
  * qui redémarre la partie). Toute la partie lit ses constantes dans physicsFor(c) : joueur,
  * scène (longueurs en L = c²/a), butée, ?bench ; le HUD et le rendu lisent snapshot.c.
  *
- * Une image (plan §2) : commandes → butée douce → player.step (dτ ≤ 0,1 s) → vision
- * classique (k) → world.update (observateur, coupe, LOD) → caméra → world.render → HUD
- * (12 Hz) → #diag.
+ * Direction tactile (jalon 2) : inclinaison du GSM (input/tilt.js) ou glisser, réglage
+ * « Direction » de l'écran titre et du menu pause, mémorisé (aslower:v1:commandes) ; par
+ * défaut l'inclinaison sur écran tactile. La permission du capteur est demandée EN PREMIER
+ * dans le clic « Jouer » (geste exigé par iOS), puis le plein écran (Android), puis le
+ * chargement. Repli automatique en glisser, annoncé (aria-live) ; calibrage quand le capteur
+ * répond en jeu ; « Recentrer le volant » au menu pause.
  *
- * Pauses (horloges gelées) : Échap ou P, onglet caché, panneau « Tourne ton GSM »
- * (portrait sur écran tactile : paysage strictement imposé), perte du contexte WebGL
- * (recompilation et préchauffage à la restauration ; « Recharger » si elle tarde).
+ * Une image (plan §2) : commandes → butée douce → player.step (dτ ≤ 0,1 s) → vision
+ * classique (k) → bulles (game/bubbles.js, conditions à 5 Hz) → world.update (observateur,
+ * coupe, LOD) → caméra → world.render → HUD (12 Hz) → #diag → DPR adaptatif
+ * (render/adaptiveDpr.js, appliqué à l'image suivante, avant le rendu).
+ *
+ * Pauses (horloges gelées, horloge des bulles comprise, écran plus maintenu allumé) : Échap
+ * ou P, onglet caché, panneau « Tourne ton GSM » (portrait sur écran tactile : paysage
+ * strictement imposé), perte du contexte WebGL (recompilation et préchauffage à la
+ * restauration ; « Recharger » si elle tarde). Menu pause : Reprendre, Recentrer le volant,
+ * Direction, Changer c, Revoir les bulles, Recommencer, Crédits.
  */
 import { PHI_MAX_DEFAULT, physicsFor } from './physics/constants.js';
 import { createPlayer, snapshot, step } from './physics/player.js';
 import { createCamera, updateCamera } from './render/camera.js';
-import { armBootGuard, confirmBoot, createQuality } from './render/quality.js';
+import { createAdaptiveDpr, DPR_FLOOR, DPR_FLOOR_LITE } from './render/adaptiveDpr.js';
+import { armBootGuard, confirmBoot, createQuality, profilePixelRatio } from './render/quality.js';
 import { createRenderer, observeViewport, resizeRenderer, viewportSize, watchContextLoss } from './render/renderer.js';
 import { createWorld } from './render/scene.js';
 import { createControls } from './input/controls.js';
+import { createWakeLock, enterFullscreen } from './input/device.js';
+import { CALIBRATION_MS, createTilt } from './input/tilt.js';
+import { createAnnouncer } from './hud/announcer.js';
+import { createBubbleView } from './hud/bubbles.js';
 import { createCredits } from './hud/credits.js';
 import { createDiag, diagModeFromUrl, readGlInfo } from './hud/diag.js';
+import { createDirectionControl } from './hud/direction.js';
 import { createHud } from './hud/hud.js';
 import { formatLightSpeed } from './hud/format.js';
 import { createLightSpeedControl } from './hud/lightSpeed.js';
-import { LIGHT_SPEED_PRESETS, initialLightSpeed, parseLightSpeed, saveSettings } from './game/settings.js';
+import { createTiltDebug, tiltDebugFromUrl } from './hud/tiltDebug.js';
+import { createBubbleEngine, createBubbleVariables, facadeAhead } from './game/bubbles.js';
+import {
+  LIGHT_SPEED_PRESETS,
+  initialLightSpeed,
+  loadControlMode,
+  parseLightSpeed,
+  saveControlMode,
+  saveSettings,
+} from './game/settings.js';
 import { createLoop } from './loop.js';
+import { local } from './storage.js';
+import bubblesJson from './data/bubbles.json';
 import palette from './data/palette.json';
 
 /** Scènes de développement (chargées à la demande : un fichier par scène dans le build). */
@@ -56,6 +84,20 @@ const SOFT_STOP_MARGIN = 3;
 const SOFT_STOP_RATIO = 0.9;
 /** Contre le bord, une vitesse propre restante plus petite (m/s) est un arrêt. */
 const SLIDE_MIN_SPEED = 1e-6;
+
+/** Repli de l'inclinaison en glisser : textes annoncés (aria-live) et affichés. */
+const TILT_FALLBACK_TEXTS = Object.freeze({
+  refuse:
+    "Inclinaison refusée : direction au doigt (glisser). Sur iPhone, iOS ne repose la question qu'après un rechargement de la page.",
+  indisponible: "Pas de capteur d'inclinaison : direction au doigt (glisser).",
+});
+/** Message du calibrage (≈ 0,5 s : la position tenue devient « tout droit »). */
+const CALIBRATION_TEXT = 'Tiens ton GSM comme un volant…';
+/** Durées d'affichage des messages courts (ms). */
+const CALIBRATION_TOAST_MS = 900;
+const TOAST_FALLBACK_MS = 6000;
+/** Période du test « façade dans l'axe » des bulles (s) : 5 Hz. */
+const FACADE_PERIOD_S = 0.2;
 
 /** Démarrage confirmé (garde-fou de quality.js) après ce nombre d'images affichées. */
 const BOOT_CONFIRM_FRAMES = 30;
@@ -339,6 +381,10 @@ const dom = {
   noticeContent: $('notice-content'),
   noticeActions: $('notice-actions'),
   lightSpeed: $('light-speed'),
+  direction: $('direction'),
+  helpTilt: $('help-tilt'),
+  helpDrag: $('help-drag'),
+  helpIos: $('help-ios'),
 };
 
 // Safari iOS ignore user-scalable=no : pas de pincement, sur toute la page (titre, pause, Crédits).
@@ -352,6 +398,9 @@ if (requestedScene && !(requestedScene in SCENES)) {
 }
 const diagMode = diagModeFromUrl(window.location.search);
 const benchMode = diagMode === 'bench';
+
+/** Écran tactile : direction par inclinaison par défaut, réglage Direction, plein écran. */
+const touchDevice = window.matchMedia('(any-pointer: coarse)').matches;
 
 // Vitesse de la lumière de la prochaine partie : ?c= (prioritaire), sinon le réglage mémorisé.
 const startLight = initialLightSpeed(window.location.search);
@@ -368,25 +417,6 @@ function chooseLightSpeed(c) {
 // Garde-fou de démarrage (lecture) : à appeler une fois, avant de créer le renderer.
 const quality = createQuality();
 
-const controls = createControls(dom.controls, { mode: 'drag' });
-controls.setEnabled(false); // écran titre : Espace et flèches gardent leur rôle habituel
-const hud = createHud(dom.hud, { phiMax: PHI_MAX_DEFAULT });
-const credits = createCredits(/** @type {HTMLDialogElement} */ (dom.credits));
-dom.openCredits.addEventListener('click', () => credits.open());
-const diag = diagMode ? createDiag(dom.diag) : null;
-diag?.show();
-const titleLightSpeed = createLightSpeedControl(dom.lightSpeed, {
-  value: chosenC,
-  presets: LIGHT_SPEED_PRESETS,
-  parse: parseLightSpeed,
-  onChange: chooseLightSpeed,
-});
-if (startLight.message) titleLightSpeed.setMessage(startLight.message);
-
-/** Portrait sur écran tactile : même requête que le panneau #rotate de base.css. */
-const portrait = window.matchMedia('(orientation: portrait) and (pointer: coarse)');
-const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
-
 /**
  * État de la page : 'title' → 'loading' → 'playing' ⇄ 'paused' ; 'lost' (contexte WebGL
  * perdu) ; 'done' (fin de ?bench) ; 'error'.
@@ -397,11 +427,194 @@ let game = null;
 /** Intervalle moyen entre images (s), pour les i/s du HUD en ?diag. */
 let averageDt = NaN;
 
+/** Réglages Direction de l'écran titre et du menu pause (ce dernier, recréé à chaque ouverture). */
+let titleDirection = null;
+let pauseDirection = null;
+
+/* --- Annonces, inclinaison, commandes ------------------------------------------ */
+
+// Région aria-live (hors du HUD, qui est masqué hors du jeu) : bulles, replis, recentrage.
+const announcer = createAnnouncer(document.body);
+
+/** Direction tactile préférée (mémorisée : aslower:v1:commandes). Sans écran tactile : glisser. */
+let preferredMode = loadControlMode({ touch: touchDevice });
+/** L'inclinaison est-elle voulue ? (jamais sans écran tactile : pas de réglage Direction.) */
+const wantsTilt = () => touchDevice && preferredMode === 'tilt';
+/** Dernier repli de l'inclinaison ('refuse' | 'indisponible'), ou null : message et « Réessayer ». */
+let tiltFallback = null;
+/** Calibrer dès que l'inclinaison répond en jeu (après une demande, ou un passage en inclinaison). */
+let calibrationPending = false;
+/** Annoncer un échec de l'inclinaison choisie sur l'écran titre (pas à « Jouer » : le jeu l'annonce). */
+let announceTitleFailure = false;
+
+const tilt = createTilt();
+const controls = createControls(dom.controls, { mode: 'drag', tilt, onFallback: onTiltFallback });
+controls.setEnabled(false); // écran titre : Espace et flèches gardent leur rôle habituel
+
+/**
+ * Demande la permission du capteur et démarre son écoute. À appeler EN PREMIER dans un
+ * gestionnaire `click` (geste utilisateur : iOS le vérifie à l'appel, aucun await avant).
+ */
+function requestTilt() {
+  tiltFallback = null;
+  calibrationPending = true;
+  tilt.requestPermission().then((result) => {
+    if (result === 'accorde') tilt.start();
+  });
+}
+
+/** Repli automatique en glisser (controls.js) : annoncé (aria-live), et affiché en jeu. */
+function onTiltFallback(reason) {
+  tiltFallback = reason;
+  const text = TILT_FALLBACK_TEXTS[reason] ?? TILT_FALLBACK_TEXTS.indisponible;
+  announcer.announce(text);
+  if (mode === 'playing') showToast(text, TOAST_FALLBACK_MS, { announce: false });
+  refreshDirection();
+}
+
+tilt.subscribe((state) => {
+  if (state === 'actif') {
+    tiltFallback = null;
+    maybeCalibrate();
+  } else if ((state === 'refuse' || state === 'indisponible') && wantsTilt()) {
+    tiltFallback = state;
+    if (announceTitleFailure && mode === 'title') announcer.announce(TILT_FALLBACK_TEXTS[state]);
+    announceTitleFailure = false;
+  }
+  refreshDirection();
+});
+
+/** Calibrage (≈ 0,5 s) quand l'inclinaison répond, en jeu : la position tenue devient « tout droit ». */
+function maybeCalibrate() {
+  if (!calibrationPending || mode !== 'playing' || controls.getMode() !== 'tilt' || tilt.state !== 'actif') return;
+  calibrationPending = false;
+  showToast(CALIBRATION_TEXT, CALIBRATION_TOAST_MS);
+  tilt.calibrate(CALIBRATION_MS);
+}
+
+/** Le joueur choisit la direction (écran titre ou menu pause) : geste utilisateur. */
+function chooseDirection(next) {
+  if (next === 'tilt') requestTilt(); // EN PREMIER (iOS)
+  preferredMode = next;
+  saveControlMode(next);
+  if (next === 'drag') {
+    tiltFallback = null;
+    tilt.stop(); // plus d'écoute du capteur
+  }
+  if (mode === 'title') announceTitleFailure = next === 'tilt';
+  if (game && (mode === 'playing' || mode === 'paused')) controls.setMode(next);
+  refreshDirection();
+}
+
+/** Mode affiché par les réglages Direction : celui en usage, ou le repli. */
+function shownDirection() {
+  if (game && mode !== 'title') return controls.getMode();
+  if (!touchDevice) return 'drag';
+  return preferredMode === 'tilt' && tiltFallback ? 'drag' : preferredMode;
+}
+
+/** Met à jour les réglages Direction (titre, pause), l'aide du titre et « Recentrer le volant ». */
+function refreshDirection() {
+  const shown = shownDirection();
+  const message = tiltFallback && wantsTilt() ? TILT_FALLBACK_TEXTS[tiltFallback] : '';
+  for (const control of [titleDirection, pauseDirection]) {
+    if (!control) continue;
+    control.setValue(shown);
+    control.setMessage(message);
+    control.setRetry(Boolean(message));
+  }
+  dom.helpTilt.hidden = shown !== 'tilt';
+  dom.helpDrag.hidden = shown === 'tilt';
+  const recenter = /** @type {HTMLElement | null} */ (dom.noticeActions.querySelector('[data-action="recentrer"]'));
+  if (recenter) recenter.hidden = !canRecenter();
+}
+
+/** « Recentrer le volant » n'a de sens qu'en inclinaison, capteur actif. */
+function canRecenter() {
+  return controls.getMode() === 'tilt' && tilt.state === 'actif';
+}
+
+/* --- HUD, bulles, Crédits, #diag -------------------------------------------- */
+
+const hud = createHud(dom.hud, { phiMax: PHI_MAX_DEFAULT });
+
+/** Horloge réelle de jeu (ms) : avance seulement en jeu, s'arrête en pause (durées des bulles). */
+let playClockMs = 0;
+const bubbles = createBubbleEngine({ definitions: bubblesJson, store: local, now: () => playClockMs });
+// Après createHud (qui remplit #hud) : la bulle se place sous les horloges.
+const bubbleView = createBubbleView(dom.hud, { announcer, onDismiss: () => bubbles.dismiss() });
+bubbles.onShow((b) => (b ? bubbleView.show(b) : bubbleView.hide()));
+const bubbleVars = createBubbleVariables();
+
+// Messages courts du jeu (calibrage, repli) : même allure qu'une bulle, hors du moteur de bulles.
+// Sans annonceur : showToast annonce lui-même, sauf si l'appelant l'a déjà fait.
+const toast = createBubbleView(dom.hud, { onDismiss: () => hideToast() });
+toast.element.classList.add('bubble-toast');
+let toastTimer = 0;
+/** Affiche un message court pendant `ms` ; announce : faux si l'appelant l'a déjà annoncé. */
+function showToast(text, ms, { announce = true } = {}) {
+  clearTimeout(toastTimer);
+  toast.show({ id: 'message', text, blocking: false });
+  if (announce) announcer.announce(text);
+  toastTimer = window.setTimeout(hideToast, ms);
+}
+function hideToast() {
+  clearTimeout(toastTimer);
+  toast.hide();
+}
+
+const credits = createCredits(/** @type {HTMLDialogElement} */ (dom.credits));
+dom.openCredits.addEventListener('click', () => credits.open());
+const diag = diagMode ? createDiag(dom.diag) : null;
+diag?.show();
+const tiltDebug = tiltDebugFromUrl(window.location.search) ? createTiltDebug(document.body) : null;
+if (tiltDebug) {
+  tiltDebug.show();
+  // Panneau ?debug : mis à jour à chaque image, écran titre et pause compris.
+  const debugTick = () => {
+    tiltDebug.update({ ...tilt.debugInfo(), mode: game ? controls.getMode() : `${preferredMode}, titre` });
+    requestAnimationFrame(debugTick);
+  };
+  requestAnimationFrame(debugTick);
+}
+
+/* --- Écran titre ------------------------------------------------------------ */
+
+const titleLightSpeed = createLightSpeedControl(dom.lightSpeed, {
+  value: chosenC,
+  presets: LIGHT_SPEED_PRESETS,
+  parse: parseLightSpeed,
+  onChange: chooseLightSpeed,
+});
+if (startLight.message) titleLightSpeed.setMessage(startLight.message);
+
+// Réglage Direction de l'écran titre (écran tactile seulement : masqué ailleurs par la feuille).
+titleDirection = createDirectionControl(dom.direction, { value: shownDirection(), onChange: chooseDirection });
+
+// iPhone hors écran d'accueil : le plein écran passe par « Sur l'écran d'accueil ».
+const ios = /iPhone|iPod/.test(navigator.userAgent);
+const standalone =
+  /** @type {any} */ (navigator).standalone === true || window.matchMedia('(display-mode: standalone), (display-mode: fullscreen)').matches;
+dom.helpIos.hidden = !(ios && !standalone);
+refreshDirection();
+
+/** Portrait sur écran tactile : même requête que le panneau #rotate de base.css. */
+const portrait = window.matchMedia('(orientation: portrait) and (pointer: coarse)');
+const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+
+/** Écran maintenu allumé pendant le jeu (relâché en pause). */
+const wakeLock = createWakeLock();
+
+/** DPR adaptatif (créé avec le renderer) ; jamais en ?bench ni avec ?dpr=. */
+let adaptive = null;
+const adaptiveAllowed = !benchMode && quality.dprOverride === null;
+
 const loop = createLoop(frame, {
   // Exception dans une image : la boucle s'est arrêtée ; sans console sur GSM, on le dit.
   onError: () => {
     mode = 'error';
     controls.setEnabled(false);
+    wakeLock.release();
     hud.hide();
     showNotice({
       title: "Le jeu s'est arrêté",
@@ -411,18 +624,25 @@ const loop = createLoop(frame, {
   },
 });
 
-/** Affiche le panneau générique (#notice) avec ses boutons (et, au besoin, un contenu). */
-function showNotice({ title, text, actions = [], content = null }) {
+/**
+ * Affiche le panneau générique (#notice) avec ses boutons (et, au besoin, un contenu).
+ * `variant` ('pause'…) ajuste la mise en page ; `id` d'une action → data-action du bouton.
+ */
+function showNotice({ title, text, actions = [], content = null, variant = '' }) {
   dom.noticeTitle.textContent = title;
   dom.noticeText.textContent = text;
+  dom.notice.dataset.variant = variant;
   if (content) dom.noticeContent.replaceChildren(content);
   else dom.noticeContent.replaceChildren();
+  if (variant !== 'pause') pauseDirection = null;
   dom.noticeActions.replaceChildren(
-    ...actions.map(({ label, primary = false, onClick }) => {
+    ...actions.map(({ label, primary = false, onClick, id, hidden = false }) => {
       const button = document.createElement('button');
       button.type = 'button';
       button.className = primary ? 'btn btn-primary' : 'btn';
       button.textContent = label;
+      if (id) button.dataset.action = id;
+      button.hidden = hidden;
       button.addEventListener('click', onClick);
       return button;
     }),
@@ -434,6 +654,7 @@ function showNotice({ title, text, actions = [], content = null }) {
 function hideNotice() {
   if (dom.notice.contains(document.activeElement)) /** @type {HTMLElement} */ (document.activeElement).blur();
   dom.notice.hidden = true;
+  pauseDirection = null;
 }
 
 /** Un tour du navigateur (le temps d'afficher « Chargement… »). */
@@ -447,18 +668,68 @@ function pause() {
   if (mode !== 'playing' || benchMode) return;
   mode = 'paused';
   controls.setEnabled(false);
+  wakeLock.release();
   showPauseNotice();
 }
 
-function showPauseNotice() {
+/**
+ * Menu pause : Reprendre ; Recentrer le volant (inclinaison active) ; Direction (écran
+ * tactile) ; Changer c ; Revoir les bulles ; Recommencer ; Crédits. Tout au clavier (Tab,
+ * Entrée, Échap ou P pour reprendre) et au toucher (cibles ≥ 48 px).
+ * @param {string} [status] message affiché (et lu) sous les réglages
+ */
+function showPauseNotice(status = '') {
+  const content = document.createElement('div');
+  content.className = 'pause-content';
+  let direction = null;
+  if (touchDevice) {
+    const holder = document.createElement('div');
+    direction = createDirectionControl(holder, { value: shownDirection(), onChange: chooseDirection });
+    content.append(holder);
+  }
+  const statusLine = document.createElement('p');
+  statusLine.className = 'pause-status';
+  statusLine.setAttribute('role', 'status');
+  statusLine.textContent = status;
+  content.append(statusLine);
+  const keys = touchDevice ? '' : ' Échap ou P pour reprendre.';
   showNotice({
     title: 'Pause',
-    text: `Les deux horloges sont arrêtées (${formatLightSpeed(game.physics.c)}). Échap ou P pour reprendre au clavier.`,
+    text: `Les deux horloges sont arrêtées (${formatLightSpeed(game.physics.c)}).${keys}`,
+    content,
+    variant: 'pause',
     actions: [
-      { label: 'Reprendre', primary: true, onClick: resume },
-      { label: 'Changer c', onClick: showLightSpeedNotice },
+      { label: 'Reprendre', primary: true, onClick: onResumeClick },
+      { label: 'Recentrer le volant', id: 'recentrer', hidden: !canRecenter(), onClick: recenterWheel },
+      { label: 'Changer c', id: 'changer-c', onClick: showLightSpeedNotice },
+      { label: 'Revoir les bulles', id: 'revoir-bulles', onClick: replayBubbles },
+      { label: 'Recommencer', id: 'recommencer', onClick: () => restartGame(game.physics.c, 'Recommencer') },
+      { label: 'Crédits', id: 'credits', onClick: () => credits.open() },
     ],
   });
+  pauseDirection = direction;
+  refreshDirection();
+}
+
+/** Message du menu pause (région role="status" : lu par les lecteurs d'écran). */
+function setPauseStatus(text) {
+  const line = dom.noticeContent.querySelector('.pause-status');
+  if (line) line.textContent = text;
+}
+
+/** Menu pause → « Recentrer le volant » : la position actuelle du GSM devient « tout droit ». */
+function recenterWheel() {
+  if (!canRecenter()) return;
+  setPauseStatus('Garde ton GSM comme un volant, tout droit…');
+  tilt.calibrate(CALIBRATION_MS).then(() => {
+    if (mode === 'paused') setPauseStatus('Volant recentré.');
+  });
+}
+
+/** Menu pause → « Revoir les bulles » : les bulles d'aide déjà vues reviendront. */
+function replayBubbles() {
+  bubbles.reset();
+  setPauseStatus("Bulles d'aide remises à zéro : elles reviendront pendant la partie.");
 }
 
 /** Menu pause → « Changer c » : le réglage, puis « Redémarrer » (nouvelle partie) ou retour. */
@@ -466,7 +737,7 @@ function showLightSpeedNotice() {
   if (mode !== 'paused') return;
   const holder = document.createElement('div');
   let proposed = game.physics.c;
-  const restartLabel = (c) => `Redémarrer avec c\u202f=\u202f${c}\u202fm/s`;
+  const restartLabel = (c) => `Redémarrer avec c = ${c} m/s`;
   const control = createLightSpeedControl(holder, {
     value: proposed,
     presets: LIGHT_SPEED_PRESETS,
@@ -488,19 +759,33 @@ function showLightSpeedNotice() {
         onClick: () => {
           chooseLightSpeed(proposed);
           titleLightSpeed.setValue(proposed);
-          restartGame(proposed);
+          restartGame(proposed, 'Changer c');
         },
       },
-      { label: 'Annuler', onClick: showPauseNotice },
+      { label: 'Annuler', onClick: () => showPauseNotice() },
     ],
   });
+}
+
+/** « Reprendre » touché ou cliqué (geste) : le plein écran quitté est redemandé. */
+function onResumeClick() {
+  if (touchDevice && !portrait.matches) enterFullscreen();
+  resume();
 }
 
 function resume() {
   if (mode !== 'paused' || portrait.matches) return;
   hideNotice();
-  controls.setEnabled(true);
+  enterPlaying();
+}
+
+/** Passage en jeu (départ, reprise, nouvelle partie) : commandes, écran allumé, mesures. */
+function enterPlaying() {
   mode = 'playing';
+  controls.setEnabled(true);
+  wakeLock.acquire();
+  adaptive?.reset();
+  maybeCalibrate();
 }
 
 document.addEventListener('visibilitychange', () => {
@@ -552,7 +837,7 @@ async function createSession(renderer, sceneJson, c) {
   world.update(first, 1, 0);
   updateCamera(camera, first);
   await world.warmup(camera);
-  return { physics, world, camera, player, limits, bench, lastSnapshot: first };
+  return { physics, world, camera, player, limits, bench, lastSnapshot: first, facade: false, facadeTimer: Infinity };
 }
 
 /** Informations de la partie pour #diag. */
@@ -567,9 +852,16 @@ function sessionInfo(g) {
 async function createGame() {
   const sceneJson = (await SCENES[sceneId]()).default;
   const renderer = createRenderer(dom.canvas, quality);
+  if (adaptiveAllowed) {
+    const { width, height } = viewportSize();
+    adaptive = createAdaptiveDpr({
+      max: profilePixelRatio(quality, width, height),
+      min: quality.tier === 'lite' ? DPR_FLOOR_LITE : DPR_FLOOR,
+    });
+  }
   const session = await createSession(renderer, sceneJson, chosenC);
 
-  const g = { renderer, sceneJson, ...session, k: 1, frames: 0, environment: true };
+  const g = { renderer, sceneJson, ...session, k: 1, frames: 0, environment: true, pendingDpr: null };
 
   if (diag) {
     const gl = renderer.getContext();
@@ -595,6 +887,7 @@ async function createGame() {
       if (mode === 'playing' || mode === 'paused') {
         mode = 'lost';
         controls.setEnabled(false);
+        wakeLock.release();
       }
       showNotice({
         title: 'Affichage interrompu',
@@ -624,6 +917,12 @@ async function createGame() {
   });
 
   observeViewport(() => {
+    if (adaptive) {
+      const { width, height } = viewportSize();
+      adaptive.setMax(profilePixelRatio(quality, width, height));
+      quality.adaptiveDpr = adaptive.dpr;
+      g.pendingDpr = null;
+    }
     resizeRenderer(renderer, quality, g.camera);
     if (diag) diag.setInfo(displayInfo(g));
     // En pause, le redimensionnement a effacé le canevas : on redessine l'image figée.
@@ -634,15 +933,17 @@ async function createGame() {
 }
 
 /**
- * Menu pause → « Changer c » → « Redémarrer » : nouvelle partie au départ, avec la vitesse de
- * la lumière c (le renderer, les commandes et le HUD sont gardés ; le monde est refait, car
- * la scène dépend de L = c²/a).
+ * Menu pause → « Recommencer », ou « Changer c » → « Redémarrer » : nouvelle partie au
+ * départ, avec la vitesse de la lumière c (le renderer, les commandes et le HUD sont gardés ;
+ * le monde est refait, car la scène dépend de L = c²/a). Les bulles déjà vues le restent ;
+ * celle affichée et la file d'attente sont oubliées.
  * @param {number} c
+ * @param {string} [title] titre du panneau d'attente
  */
-async function restartGame(c) {
+async function restartGame(c, title = 'Changer c') {
   if (mode !== 'paused' || !game) return;
   mode = 'loading';
-  showNotice({ title: 'Changer c', text: `Préparation de la ville pour ${formatLightSpeed(c)}…` });
+  showNotice({ title, text: `Préparation de la ville pour ${formatLightSpeed(c)}…` });
   await nextPaint();
   const g = game;
   try {
@@ -659,21 +960,42 @@ async function restartGame(c) {
     });
     return;
   }
+  bubbles.clearPending();
+  bubbleVars.reset();
+  hideToast();
   if (diag) diag.setInfo(sessionInfo(g));
   hud.update(g.lastSnapshot, { k: 1 });
   hideNotice();
-  mode = 'playing';
-  controls.setEnabled(true);
+  enterPlaying();
   if (portrait.matches) pause();
 }
 
 /** DPR et taille du canevas, pour #diag. */
 function displayInfo(g) {
   const canvas = g.renderer.domElement;
-  return { dpr: `${g.renderer.getPixelRatio().toFixed(2)} (${canvas.width}×${canvas.height} px)` };
+  const range = adaptive
+    ? ` · adaptatif ${adaptive.min.toFixed(2)}–${adaptive.max.toFixed(2)}`
+    : benchMode
+      ? ' · fixe (?bench)'
+      : quality.dprOverride !== null
+        ? ' · imposé (?dpr=)'
+        : '';
+  return { dpr: `${g.renderer.getPixelRatio().toFixed(2)} (${canvas.width}×${canvas.height} px)${range}` };
 }
 
-/** Clic sur « Jouer » (ou démarrage automatique de ?bench). */
+/**
+ * Clic sur « Jouer » (geste utilisateur). Dans cet ordre : permission du capteur
+ * d'inclinaison (EN PREMIER, synchrone : iOS vérifie le geste à l'appel), plein écran (écran
+ * tactile, si l'API existe), puis le chargement (dont l'await ferait perdre le geste).
+ */
+function onPlayClick() {
+  if (mode !== 'title') return;
+  if (wantsTilt()) requestTilt();
+  if (touchDevice) enterFullscreen();
+  startGame();
+}
+
+/** Chargement puis départ (après « Jouer », ou démarrage automatique de ?bench). */
 async function startGame() {
   if (mode !== 'title') return;
   mode = 'loading';
@@ -698,18 +1020,23 @@ async function startGame() {
   }
   dom.title.hidden = true;
   hud.show();
-  mode = 'playing';
-  if (!benchMode) {
-    controls.setEnabled(true);
+  if (benchMode) {
+    mode = 'playing';
+    wakeLock.acquire(); // mesure sur GSM : l'écran ne doit pas s'éteindre
+  } else {
+    mode = 'playing'; // avant setMode : un repli immédiat (permission déjà refusée) s'affiche en jeu
+    controls.setMode(wantsTilt() ? 'tilt' : 'drag');
+    enterPlaying();
     if (portrait.matches) pause();
   }
+  refreshDirection();
   loop.start();
 }
 
-dom.play.addEventListener('click', startGame);
+dom.play.addEventListener('click', onPlayClick);
 
-// ?diag et ?bench : lecture seule de l'état, pour les mesures et les tests automatisés.
-if (diag) {
+// ?diag, ?bench et ?debug : lecture seule de l'état, pour les mesures et les tests automatisés.
+if (diag || tiltDebug) {
   /** @type {any} */ (window).__coursier = {
     get mode() {
       return mode;
@@ -720,6 +1047,25 @@ if (diag) {
     /** Vitesse de la lumière de la partie en cours (ou du réglage, avant « Jouer »). */
     get c() {
       return game ? game.physics.c : chosenC;
+    },
+    /** Direction tactile en usage ('tilt' | 'drag') et état du capteur d'inclinaison. */
+    get controlMode() {
+      return controls.getMode();
+    },
+    get tiltState() {
+      return tilt.state;
+    },
+    /** Angle neutre du volant d'inclinaison (degrés, calibrage). */
+    get tiltNeutral() {
+      return tilt.neutral;
+    },
+    /** Bulle affichée ({id, text}) ou null. */
+    get bubble() {
+      return bubbles.current();
+    },
+    /** DPR appliqué au canevas. */
+    get dpr() {
+      return game ? game.renderer.getPixelRatio() : null;
     },
     snapshot: () => (game ? { ...game.lastSnapshot } : null),
     stats: () => (game ? game.world.stats() : null),
@@ -737,6 +1083,37 @@ function nextK(k, classicHeld, dtReal) {
 }
 
 /**
+ * Bulles pédagogiques : variables de l'image (commande appliquée, butée, façade dans l'axe à
+ * 5 Hz…), puis le moteur (conditions évaluées à 5 Hz).
+ * @param {any} snap
+ * @param {{thrust?: number, brake?: number, steer?: number}} cmd commande appliquée
+ * @param {ReturnType<typeof controls.read>} input commande du joueur
+ * @param {number} dt temps propre simulé (s)
+ * @param {number} dtReal
+ */
+function updateBubbles(snap, cmd, input, dt, dtReal) {
+  const { player, limits, world } = game;
+  game.facadeTimer += dtReal;
+  if (game.facadeTimer >= FACADE_PERIOD_S) {
+    game.facadeTimer = 0;
+    game.facade = facadeAhead(world.buildings, snap.x, snap.y, snap.hx, snap.hy);
+  }
+  bubbles.update(
+    bubbleVars.compute({
+      snapshot: snap,
+      command: { ...cmd, classic: input.classic },
+      k: game.k,
+      a: game.physics.a,
+      modeVolant: input.lastSource === 'clavier' ? 'clavier' : controls.getMode(),
+      distanceDevant: exitDistance(player.x, player.y, player.hx, player.hy, limits),
+      facadeDevant: game.facade,
+      butee: cmd !== input,
+    }),
+    dt,
+  );
+}
+
+/**
  * @param {number} dtReal temps réel écoulé (s)
  * @param {number} dt temps propre à simuler (s), plafonné à MAX_FRAME_DT
  */
@@ -747,19 +1124,31 @@ function frame(dtReal, dt) {
     else if (mode === 'paused') resume();
   }
   if (mode !== 'playing' || !game) return;
-  const { world, camera, player, bench } = game;
+  const { world, camera, player, bench, renderer } = game;
+
+  // DPR adaptatif décidé à l'image précédente : appliqué avant le rendu (pas d'image effacée).
+  if (game.pendingDpr !== null) {
+    quality.adaptiveDpr = game.pendingDpr;
+    game.pendingDpr = null;
+    resizeRenderer(renderer, quality, camera);
+    if (diag) diag.setInfo(displayInfo(game));
+  }
 
   // Simulation.
   const t0 = performance.now();
   let snap;
+  let cmd = null;
   if (bench) {
     snap = bench.advance();
   } else {
-    step(player, softStopCommand(player, input, game.limits), dt);
+    cmd = softStopCommand(player, input, game.limits);
+    step(player, cmd, dt);
     keepInside(player, game.limits);
     snap = snapshot(player);
+    playClockMs += dtReal * 1000;
   }
   game.k = nextK(game.k, !bench && input.classic, dtReal);
+  if (cmd) updateBubbles(snap, cmd, input, dt, dtReal);
   world.update(snap, game.k, dtReal);
   updateCamera(camera, snap);
   const t1 = performance.now();
@@ -773,6 +1162,12 @@ function frame(dtReal, dt) {
   if (dtReal > 0) averageDt = Number.isFinite(averageDt) ? averageDt + 0.05 * (dtReal - averageDt) : dtReal;
   hud.update(snap, { k: game.k, fps: diag ? 1 / averageDt : undefined });
   diag?.frame({ dtMs: dtReal * 1000, cpuMs: t2 - t1, calls: stats.calls, triangles: stats.triangles });
+
+  // DPR adaptatif : une mesure par image (intervalle, CPU de step + render).
+  if (adaptive) {
+    const next = adaptive.sample(dtReal * 1000, t2 - t0);
+    if (next !== null) game.pendingDpr = next;
+  }
 
   game.lastSnapshot = snap;
   game.frames += 1;
@@ -789,6 +1184,7 @@ function finishBench() {
   const { renderer, bench } = game;
   loop.stop();
   mode = 'done';
+  wakeLock.release();
   if (game.frames < BOOT_CONFIRM_FRAMES) confirmBoot();
   const gl = renderer.getContext();
   const canvas = renderer.domElement;
@@ -824,6 +1220,6 @@ if (benchMode) {
   showNotice({
     title: 'WebGL instable',
     text: "Le jeu s'est interrompu deux fois au démarrage. Il repart en mode allégé (moins de pixels, sans anticrénelage).",
-    actions: [{ label: 'Réessayer', primary: true, onClick: startGame }],
+    actions: [{ label: 'Réessayer', primary: true, onClick: onPlayClick }],
   });
 }

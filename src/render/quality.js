@@ -3,7 +3,8 @@
  *
  * - DPR par défaut : min(devicePixelRatio, 2), plafonné pour ne pas dépasser MAX_PIXELS
  *   pixels physiques (iPhone 14 Pro Max en paysage : 932 × 430 px CSS à DPR 2 ≈ 1,6 Mpx).
- * - `?dpr=` dans l'URL impose le DPR (mesures, captures) ; `?qualite=normale` oublie les
+ * - `?dpr=` dans l'URL impose le DPR (mesures, captures) ; sinon, en jeu, le DPR adaptatif
+ *   (adaptiveDpr.js, piloté par main.js) peut l'abaisser par paliers (champ adaptiveDpr) ; `?qualite=normale` oublie les
  *   plantages mémorisés et le profil « lite ».
  * - Garde-fou : un drapeau `gl-boot` est posé par armBootGuard() juste avant de créer le
  *   renderer (pas à l'ouverture de la page : quitter l'écran titre n'est pas un plantage),
@@ -44,6 +45,8 @@ export const LITE_TTL_MS = 3 * 24 * 3600 * 1000;
  * @property {number} dpr DPR visé, avant plafond de pixels
  * @property {number | null} dprOverride DPR imposé par `?dpr=` (sans plafond)
  * @property {number} maxPixels plafond de pixels physiques
+ * @property {number | null} adaptiveDpr DPR choisi par le DPR adaptatif (render/adaptiveDpr.js,
+ *   écrit par main.js), plafonné par le DPR du profil ; null : DPR du profil
  * @property {number} crashes plantages au démarrage consécutifs
  * @property {boolean} unstable deux plantages d'affilée ou plus (« WebGL instable »)
  */
@@ -74,14 +77,28 @@ export function capDpr(dpr, cssWidth, cssHeight, maxPixels = MAX_PIXELS) {
 }
 
 /**
- * DPR à appliquer pour un canevas de cssWidth × cssHeight px CSS.
+ * DPR du profil pour un canevas de cssWidth × cssHeight px CSS : `?dpr=` s'il est imposé,
+ * sinon le DPR visé plafonné en pixels. C'est le plafond du DPR adaptatif.
+ * @param {Quality} quality
+ * @param {number} cssWidth
+ * @param {number} cssHeight
+ */
+export function profilePixelRatio(quality, cssWidth, cssHeight) {
+  if (quality.dprOverride !== null) return quality.dprOverride;
+  return capDpr(quality.dpr, cssWidth, cssHeight, quality.maxPixels);
+}
+
+/**
+ * DPR à appliquer pour un canevas de cssWidth × cssHeight px CSS : celui du profil, abaissé
+ * par le DPR adaptatif s'il y en a un (jamais avec `?dpr=`).
  * @param {Quality} quality
  * @param {number} cssWidth
  * @param {number} cssHeight
  */
 export function resolvePixelRatio(quality, cssWidth, cssHeight) {
-  if (quality.dprOverride !== null) return quality.dprOverride;
-  return capDpr(quality.dpr, cssWidth, cssHeight, quality.maxPixels);
+  const profile = profilePixelRatio(quality, cssWidth, cssHeight);
+  if (quality.dprOverride !== null || !(quality.adaptiveDpr > 0)) return profile;
+  return Math.min(profile, quality.adaptiveDpr);
 }
 
 /**
@@ -161,6 +178,7 @@ export function createQuality({ search, deviceDpr } = {}) {
     dpr: tier === 'lite' ? DPR_LITE : Math.min(device, DPR_MAX),
     dprOverride: parseDprOverride(query),
     maxPixels: MAX_PIXELS,
+    adaptiveDpr: null,
     crashes,
     unstable: crashes >= 2,
   };

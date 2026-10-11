@@ -192,12 +192,17 @@ export function createWorld(renderer, sceneJson, palette, { tier = 'default', lo
     /** Limites de la carte et segments de rue (repère du jeu). */
     bounds: city.bounds,
     streets: city.streets,
+    /**
+     * Emprises au sol des bâtiments (repère du jeu : x, y = centre ; width le long de x, depth
+     * le long de y), pour game/bubbles.facadeAhead (bulles « façade dans l'axe »).
+     */
+    buildings: city.buildings,
     /** Distance où le brouillard devient opaque (m) : coupe des îlots. */
     visibilityFar,
 
     /**
      * Prépare l'image : observateur, matériaux, coupe, LOD et distances de tri.
-     * @param {{x: number, y: number, vx: number, vy: number, gamma: number, heading: number}} snapshot
+     * @param {{x: number, y: number, vx: number, vy: number, gamma: number, heading: number, c: number}} snapshot
      *   instantané du joueur (physics/player.js)
      * @param {number} k 1 = relativiste, 0 = vision classique (variantes REL_CLASSIC)
      * @param {number} [_dtReal] durée réelle de l'image (s) ; réservé (animations futures)

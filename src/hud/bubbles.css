@@ -76,6 +76,12 @@
   line-height: 1;
 }
 
+/* Message court du jeu (calibrage du volant, repli de l'inclinaison : main.js) : même bulle,
+   filet gris pour la distinguer des bulles pédagogiques. */
+.bubble-toast {
+  border-left-color: var(--neutral);
+}
+
 /* Bulle bloquante (tutoriel) : reste jusqu'au toucher. */
 .bubble-hint {
   margin-top: 4px;
@@ -118,4 +124,10 @@
   white-space: nowrap;
   border: 0;
   pointer-events: none;
+}
+
+/* Message du jeu : jusqu'à trois lignes (le texte du repli de l'inclinaison est long). */
+.bubble-toast .bubble-text {
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
 }

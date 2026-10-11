@@ -14,8 +14,11 @@ import {
   physicsFor,
 } from '../src/physics/constants.js';
 import {
+  CONTROLS_KEY,
   LIGHT_SPEED_PRESETS,
   SETTINGS_KEY,
+  loadControlMode,
+  saveControlMode,
   initialLightSpeed,
   isValidLightSpeed,
   loadSettings,
@@ -129,5 +132,35 @@ describe('stockage du réglage (aslower:v1:reglages → {c})', () => {
     expect(refused.source).toBe('reglage');
     expect(refused.message).toMatch(/ignoré/);
     expect(JSON.parse(map.get('aslower:v1:reglages'))).toEqual({ c: 50 }); // inchangé
+  });
+});
+
+describe('direction tactile mémorisée (aslower:v1:commandes)', () => {
+  it('par défaut : inclinaison sur écran tactile, glisser ailleurs', () => {
+    const { store } = fakeStore();
+    expect(loadControlMode({ touch: true }, store)).toBe('tilt');
+    expect(loadControlMode({ touch: false }, store)).toBe('drag');
+    expect(loadControlMode(undefined, store)).toBe('drag');
+  });
+
+  it('le choix du joueur est mémorisé dans une clé séparée des réglages', () => {
+    const { map, store } = fakeStore();
+    saveSettings({ c: 30 }, store);
+    expect(saveControlMode('drag', store)).toBe(true);
+    expect(CONTROLS_KEY).toBe('commandes');
+    expect(JSON.parse(map.get('aslower:v1:commandes'))).toEqual({ mode: 'drag' });
+    expect(JSON.parse(map.get('aslower:v1:reglages'))).toEqual({ c: 30 });
+    expect(loadControlMode({ touch: true }, store)).toBe('drag');
+    saveControlMode('tilt', store);
+    expect(loadControlMode({ touch: false }, store)).toBe('tilt');
+  });
+
+  it('valeur abîmée : défaut de l’appareil ; mode inconnu refusé', () => {
+    const { map, store } = fakeStore();
+    map.set('aslower:v1:commandes', '{"mode":"gyro"}');
+    expect(loadControlMode({ touch: true }, store)).toBe('tilt');
+    map.set('aslower:v1:commandes', 'pas du JSON');
+    expect(loadControlMode({ touch: false }, store)).toBe('drag');
+    expect(() => saveControlMode(/** @type {any} */ ('gyro'), store)).toThrow(RangeError);
   });
 });

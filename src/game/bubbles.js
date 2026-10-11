@@ -137,7 +137,7 @@ function checkText(text, at, errors) {
   }
   for (const [, name] of text.matchAll(PLACEHOLDER)) {
     const spec = VARIABLES[name];
-    if (!spec || !Object.hasOwn(VARIABLES, name)) errors.push(`${at} : variable {${name}} inconnue`);
+    if (!spec || !Object.prototype.hasOwnProperty.call(VARIABLES, name)) errors.push(`${at} : variable {${name}} inconnue`);
     else if (spec.type !== 'number') errors.push(`${at} : variable {${name}} non numérique (seuls les nombres s'affichent)`);
   }
   if (/[{}]/.test(text.replace(PLACEHOLDER, ''))) {
@@ -153,18 +153,19 @@ function checkText(text, at, errors) {
  */
 export function validateBubbles(json) {
   if (!isPlainObject(json)) return [`bulles : objet JSON attendu, reçu ${show(json)}`];
+  const doc = /** @type {any} */ (json);
   const errors = [];
   const extraTop = Object.keys(json).filter((k) => !['schema', 'description', 'bulles'].includes(k));
   if (extraTop.length) errors.push(`racine : clé inconnue « ${extraTop.join(', ')} » (attendues : schema, description, bulles)`);
-  if (json.schema !== BUBBLES_SCHEMA) errors.push(`schema : « ${BUBBLES_SCHEMA} » attendu, reçu ${show(json.schema)}`);
-  if (!Array.isArray(json.bulles) || json.bulles.length === 0) {
-    errors.push(`bulles : liste non vide attendue, reçu ${show(json.bulles)}`);
+  if (doc.schema !== BUBBLES_SCHEMA) errors.push(`schema : « ${BUBBLES_SCHEMA} » attendu, reçu ${show(doc.schema)}`);
+  if (!Array.isArray(doc.bulles) || doc.bulles.length === 0) {
+    errors.push(`bulles : liste non vide attendue, reçu ${show(doc.bulles)}`);
     return errors;
   }
 
-  const ids = json.bulles.filter((b) => isPlainObject(b) && typeof b.id === 'string').map((b) => b.id);
+  const ids = doc.bulles.filter((b) => isPlainObject(b) && typeof b.id === 'string').map((b) => b.id);
   const seen = new Set();
-  json.bulles.forEach((b, i) => {
+  doc.bulles.forEach((b, i) => {
     const at = isPlainObject(b) && typeof b.id === 'string' ? `bulles[${i}] (${b.id})` : `bulles[${i}]`;
     if (!isPlainObject(b)) {
       errors.push(`${at} : objet attendu, reçu ${show(b)}`);
@@ -277,7 +278,7 @@ export function createBubbleEngine({ definitions, store = createMemoryStore(), n
   const errors = validateBubbles(json);
   if (errors.length) throw new Error(`Bulles invalides :\n- ${errors.join('\n- ')}`);
 
-  const bubbles = /** @type {any[]} */ (json).bulles;
+  const bubbles = /** @type {any} */ (json).bulles;
   const ids = bubbles.map((b) => b.id);
   const defs = bubbles.map((b, order) => ({
     def: b,

@@ -2,7 +2,15 @@
 // démarrage du rendu a été armé, et le profil « lite » expire.
 import { beforeEach, describe, expect, it } from 'vitest';
 import { local, session } from '../src/storage.js';
-import { armBootGuard, confirmBoot, createQuality, LITE_TTL_MS, startBootGuard } from '../src/render/quality.js';
+import {
+  armBootGuard,
+  confirmBoot,
+  createQuality,
+  LITE_TTL_MS,
+  profilePixelRatio,
+  resolvePixelRatio,
+  startBootGuard,
+} from '../src/render/quality.js';
 
 const T0 = 1_000_000_000_000;
 
@@ -70,5 +78,29 @@ describe('garde-fou de démarrage', () => {
     const q = createQuality({ search: '', deviceDpr: 3 });
     expect(q.tier).toBe('default');
     expect(q.dpr).toBe(2);
+  });
+});
+
+describe('DPR appliqué (profil, DPR adaptatif, ?dpr=)', () => {
+  it('sans DPR adaptatif : celui du profil, plafonné en pixels', () => {
+    const q = createQuality({ search: '', deviceDpr: 3 });
+    expect(q.adaptiveDpr).toBeNull();
+    expect(resolvePixelRatio(q, 932, 430)).toBe(2); // 1,6 Mpx < 2,2 Mpx
+    expect(resolvePixelRatio(q, 1366, 1024)).toBeCloseTo(Math.sqrt(2.2e6 / (1366 * 1024)), 12);
+  });
+
+  it('le DPR adaptatif abaisse le DPR, sans jamais dépasser celui du profil', () => {
+    const q = createQuality({ search: '', deviceDpr: 3 });
+    q.adaptiveDpr = 1.25;
+    expect(resolvePixelRatio(q, 932, 430)).toBe(1.25);
+    expect(profilePixelRatio(q, 932, 430)).toBe(2);
+    q.adaptiveDpr = 3;
+    expect(resolvePixelRatio(q, 932, 430)).toBe(2);
+  });
+
+  it('?dpr= l’emporte sur le DPR adaptatif', () => {
+    const q = createQuality({ search: '?dpr=1.5', deviceDpr: 3 });
+    q.adaptiveDpr = 1;
+    expect(resolvePixelRatio(q, 932, 430)).toBe(1.5);
   });
 });

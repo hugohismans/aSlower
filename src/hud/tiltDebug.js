@@ -56,14 +56,16 @@ export function createTiltDebug(container) {
   element.setAttribute('aria-hidden', 'true');
   Object.assign(element.style, {
     position: 'fixed',
-    left: 'max(24px, env(safe-area-inset-left))',
-    bottom: '120px',
+    // En bas à droite, au-dessus de la zone d'accélération : ne masque ni le réglage
+    // Direction de l'écran titre, ni le bouton 👁 (le panneau ne capte aucun toucher).
+    right: 'max(24px, env(safe-area-inset-right))',
+    bottom: '130px',
     zIndex: '40',
     margin: '0',
     padding: '6px 8px',
     font: '12px/1.35 ui-monospace, SFMono-Regular, Menlo, monospace',
     color: '#fff',
-    background: 'rgb(0 0 0 / 0.7)',
+    background: 'rgb(0 0 0 / 0.6)',
     borderRadius: '6px',
     pointerEvents: 'none',
     whiteSpace: 'pre',

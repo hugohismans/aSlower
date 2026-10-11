@@ -11,15 +11,24 @@
     />
     <title>Coursier de la lumière lente</title>
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <!-- Application installable : plein écran depuis l'écran d'accueil (Android, iPhone). -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Coursier" />
     <!-- Styles liés ici (et non importés en JS) : src/hud/ n'importe que physics et storage. -->
     <link rel="stylesheet" href="/src/styles/base.css" />
     <link rel="stylesheet" href="/src/hud/hud.css" />
+    <link rel="stylesheet" href="/src/hud/bubbles.css" />
   </head>
   <body>
     <!-- Vue 3D (WebGL2) -->
     <canvas id="jeu" role="img" aria-label="Vue du coursier, à hauteur d'yeux, dans la ville"></canvas>
 
-    <!-- Commandes tactiles, mode glisser (src/input/touch.js) -->
+    <!-- Commandes tactiles (src/input/touch.js) ; data-mode = 'drag' (glisser) ou 'tilt'
+         (inclinaison : zone volant masquée, frein en bas à gauche), écrit par controls.js -->
     <div id="controls" class="controls" hidden>
       <div class="zone zone-steer" data-control="steer"></div>
       <div class="zone zone-thrust" data-control="thrust"></div>
@@ -47,12 +56,18 @@
         <p class="title-sub">Livre tes colis dans une ville où la lumière est lente&nbsp;: à toi de choisir à quel point.</p>
         <!-- Réglage de c (src/hud/lightSpeed.js), rempli par src/main.js -->
         <div id="light-speed"></div>
+        <!-- Réglage Direction (src/hud/direction.js), écran tactile seulement -->
+        <div id="direction" class="touch-only"></div>
         <div class="title-actions">
           <button type="button" id="play" class="btn btn-primary">Jouer</button>
           <button type="button" id="open-credits" class="btn">Crédits</button>
         </div>
         <p class="title-help title-help-touch">
-          Maintiens à droite pour accélérer · Frein en bas · Glisse à gauche pour tourner · 👁 vision classique
+          <span id="help-tilt">Penche ton GSM pour tourner · Maintiens à droite pour accélérer · Frein en bas à gauche · 👁 vision classique</span>
+          <span id="help-drag" hidden>Maintiens à droite pour accélérer · Frein en bas · Glisse à gauche pour tourner · 👁 vision classique</span>
+        </p>
+        <p id="help-ios" class="title-help title-help-ios" hidden>
+          Plein écran sur iPhone&nbsp;: Partager, puis «&nbsp;Sur l'écran d'accueil&nbsp;».
         </p>
         <p class="title-help title-help-keys">
           Clavier&nbsp;: ↑ accélérer · ← → tourner · Espace freiner · C vision classique · Échap pause
