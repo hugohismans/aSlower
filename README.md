@@ -123,7 +123,8 @@ choix est mémorisé. Par défaut, l'inclinaison.
   poses le doigt) ; la **pédale de frein** est en bas de la moitié droite, et tu peux y glisser
   le pouce depuis l'accélérateur : il freine tant qu'il est sur la pédale.
 - Dans les deux modes : **maintiens la moitié droite** pour accélérer (le frein l'emporte) ;
-  **bouton 👁** à mi-hauteur à gauche : vision classique, tant que tu le maintiens.
+  **bouton 👁** à mi-hauteur à gauche : vision classique, tant que tu le maintiens ;
+  **bouton ⏸** en haut à gauche : pause.
 
 **Plein écran** : sur Android, le jeu passe en plein écran quand tu touches « C'est parti ! »
 ou « Conduite libre ». Sur
@@ -131,7 +132,7 @@ iPhone, Safari ne le permet pas aux pages : ajoute le jeu à l'écran d'accueil 
 « Sur l'écran d'accueil ») pour l'ouvrir en plein écran, comme une application. Pendant la
 partie, l'écran reste allumé (sauf en pause).
 
-**Menu pause** (Échap ou P au clavier, ou quand tu quittes l'onglet) : Reprendre (après un
+**Menu pause** (bouton ⏸ en haut à gauche de l'écran, Échap ou P au clavier, ou quand tu quittes l'onglet) : Reprendre (après un
 décompte d'une seconde en niveau), Recentrer le volant (inclinaison), Direction, Spectromètre,
 Changer c (nouvelle partie), Revoir les bulles (les bulles d'aide, montrées une seule fois,
 reviendront), Recommencer, Quitter le niveau (ou Menu principal en conduite libre), Crédits.

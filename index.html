@@ -49,6 +49,11 @@
 
     <!-- HUD, rempli par src/hud/hud.js ; ne capte aucun toucher -->
     <div id="hud" class="hud" hidden></div>
+    <!-- Pause en jeu (niveaux et conduite libre) : visible avec le HUD, masqué pendant les menus
+         (base.css) ; même menu que Échap ou P. Hors de l'ordre de tabulation (clavier : Échap). -->
+    <button type="button" id="pause-button" class="pause-button" aria-label="Pause" title="Pause (Échap)" tabindex="-1">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="5" width="4.2" height="14" rx="1.3" /><rect x="13.8" y="5" width="4.2" height="14" rx="1.3" /></svg>
+    </button>
 
     <!-- Ciel animé des menus (src/hud/sky.js) : accueil, sélection, briefing -->
     <canvas id="sky" class="sky" aria-hidden="true" hidden></canvas>

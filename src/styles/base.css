@@ -52,6 +52,7 @@
   /* Plans d'empilement */
   --z-controls: 10;
   --z-hud: 20;
+  --z-pause: 22; /* bouton pause : au-dessus du HUD et des commandes tactiles */
   --z-sky: 25; /* ciel des menus (src/hud/sky.js) : au-dessus de la vue 3D et du HUD */
   --z-screen: 30;
   --z-diag: 40;
@@ -119,10 +120,50 @@ body {
 
 /* Pendant un écran de menu (bilan, échec, pause…), le HUD, ses bulles et les commandes
    tactiles s'effacent : rien ne transparaît sous le panneau. */
-body:has(#screen:not([hidden])) :is(#hud, #controls),
-body:has(#notice:not([hidden])) :is(#hud, #controls),
-body:has(#title:not([hidden])) :is(#hud, #controls) {
+body:has(#screen:not([hidden])) :is(#hud, #controls, #pause-button),
+body:has(#notice:not([hidden])) :is(#hud, #controls, #pause-button),
+body:has(#title:not([hidden])) :is(#hud, #controls, #pause-button) {
   visibility: hidden;
+}
+
+/* Bouton pause (src/main.js) : coin haut gauche, dans la zone sûre (encoche), au-dessus des
+   zones tactiles et du HUD (il ne capte que ses propres touchers : 48 × 48 px). En haut à gauche :
+   hors des horloges et de la jauge (centrées), loin du pouce qui accélère (moitié droite), au-dessus
+   du bouton 👁 (mi-hauteur) ; en inclinaison, la moitié gauche ne sert pas à tourner. N'existe
+   qu'avec le HUD : masqué avec lui, et pendant les menus (règle ci-dessus). */
+.pause-button {
+  position: fixed;
+  top: var(--sa-top);
+  left: var(--sa-left);
+  z-index: var(--z-pause);
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  border: 2px solid rgb(255 255 255 / 0.55);
+  border-radius: 14px;
+  background: var(--panel);
+  color: var(--text);
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.pause-button svg {
+  width: 24px;
+  height: 24px;
+  fill: currentColor;
+}
+
+.pause-button:active {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+#hud[hidden] + .pause-button {
+  display: none;
 }
 
 /* ------------------------------------------------------------------------- */

@@ -739,7 +739,10 @@ export const session               // idem pour sessionStorage
 - `main.js` : accueil (Jouer, Conduite libre, Théorie → `BASE_URL + 'theorie/'`, Réglages,
   Crédits ; étoiles gagnées et c courant ; ligne « Sur l'écran d'accueil » sur iPhone ; ciel
   animé `hud/sky.js`), dialogue Réglages (réglage de c, Direction sur écran tactile,
-  Spectromètre, Revoir les bulles, touches du clavier), menu pause (Reprendre ; Recentrer le volant si
+  Spectromètre, Revoir les bulles, touches du clavier), bouton ⏸ `#pause-button` en jeu
+  (niveaux et conduite libre : même menu que Échap ou P ; au toucher dès `pointerdown`, car
+  aucun `click` n'est émis quand d'autres doigts sont posés ; placé en haut à gauche sous les
+  panneaux du HUD, ou en haut à droite si le bouton 👁 est trop près), menu pause (Reprendre ; Recentrer le volant si
   l'inclinaison est active ; Direction ; « Changer c » → nouvelle partie au départ avec le
   nouveau c ; Revoir les bulles ; Recommencer ; Crédits ; tout au clavier et au toucher),
   panneau « Tourne ton GSM » en portrait (appareils tactiles, strictement imposé), création du

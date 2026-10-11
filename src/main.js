@@ -429,6 +429,7 @@ const dom = {
   canvas: /** @type {HTMLCanvasElement} */ ($('jeu')),
   controls: $('controls'),
   hud: $('hud'),
+  pauseButton: /** @type {HTMLButtonElement} */ ($('pause-button')),
   title: $('title'),
   play: /** @type {HTMLButtonElement} */ ($('play')),
   freeDrive: /** @type {HTMLButtonElement} */ ($('free-drive')),
@@ -1023,6 +1024,7 @@ function startCountdown(seconds) {
   if (flow === 'niveau') levelHud.show();
   dom.title.hidden = true;
   sky?.hide();
+  placePauseButton();
   game.countdown = { remaining: seconds, go: 0 };
   screens.showCountdown(String(Math.ceil(seconds)));
   if (seconds >= COUNTDOWN_START_S && controls.getMode() === 'tilt') calibrationPending = true;
@@ -1176,6 +1178,7 @@ function resume() {
 /** Passage en jeu (départ, reprise, nouvelle partie) : commandes, écran allumé, mesures. */
 function enterPlaying() {
   mode = 'playing';
+  placePauseButton();
   controls.setEnabled(true);
   wakeLock.acquire();
   adaptive?.reset();
@@ -1185,6 +1188,60 @@ function enterPlaying() {
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') pause('cache');
 });
+
+/**
+ * Bouton pause du HUD (indispensable sur GSM : pas de touche Échap). Même menu que Échap ou P ;
+ * pendant le message de reprise (« reprise », où « pause » n'existe pas), même effet qu'un onglet
+ * caché. Rien en ?bench (le bouton est retiré).
+ */
+function onPauseButton() {
+  if (flow === 'niveau') pause(sm.can('pause') ? 'pause' : 'cache');
+  else pause();
+}
+// Au toucher, dès l'appui : un « click » n'est pas émis quand d'autres doigts sont posés
+// (accélérer, tourner). « click » reste pour la souris, le clavier et VoiceOver (sans effet en
+// double : pause() ne fait rien si le jeu est déjà en pause).
+dom.pauseButton.addEventListener('pointerdown', (event) => {
+  if (event.pointerType === 'mouse') return;
+  event.preventDefault();
+  onPauseButton();
+});
+dom.pauseButton.addEventListener('click', onPauseButton);
+
+/** Écart (px) entre le bouton pause et ce qu'il évite. */
+const PAUSE_GAP = 8;
+
+/**
+ * Place le bouton pause : en haut à gauche (zone sûre), sous les panneaux du HUD qui occupent ce
+ * coin (le HUD de niveau remplit toute la largeur d'un GSM à encoche) ; si le bouton 👁
+ * (mi-hauteur à gauche) est alors trop près (écran bas), en haut à droite, sous la jauge. À
+ * refaire quand le HUD change de contenu ou la vue de taille (lectures de mise en page : jamais
+ * dans la boucle d'images).
+ */
+function placePauseButton() {
+  const button = dom.pauseButton;
+  if (!button.isConnected || dom.hud.hidden) return;
+  button.style.top = '';
+  button.style.left = '';
+  button.style.right = '';
+  const blockers = [...dom.hud.querySelectorAll('.hud-top > *, .hud-fps:not([hidden])')]
+    .map((e) => e.getBoundingClientRect())
+    .filter((r) => r.width > 0);
+  /** Haut du bouton dans la colonne [left, right] : sous ce qui l'occupe. */
+  const topIn = (rect) => Math.max(rect.top, ...blockers.filter((r) => r.left < rect.right && r.right > rect.left).map((r) => r.bottom + PAUSE_GAP));
+  let rect = button.getBoundingClientRect();
+  let top = topIn(rect);
+  const eye = /** @type {HTMLElement | null} */ (dom.controls.querySelector('.pad-classic'))?.getBoundingClientRect();
+  if (eye && eye.width > 0 && eye.left < rect.right && top + rect.height > eye.top - PAUSE_GAP) {
+    button.style.left = 'auto';
+    button.style.right = 'var(--sa-right)';
+    rect = button.getBoundingClientRect();
+    top = topIn(rect);
+  }
+  button.style.top = `${Math.round(top)}px`;
+}
+window.addEventListener('resize', () => requestAnimationFrame(placePauseButton));
+if (benchMode) dom.pauseButton.remove();
 portrait.addEventListener('change', (event) => {
   if (event.matches) pause('cache');
 });
