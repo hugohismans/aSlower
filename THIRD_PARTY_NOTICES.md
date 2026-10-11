@@ -128,3 +128,12 @@ Les fonctions colorimétriques CIE 1931 utilisées par `src/physics/spectrum.js`
 
 Seules les formules et les coefficients publiés dans l'article sont repris, réécrits
 en JavaScript ; aucun code n'est copié.
+
+## Police STIX Two Math (page Théorie)
+
+La page `theorie/` embarque la police mathématique **STIX Two Math**
+(`public/theorie/fonts/stix-two-math.woff2`), chargée seulement quand des équations sont affichées.
+
+Copyright 2001-2021 The STIX Fonts Project Authors (https://github.com/stipub/stixfonts).
+Distribuée sous la **SIL Open Font License, version 1.1** ; le texte intégral est publié avec le
+jeu : `public/theorie/fonts/OFL-STIX-Two-Math.txt` (servi sous `theorie/fonts/OFL-STIX-Two-Math.txt`).

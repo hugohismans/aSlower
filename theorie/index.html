@@ -1,0 +1,957 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Théorie — Coursier de la lumière lente</title>
+    <meta
+      name="description"
+      content="La relativité restreinte du jeu Coursier de la lumière lente, en trois niveaux : débutant (sans équations), intermédiaire (équations et exemples chiffrés), expert (modèle physique et rendu)."
+    />
+    <meta name="theme-color" content="#0a0d14" />
+    <meta name="color-scheme" content="dark" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="./theorie.css" />
+    <script type="module" src="./theorie.js"></script>
+  </head>
+  <body>
+    <a class="saut" href="#contenu">Aller au contenu</a>
+
+    <header class="barre">
+      <a class="retour" href="../">
+        <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+          <path d="M12.5 4 6.5 10l6 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+        <span class="retour-texte">Retour au jeu</span><span class="retour-court" aria-hidden="true">Jeu</span>
+      </a>
+      <nav class="niveaux" aria-label="Niveau de lecture">
+        <ul>
+          <li><a href="#debutant" data-level-tab="debutant">Débutant</a></li>
+          <li><a href="#intermediaire" data-level-tab="intermediaire">Intermédiaire</a></li>
+          <li><a href="#expert" data-level-tab="expert">Expert</a></li>
+        </ul>
+      </nav>
+    </header>
+
+    <main id="contenu" class="page" tabindex="-1">
+      <div class="entete">
+        <p class="surtitre">Coursier de la lumière lente · Théorie</p>
+        <h1>La physique derrière le jeu</h1>
+        <p class="chapo">
+          Dans la ville du jeu, la lumière ne va qu’à 30 m/s, à peu près 108 km/h. Ton véhicule de livraison
+          peut s’en approcher, et tout ce que tu vois change : les couleurs, les formes, le temps. Rien n’est
+          truqué : c’est la relativité restreinte d’Einstein, calculée image par image. Choisis ton niveau.
+        </p>
+        <ul class="choix-niveau">
+          <li>
+            <a href="#debutant" data-level-tab="debutant"><strong>Débutant</strong><span>Les idées, sans équations, avec des captures du jeu.</span></a>
+          </li>
+          <li>
+            <a href="#intermediaire" data-level-tab="intermediaire"><strong>Intermédiaire</strong><span>Les équations, des exemples chiffrés et des schémas.</span></a>
+          </li>
+          <li>
+            <a href="#expert" data-level-tab="expert"><strong>Expert</strong><span>Quadrivecteurs, modèle spectral, shaders et limites du modèle.</span></a>
+          </li>
+        </ul>
+      </div>
+
+      <!-- ================================================================== -->
+      <section id="debutant" class="niveau" data-level="debutant" aria-labelledby="debutant-titre">
+        <h2 id="debutant-titre" class="titre-niveau"><span class="badge">Niveau 1</span>Débutant : ce que tu vois, et pourquoi</h2>
+        <p>
+          Pas d’équations ici, seulement des idées et des images du jeu. Tout ce qui suit est vrai dans notre monde
+          aussi. Chez nous, la lumière va dix millions de fois plus vite (300 000 km/s) : il faudrait foncer à une
+          fraction notable de cette vitesse pour voir ces effets. Dans le jeu, une voiture suffit.
+        </p>
+
+        <nav class="sommaire" aria-labelledby="debutant-sommaire">
+          <h3 id="debutant-sommaire">Sommaire</h3>
+          <ol>
+            <li><a href="#d-limite">Une vitesse limite</a></li>
+            <li><a href="#d-horloges">Deux horloges</a></li>
+            <li><a href="#d-passe">Voir, c’est regarder le passé</a></li>
+            <li><a href="#d-aberration">Le décor se resserre vers l’avant</a></li>
+            <li><a href="#d-doppler">Bleu devant, rouge derrière</a></li>
+            <li><a href="#d-invisible">Des couleurs invisibles apparaissent</a></li>
+            <li><a href="#d-projecteur">L’effet projecteur</a></li>
+            <li><a href="#d-classique">La vision classique, pour comparer</a></li>
+            <li><a href="#d-retenir">Ce qu’il faut retenir</a></li>
+          </ol>
+        </nav>
+
+        <figure class="large">
+          <img src="/theorie/img/arret.webp" width="1600" height="738" loading="lazy" decoding="async" alt="Vue du coursier à l’arrêt sur l’avenue de test : rue droite bordée de façades orange, jaunes, vertes, turquoise et violettes, ciel bleu pâle, guidon du véhicule en bas de l’image.">
+          <figcaption>
+            <strong>À l’arrêt.</strong> L’avenue de test du jeu : des façades aux couleurs de l’arc-en-ciel, des
+            lampadaires tous les 40 m. Le petit rectangle sombre, au loin à gauche, est un panneau qui ne renvoie
+            que de l’infrarouge : on le retrouvera plus bas. Les images de cette page viennent toutes de
+            cette avenue, avec c = 30 m/s.
+          </figcaption>
+        </figure>
+
+        <h3 id="d-limite">1. Une vitesse limite</h3>
+        <p>
+          Rien ne va plus vite que la lumière : ni ton véhicule, ni aucun message. Tu peux garder l’accélérateur
+          enfoncé aussi longtemps que tu veux, ta vitesse s’approche de 30 m/s sans jamais l’atteindre.
+        </p>
+        <p>
+          Au début, chaque seconde de poussée ajoute 3 m/s, comme on s’y attend. Puis le gain fond : il faut
+          5,5 s pour atteindre 15 m/s (la moitié de c), 10 s pour 22,8 m/s (76 %), 14,7 s pour 27 m/s (90 %).
+          Le jeu s’arrête à 99,5 % de c, soit 29,85 m/s.
+        </p>
+        <p>
+          Ce n’est pas le moteur qui faiblit : à bord, tu ressens toujours la même poussée. C’est la façon dont
+          les vitesses s’additionnent qui change. Ajouter 3 m/s à une vitesse déjà proche de c donne un peu
+          moins que la somme, et d’autant moins qu’on est près de c.
+        </p>
+        <aside class="jeu">
+          <span class="encadre-titre">Dans le jeu</span>
+          <p>
+            L’aiguille de la jauge de vitesse ralentit en approchant du mur hachuré marqué « c ». Comme il n’y a
+            pas de frottement, lâcher l’accélérateur garde ta vitesse : il faut freiner, et cela prend de la place.
+            Depuis 22,8 m/s, il faut 163 m pour s’arrêter.
+          </p>
+        </aside>
+
+        <h3 id="d-horloges">2. Deux horloges</h3>
+        <p>
+          Le jeu affiche deux horloges. <strong>Ta montre</strong> mesure ton temps à toi : c’est aussi ta
+          batterie. <strong>L’horloge de la ville</strong> mesure le temps des habitants, des délais de livraison,
+          des ponts et des feux.
+        </p>
+        <p>
+          À l’arrêt, elles avancent ensemble. Quand tu roules vite, ta montre avance moins vite que l’horloge de
+          la ville. Toi, tu ne sens rien : ton cœur, ta montre et ton moteur ralentissent tous ensemble. Mais en
+          comparant les deux horloges, l’écart se creuse.
+        </p>
+        <figure class="large">
+          <img src="/theorie/img/horloges.webp" width="1600" height="738" loading="lazy" decoding="async" alt="Le jeu en pleine vitesse avec son affichage : à gauche, « Ta montre » et « Horloge de la ville » avec un écart rouge entre elles ; à droite, la jauge de vitesse presque au mur marqué c.">
+          <figcaption><strong>Après 14,7 s de poussée, à 27 m/s (90 % de c).</strong> Ta montre marque 19,5 s, l’horloge de
+            la ville 26,0 s : la ville a pris 6,5 s d’avance, et l’écart grandit vite, car à cette vitesse la ville
+            vieillit 2,3 fois plus vite que toi (γ = 2,29 ; le jeu arrondit en « ×2 »). Le compteur tronque
+            26,99 m/s en « 26 m/s ».</figcaption>
+        </figure>
+        <p>
+          <strong>Le paradoxe des jumeaux.</strong> Luc, ton jumeau, reste au dépôt. Toi, tu fais un aller-retour
+          de 300 m le plus vite possible : tu accélères jusqu’à mi-chemin, tu freines, tu fais demi-tour et tu
+          recommences. Pendant que tu roules, ta montre avance de 38,5 s et celle de Luc de 44,7 s. À ton retour,
+          tu as 6,2 s de moins que lui.
+        </p>
+        <p>
+          Ce n’est pas symétrique : c’est toi qui as accéléré, freiné et fait demi-tour, pas Luc. Le paradoxe a
+          été proposé par Paul Langevin en 1911.
+        </p>
+        <aside class="jeu">
+          <span class="encadre-titre">Dans le jeu</span>
+          <p>
+            Certains clients ne sont pas là avant une heure donnée de la ville. Attendre sur place coûte une
+            seconde de batterie par seconde de ville. Faire un détour à grande vitesse fait passer le temps de la
+            ville en usant moins ta batterie : c’est le paradoxe des jumeaux, utilisé comme une astuce.
+          </p>
+        </aside>
+
+        <h3 id="d-passe">3. Voir, c’est regarder le passé</h3>
+        <p>
+          La lumière met du temps pour venir jusqu’à toi. À 30 m/s, un bâtiment situé à 300 m t’apparaît tel
+          qu’il était il y a 10 s. Tout ce que tu vois est une image du passé, d’autant plus ancienne que c’est
+          loin.
+        </p>
+        <figure>
+          <svg class="schema" viewBox="0 0 640 195" role="img" aria-labelledby="svg-retard-t svg-retard-d" xmlns="http://www.w3.org/2000/svg"><title id="svg-retard-t">Voir, c’est regarder le passé</title><desc id="svg-retard-d">Un bâtiment est à 300 mètres. À 30 mètres par seconde, sa lumière met 10 secondes pour te parvenir : quand son horloge marque 12 h 00 min 10 s, tu la vois marquer 12 h 00 min 00 s.</desc><line x1="30" y1="150" x2="610" y2="150" stroke="var(--svg-axis)" stroke-width="2"/><rect x="50" y="122" width="54" height="22" rx="6" fill="var(--accent)"/><circle cx="62" cy="148" r="6" fill="var(--svg-text)"/><circle cx="92" cy="148" r="6" fill="var(--svg-text)"/><circle cx="96" cy="128" r="3" fill="var(--svg-bg)"/><rect x="520" y="56" width="70" height="94" rx="3" fill="var(--svg-blue)" fill-opacity="0.85"/><rect x="532" y="68" width="18" height="14" fill="var(--svg-bg)" fill-opacity="0.6"/><rect x="560" y="68" width="18" height="14" fill="var(--svg-bg)" fill-opacity="0.6"/><rect x="532" y="94" width="18" height="14" fill="var(--svg-bg)" fill-opacity="0.6"/><rect x="560" y="94" width="18" height="14" fill="var(--svg-bg)" fill-opacity="0.6"/><rect x="532" y="120" width="18" height="14" fill="var(--svg-bg)" fill-opacity="0.6"/><rect x="560" y="120" width="18" height="14" fill="var(--svg-bg)" fill-opacity="0.6"/><circle cx="555" cy="34" r="16" fill="none" stroke="var(--svg-text)" stroke-width="2"/><line x1="555" y1="34" x2="555" y2="22" stroke="var(--svg-text)" stroke-width="2"/><line x1="555" y1="34" x2="564" y2="38" stroke="var(--svg-text)" stroke-width="2"/><text x="520" y="40" text-anchor="end" class="t-small">là-bas, maintenant : 12:00:10</text><path d="M515 110 L515 110 L511 113 L507 115.4 L503 116.8 L499 116.9 L495 115.6 L491 113.2 L487 110.2 L483 107.2 L479 104.7 L475 103.2 L471 103.1 L467 104.3 L463 106.6 L459 109.6 L455 112.6 L451 115.2 L447 116.7 L443 116.9 L439 115.8 L435 113.6 L431 110.6 L427 107.6 L423 105 L419 103.4 L415 103 L411 104.1 L407 106.2 L403 109.1 L399 112.2 L395 114.9 L391 116.6 L387 117 L383 116 L379 113.9 L375 111.1 L371 108 L367 105.3 L363 103.5 L359 103 L355 103.9 L351 105.9 L347 108.7 L343 111.8 L339 114.5 L335 116.4 L331 117 L327 116.2 L323 114.3 L319 111.5 L315 108.4 L311 105.6 L307 103.7 L303 103 L299 103.7 L295 105.6 L291 108.3 L287 111.4 L283 114.2 L279 116.2 L275 117 L271 116.4 L267 114.6 L263 111.9 L259 108.8 L255 106 L251 103.9 L247 103 L243 103.5 L239 105.2 L235 107.9 L231 111 L227 113.9 L223 116 L219 117 L215 116.6 L211 114.9 L207 112.3 L203 109.2 L199 106.3 L195 104.1 L191 103.1 L187 103.3 L183 104.9 L179 107.5 L175 110.6 L171 113.5 L167 115.8 L163 116.9 L159 116.7 L155 115.2 L151 112.7 L147 109.7 L143 106.7 L139 104.4 L135 103.1 L131 103.2 L127 104.6 L123 107.1 L119 110.1 L115 113.1" fill="none" stroke="var(--accent)" stroke-width="2"/><path d="M115 110 l12 -7 l0 14 Z" fill="var(--accent)"/><text x="315" y="88" text-anchor="middle" class="t-strong">la lumière met 10 s pour venir</text><text x="315" y="178" text-anchor="middle" class="t-small">300 m à c = 30 m/s</text><line x1="104" y1="166" x2="520" y2="166" stroke="var(--svg-muted)" stroke-width="1"/><line x1="104" y1="160" x2="104" y2="172" stroke="var(--svg-muted)"/><line x1="520" y1="160" x2="520" y2="172" stroke="var(--svg-muted)"/><text x="40" y="100" class="t-small">tu vois : 12:00:00</text></svg>
+        </figure>
+        <p>
+          Pour une maison immobile, cela ne change rien. Mais une porte qui s’ouvre, un pont qui se lève ou un
+          feu qui change de couleur : tu le vois en retard. Un pont qui te paraît baissé peut être déjà levé. Il
+          vaut mieux se fier aux horaires de la ville qu’à ses yeux.
+        </p>
+        <p>
+          Chez nous aussi : la lumière du Soleil met un peu plus de 8 minutes pour nous parvenir. Le Soleil que
+          tu vois est celui d’il y a 8 minutes.
+        </p>
+
+        <h3 id="d-aberration">4. Le décor se resserre vers l’avant</h3>
+        <p>
+          Quand tu cours sous une pluie qui tombe bien droit, tu dois pencher ton parapluie vers l’avant : pour
+          toi, la pluie arrive de face. La lumière fait la même chose. Quand tu roules vite, chaque objet semble
+          plus en avant qu’il ne l’est vraiment.
+        </p>
+        <p>
+          Résultat : tout le décor se resserre vers le centre de l’écran. Ce qui est devant semble plus loin et
+          plus petit. Ce qui était sur les côtés, et même un peu derrière toi, entre dans l’écran. Les lignes
+          droites des façades se courbent. C’est l’<strong>aberration</strong> de la lumière.
+        </p>
+        <figure class="large">
+          <svg class="schema" viewBox="0 0 640 330" role="img" aria-labelledby="svg-aberration-t svg-aberration-d" xmlns="http://www.w3.org/2000/svg"><title id="svg-aberration-t">Aberration : le décor se resserre vers l’avant</title><desc id="svg-aberration-d">Vue de dessus. 24 bâtiments répartis tout autour de toi, tous les 15 degrés. À l’arrêt, 7 d’entre eux tiennent dans les 90 degrés de l’écran. À 76 % de c, leurs directions apparentes se resserrent vers l’avant : 13 tiennent dans l’écran, dont celui qui est exactement sur ton côté (en jaune), vu à 40 degrés devant toi. Ceux de devant sont bleuis, ceux de derrière rougis.</desc><path d="M165 150 L75.2 60.2 A127 127 0 0 1 254.8 60.2 Z" fill="var(--svg-wedge)" stroke="none"/><circle cx="165" cy="150" r="105" fill="none" stroke="var(--svg-grid)" stroke-width="1"/><line x1="165" y1="150" x2="165" y2="45" stroke="var(--svg-muted)" stroke-width="1" stroke-opacity="0.55"/><circle cx="165" cy="45" r="4.5" fill="var(--svg-muted)" stroke="var(--svg-bg)" stroke-width="2"/><line x1="165" y1="150" x2="192.2" y2="48.6" stroke="var(--svg-muted)" stroke-width="1" stroke-opacity="0.55"/><circle cx="192.2" cy="48.6" r="4.5" fill="var(--svg-muted)" stroke="var(--svg-bg)" stroke-width="2"/><line x1="165" y1="150" x2="217.5" y2="59.1" stroke="var(--svg-muted)" stroke-width="1" stroke-opacity="0.55"/><circle cx="217.5" cy="59.1" r="4.5" fill="var(--svg-muted)" stroke="var(--svg-bg)" stroke-width="2"/><line x1="165" y1="150" x2="239.2" y2="75.8" stroke="var(--svg-muted)" stroke-width="1" stroke-opacity="0.55"/><circle cx="239.2" cy="75.8" r="4.5" fill="var(--svg-muted)" stroke="var(--svg-bg)" stroke-width="2"/><line x1="165" y1="150" x2="255.9" y2="97.5" stroke="var(--svg-muted)" stroke-width="1" stroke-opacity="0.55"/><circle cx="255.9" cy="97.5" r="4.5" fill="var(--svg-muted)" stroke="var(--svg-bg)" stroke-width="2"/><line x1="165" y1="150" x2="266.4" y2="122.8" stroke="var(--svg-muted)" stroke-width="1" stroke-opacity="0.55"/><circle cx="266.4" cy="122.8" r="4.5" fill="var(--svg-muted)" stroke="var(--svg-bg)" stroke-width="2"/><line x1="165" y1="150" x2="270" y2="150" stroke="var(--accent)" stroke-width="2" stroke-opacity="1"/><circle cx="270" cy="150" r="6" fill="var(--accent)" stroke="var(--svg-bg)" stroke-width="2"/><line x1="165" y1="150" x2="266.4" y2="177.2" stroke="var(--svg-muted)" stroke-width="1" stroke-opacity="0.55"/><circle cx="266.4" cy="177.2" r="4.5" fill="var(--svg-muted)" stroke="var(--svg-bg)" stroke-width="2"/><line x1="165" y1="150" x2="255.9" y2="202.5" stroke="var(--svg-muted)" stroke-width="1" stroke-opacity="0.55"/><circle cx="255.9" cy="202.5" r="4.5" fill="var(--svg-muted)" stroke="var(--svg-bg)" stroke-width="2"/><line x1="165" y1="150" x2="239.2" y2="224.2" stroke="var(--svg-muted)" stroke-width="1" stroke-opacity="0.55"/><circle cx="239.2" cy="224.2" r="4.5" fill="var(--svg-muted)" stroke="var(--svg-bg)" stroke-width="2"/><line x1="165" y1="150" x2="217.5" y2="240.9" stroke="var(--svg-muted)" stroke-width="1" stroke-opacity="0.55"/><circle cx="217.5" cy="240.9" r="4.5" fill="var(--svg-muted)" stroke="var(--svg-bg)" stroke-width="2"/><line x1="165" y1="150" x2="192.2" y2="251.4" stroke="var(--svg-muted)" stroke-width="1" stroke-opacity="0.55"/><circle cx="192.2" cy="251.4" r="4.5" fill="var(--svg-muted)" stroke="var(--svg-bg)" stroke-width="2"/><line x1="165" y1="150" x2="165" y2="255" stroke="var(--svg-muted)" stroke-width="1" stroke-opacity="0.55"/><circle cx="165" cy="255" r="4.5" fill="var(--svg-muted)" stroke="var(--svg-bg)" stroke-width="2"/><line x1="165" y1="150" x2="137.8" y2="251.4" stroke="var(--svg-muted)" stroke-width="1" stroke-opacity="0.55"/><circle cx="137.8" cy="251.4" r="4.5" fill="var(--svg-muted)" stroke="var(--svg-bg)" stroke-width="2"/><line x1="165" y1="150" x2="112.5" y2="240.9" stroke="var(--svg-muted)" stroke-width="1" stroke-opacity="0.55"/><circle cx="112.5" cy="240.9" r="4.5" fill="var(--svg-muted)" stroke="var(--svg-bg)" stroke-width="2"/><line x1="165" y1="150" x2="90.8" y2="224.2" stroke="var(--svg-muted)" stroke-width="1" stroke-opacity="0.55"/><circle cx="90.8" cy="224.2" r="4.5" fill="var(--svg-muted)" stroke="var(--svg-bg)" stroke-width="2"/><line x1="165" y1="150" x2="74.1" y2="202.5" stroke="var(--svg-muted)" stroke-width="1" stroke-opacity="0.55"/><circle cx="74.1" cy="202.5" r="4.5" fill="var(--svg-muted)" stroke="var(--svg-bg)" stroke-width="2"/><line x1="165" y1="150" x2="63.6" y2="177.2" stroke="var(--svg-muted)" stroke-width="1" stroke-opacity="0.55"/><circle cx="63.6" cy="177.2" r="4.5" fill="var(--svg-muted)" stroke="var(--svg-bg)" stroke-width="2"/><line x1="165" y1="150" x2="60" y2="150" stroke="var(--svg-muted)" stroke-width="1" stroke-opacity="0.55"/><circle cx="60" cy="150" r="4.5" fill="var(--svg-muted)" stroke="var(--svg-bg)" stroke-width="2"/><line x1="165" y1="150" x2="63.6" y2="122.8" stroke="var(--svg-muted)" stroke-width="1" stroke-opacity="0.55"/><circle cx="63.6" cy="122.8" r="4.5" fill="var(--svg-muted)" stroke="var(--svg-bg)" stroke-width="2"/><line x1="165" y1="150" x2="74.1" y2="97.5" stroke="var(--svg-muted)" stroke-width="1" stroke-opacity="0.55"/><circle cx="74.1" cy="97.5" r="4.5" fill="var(--svg-muted)" stroke="var(--svg-bg)" stroke-width="2"/><line x1="165" y1="150" x2="90.8" y2="75.8" stroke="var(--svg-muted)" stroke-width="1" stroke-opacity="0.55"/><circle cx="90.8" cy="75.8" r="4.5" fill="var(--svg-muted)" stroke="var(--svg-bg)" stroke-width="2"/><line x1="165" y1="150" x2="112.5" y2="59.1" stroke="var(--svg-muted)" stroke-width="1" stroke-opacity="0.55"/><circle cx="112.5" cy="59.1" r="4.5" fill="var(--svg-muted)" stroke="var(--svg-bg)" stroke-width="2"/><line x1="165" y1="150" x2="137.8" y2="48.6" stroke="var(--svg-muted)" stroke-width="1" stroke-opacity="0.55"/><circle cx="137.8" cy="48.6" r="4.5" fill="var(--svg-muted)" stroke="var(--svg-bg)" stroke-width="2"/><path d="M158 158 L165 140 L172 158 Z" fill="var(--svg-text)"/><text x="165" y="295" text-anchor="middle" class="t-strong">À l’arrêt</text><text x="165" y="315" text-anchor="middle" class="t-small">7 points sur 24 dans l’écran</text><path d="M475 150 L385.2 60.2 A127 127 0 0 1 564.8 60.2 Z" fill="var(--svg-wedge)" stroke="none"/><circle cx="475" cy="150" r="105" fill="none" stroke="var(--svg-grid)" stroke-width="1"/><line x1="475" y1="150" x2="475" y2="45" stroke="var(--svg-blue)" stroke-width="1" stroke-opacity="0.55"/><circle cx="475" cy="45" r="4.5" fill="var(--svg-blue)" stroke="var(--svg-bg)" stroke-width="2"/><line x1="475" y1="150" x2="485.1" y2="45.5" stroke="var(--svg-blue)" stroke-width="1" stroke-opacity="0.55"/><circle cx="485.1" cy="45.5" r="4.5" fill="var(--svg-blue)" stroke="var(--svg-bg)" stroke-width="2"/><line x1="475" y1="150" x2="495.5" y2="47" stroke="var(--svg-blue)" stroke-width="1" stroke-opacity="0.55"/><circle cx="495.5" cy="47" r="4.5" fill="var(--svg-blue)" stroke="var(--svg-bg)" stroke-width="2"/><line x1="475" y1="150" x2="506.3" y2="49.8" stroke="var(--svg-blue)" stroke-width="1" stroke-opacity="0.55"/><circle cx="506.3" cy="49.8" r="4.5" fill="var(--svg-blue)" stroke="var(--svg-bg)" stroke-width="2"/><line x1="475" y1="150" x2="517.7" y2="54.1" stroke="var(--svg-blue)" stroke-width="1" stroke-opacity="0.55"/><circle cx="517.7" cy="54.1" r="4.5" fill="var(--svg-blue)" stroke="var(--svg-bg)" stroke-width="2"/><line x1="475" y1="150" x2="529.9" y2="60.5" stroke="var(--svg-blue)" stroke-width="1" stroke-opacity="0.55"/><circle cx="529.9" cy="60.5" r="4.5" fill="var(--svg-blue)" stroke="var(--svg-bg)" stroke-width="2"/><line x1="475" y1="150" x2="543" y2="70" stroke="var(--accent)" stroke-width="2" stroke-opacity="1"/><circle cx="543" cy="70" r="6" fill="var(--accent)" stroke="var(--svg-bg)" stroke-width="2"/><line x1="475" y1="150" x2="556.9" y2="84.2" stroke="var(--svg-blue)" stroke-width="1" stroke-opacity="0.55"/><circle cx="556.9" cy="84.2" r="4.5" fill="var(--svg-blue)" stroke="var(--svg-bg)" stroke-width="2"/><line x1="475" y1="150" x2="570.2" y2="105.6" stroke="var(--svg-text)" stroke-width="1" stroke-opacity="0.55"/><circle cx="570.2" cy="105.6" r="4.5" fill="var(--svg-text)" stroke="var(--svg-bg)" stroke-width="2"/><line x1="475" y1="150" x2="579.3" y2="137.6" stroke="var(--svg-red)" stroke-width="1" stroke-opacity="0.55"/><circle cx="579.3" cy="137.6" r="4.5" fill="var(--svg-red)" stroke="var(--svg-bg)" stroke-width="2"/><line x1="475" y1="150" x2="574.9" y2="182.2" stroke="var(--svg-red)" stroke-width="1" stroke-opacity="0.55"/><circle cx="574.9" cy="182.2" r="4.5" fill="var(--svg-red)" stroke="var(--svg-bg)" stroke-width="2"/><line x1="475" y1="150" x2="541.6" y2="231.2" stroke="var(--svg-red)" stroke-width="1" stroke-opacity="0.55"/><circle cx="541.6" cy="231.2" r="4.5" fill="var(--svg-red)" stroke="var(--svg-bg)" stroke-width="2"/><line x1="475" y1="150" x2="475" y2="255" stroke="var(--svg-red)" stroke-width="1" stroke-opacity="0.55"/><circle cx="475" cy="255" r="4.5" fill="var(--svg-red)" stroke="var(--svg-bg)" stroke-width="2"/><line x1="475" y1="150" x2="408.4" y2="231.2" stroke="var(--svg-red)" stroke-width="1" stroke-opacity="0.55"/><circle cx="408.4" cy="231.2" r="4.5" fill="var(--svg-red)" stroke="var(--svg-bg)" stroke-width="2"/><line x1="475" y1="150" x2="375.1" y2="182.2" stroke="var(--svg-red)" stroke-width="1" stroke-opacity="0.55"/><circle cx="375.1" cy="182.2" r="4.5" fill="var(--svg-red)" stroke="var(--svg-bg)" stroke-width="2"/><line x1="475" y1="150" x2="370.7" y2="137.6" stroke="var(--svg-red)" stroke-width="1" stroke-opacity="0.55"/><circle cx="370.7" cy="137.6" r="4.5" fill="var(--svg-red)" stroke="var(--svg-bg)" stroke-width="2"/><line x1="475" y1="150" x2="379.8" y2="105.6" stroke="var(--svg-text)" stroke-width="1" stroke-opacity="0.55"/><circle cx="379.8" cy="105.6" r="4.5" fill="var(--svg-text)" stroke="var(--svg-bg)" stroke-width="2"/><line x1="475" y1="150" x2="393.1" y2="84.2" stroke="var(--svg-blue)" stroke-width="1" stroke-opacity="0.55"/><circle cx="393.1" cy="84.2" r="4.5" fill="var(--svg-blue)" stroke="var(--svg-bg)" stroke-width="2"/><line x1="475" y1="150" x2="407" y2="70" stroke="var(--svg-blue)" stroke-width="1" stroke-opacity="0.55"/><circle cx="407" cy="70" r="4.5" fill="var(--svg-blue)" stroke="var(--svg-bg)" stroke-width="2"/><line x1="475" y1="150" x2="420.1" y2="60.5" stroke="var(--svg-blue)" stroke-width="1" stroke-opacity="0.55"/><circle cx="420.1" cy="60.5" r="4.5" fill="var(--svg-blue)" stroke="var(--svg-bg)" stroke-width="2"/><line x1="475" y1="150" x2="432.3" y2="54.1" stroke="var(--svg-blue)" stroke-width="1" stroke-opacity="0.55"/><circle cx="432.3" cy="54.1" r="4.5" fill="var(--svg-blue)" stroke="var(--svg-bg)" stroke-width="2"/><line x1="475" y1="150" x2="443.7" y2="49.8" stroke="var(--svg-blue)" stroke-width="1" stroke-opacity="0.55"/><circle cx="443.7" cy="49.8" r="4.5" fill="var(--svg-blue)" stroke="var(--svg-bg)" stroke-width="2"/><line x1="475" y1="150" x2="454.5" y2="47" stroke="var(--svg-blue)" stroke-width="1" stroke-opacity="0.55"/><circle cx="454.5" cy="47" r="4.5" fill="var(--svg-blue)" stroke="var(--svg-bg)" stroke-width="2"/><line x1="475" y1="150" x2="464.9" y2="45.5" stroke="var(--svg-blue)" stroke-width="1" stroke-opacity="0.55"/><circle cx="464.9" cy="45.5" r="4.5" fill="var(--svg-blue)" stroke="var(--svg-bg)" stroke-width="2"/><path d="M468 158 L475 140 L482 158 Z" fill="var(--svg-text)"/><text x="475" y="295" text-anchor="middle" class="t-strong">À 22,8 m/s (β = 0,76)</text><text x="475" y="315" text-anchor="middle" class="t-small">13 points sur 24 dans l’écran</text><text x="320" y="24" text-anchor="middle" class="t-small">avant ↑ · zone claire : ce que montre l’écran (90°)</text></svg>
+        </figure>
+        <figure class="large">
+          <div class="paire">
+            <figure>
+              <img src="/theorie/img/v076.webp" width="1600" height="738" loading="lazy" decoding="async" alt="Vision relativiste à 22,8 m/s : l’avenue paraît lointaine au centre, les façades proches se courbent en arcs bleutés et lumineux sur les côtés, le ciel au-dessus devient bleu nuit.">
+              <figcaption><span class="etiquette rel">Relativiste</span> ce que tu vois</figcaption>
+            </figure>
+            <figure>
+              <img src="/theorie/img/v076-classique.webp" width="1600" height="738" loading="lazy" decoding="async" alt="Même instant en vision classique : l’avenue droite avec ses façades jaunes, vertes, turquoise et bleues, sous un ciel bleu pâle.">
+              <figcaption><span class="etiquette">Classique</span> la même ville, sans effets</figcaption>
+            </figure>
+          </div>
+          <figcaption>
+            <strong>À 22,8 m/s (76 % de c).</strong> En vision classique, la ville telle qu’elle est ; en vision
+            relativiste, ce que tu vois au même instant. Les façades qui longent la route, presque à côté de toi, sont ramenées devant
+            toi en grandes courbes. L’avenue semble s’éloigner. Facteur de temps γ = 1,54 ; droit devant, les
+            fréquences de la lumière sont multipliées par D = 2,72.
+          </figcaption>
+        </figure>
+
+        <h3 id="d-doppler">5. Bleu devant, rouge derrière</h3>
+        <p>
+          Tu connais l’effet Doppler avec le son : la sirène d’une ambulance est plus aiguë quand elle vient vers
+          toi, plus grave quand elle s’éloigne. Avec la lumière, c’est la couleur qui change. En fonçant vers une
+          façade, tu reçois ses ondes plus serrées : elle paraît plus bleue. Derrière toi, plus rouge.
+        </p>
+        <p>
+          On note ce décalage D. Avec D = 2, les ondes arrivent deux fois plus serrées. Droit devant, D vaut 1,7
+          à 15 m/s, 2,7 à 22,8 m/s et 4,4 à 27 m/s. Droit derrière, c’est l’inverse : 0,58, 0,37 puis 0,23.
+        </p>
+        <figure class="large">
+          <div class="paire">
+            <figure>
+              <img src="/theorie/img/v050.webp" width="1600" height="738" loading="lazy" decoding="async" alt="Vision relativiste à 15 m/s : le centre de l’image, au bout de l’avenue, est bleuté ; les façades proches, sur les bords, prennent des teintes violettes, brunes et vert olive.">
+              <figcaption><span class="etiquette rel">Relativiste</span> 15 m/s</figcaption>
+            </figure>
+            <figure>
+              <img src="/theorie/img/v050-classique.webp" width="1600" height="738" loading="lazy" decoding="async" alt="Même instant en vision classique : façades vertes, turquoise, bleues et violettes de part et d’autre de l’avenue.">
+              <figcaption><span class="etiquette">Classique</span> 15 m/s</figcaption>
+            </figure>
+          </div>
+          <figcaption>
+            <strong>À 15 m/s (50 % de c).</strong> Le bout de l’avenue, droit devant (D = 1,73), est bleui. Les
+            façades proches, vues sur le côté, sont moins décalées et changent de teinte autrement. γ = 1,15.
+          </figcaption>
+        </figure>
+        <p>
+          Une couleur décalée ne fait pas que « bleuir ». Une lampe rouge vue de face devient orange, puis jaune,
+          puis verte, puis bleue. Au-delà, sa lumière part dans l’ultraviolet, que tu ne vois pas : la lampe
+          s’éteint à tes yeux.
+        </p>
+        <aside class="jeu">
+          <span class="encadre-titre">Dans le jeu</span>
+          <p>
+            Niveau 3, « La Porte Verte » : une porte s’ouvre quand tu vois sa lampe en vert. Sa lampe est rouge
+            (640 nm). Il faut rouler vers elle entre 3,9 et 6,7 m/s environ : plus vite, elle bleuit, puis noircit.
+          </p>
+        </aside>
+
+        <h3 id="d-invisible">6. Des couleurs invisibles apparaissent</h3>
+        <p>
+          Ton œil ne voit qu’une tranche de la lumière, du violet (vers 360 nm) au rouge profond (vers 830 nm).
+          Au-delà du rouge, il y a l’<strong>infrarouge</strong> : la chaleur, la lumière des télécommandes. En deçà
+          du violet, l’<strong>ultraviolet</strong>, celui des coups de soleil. Les façades en renvoient aussi,
+          mais tu ne les vois pas.
+        </p>
+        <p>
+          Quand tu fonces, l’infrarouge des objets de devant est décalé jusque dans le visible : tu le vois ! Et
+          leur lumière visible, décalée elle aussi, part dans l’ultraviolet. Derrière toi, c’est l’inverse : tu
+          vois leur ultraviolet.
+        </p>
+        <figure class="large">
+          <svg class="schema" viewBox="0 0 660 302" role="img" aria-labelledby="svg-spectre-t svg-spectre-d" xmlns="http://www.w3.org/2000/svg"><title id="svg-spectre-t">Effet Doppler : la fenêtre de l’œil glisse sur le spectre</title><desc id="svg-spectre-d">Ton œil voit de 360 à 830 nanomètres. Avec un facteur Doppler D, il reçoit la lumière émise entre 360 fois D et 830 fois D. Derrière toi (D = 0,5), cette fenêtre tombe dans l’ultraviolet émis, entre 180 et 415 nanomètres ; à l’arrêt (D = 1), dans le visible ; devant toi (D = 2), dans l’infrarouge émis, entre 720 et 1660 nanomètres.</desc><text x="40" y="22" class="t-small">lumière émise par la façade (longueur d’onde en nm, échelle log.)</text><rect x="40" y="34" width="181.1" height="30" fill="var(--band-uv)"/><text x="131.6" y="54" text-anchor="middle" class="t-band">UV</text><rect x="223.1" y="34" width="62.5" height="30" fill="var(--band-b)"/><text x="255.4" y="54" text-anchor="middle" class="t-band">bleu</text><rect x="287.6" y="34" width="36.9" height="30" fill="var(--band-g)"/><text x="307.1" y="54" text-anchor="middle" class="t-band">vert</text><rect x="326.5" y="34" width="69.4" height="30" fill="var(--band-r)"/><text x="362.2" y="54" text-anchor="middle" class="t-band">rouge</text><rect x="397.9" y="34" width="220.1" height="30" fill="var(--band-ir)"/><text x="508.9" y="54" text-anchor="middle" class="t-band">infrarouge</text><line x1="100.2" y1="66" x2="100.2" y2="72" stroke="var(--svg-axis)"/><text x="100.2" y="86" text-anchor="middle" class="t-tick">200</text><line x1="223.1" y1="66" x2="223.1" y2="72" stroke="var(--svg-axis)"/><text x="223.1" y="86" text-anchor="middle" class="t-tick">360</text><line x1="287.6" y1="66" x2="287.6" y2="72" stroke="var(--svg-axis)"/><text x="287.6" y="86" text-anchor="middle" class="t-tick">490</text><line x1="326.5" y1="66" x2="326.5" y2="72" stroke="var(--svg-axis)"/><text x="326.5" y="86" text-anchor="middle" class="t-tick">590</text><line x1="397.9" y1="66" x2="397.9" y2="72" stroke="var(--svg-axis)"/><text x="397.9" y="86" text-anchor="middle" class="t-tick">830</text><line x1="475" y1="66" x2="475" y2="72" stroke="var(--svg-axis)"/><text x="475" y="86" text-anchor="middle" class="t-tick">1200</text><line x1="581.9" y1="66" x2="581.9" y2="72" stroke="var(--svg-axis)"/><text x="581.9" y="86" text-anchor="middle" class="t-tick">2000</text><text x="40" y="122"><tspan class="t-strong">derrière toi, D = 0,5</tspan><tspan class="t-small"> : tu vois l’UV, tout est sombre et rougi</tspan></text><line x1="78.1" y1="138" x2="252.9" y2="138" stroke="var(--svg-red)" stroke-width="7" stroke-linecap="round"/><text x="40" y="174"><tspan class="t-strong">à l’arrêt, D = 1</tspan><tspan class="t-small"> : le visible, couleurs normales</tspan></text><line x1="223.1" y1="190" x2="397.9" y2="190" stroke="var(--svg-text)" stroke-width="7" stroke-linecap="round"/><text x="40" y="226"><tspan class="t-strong">devant toi, D = 2</tspan><tspan class="t-small"> : l’infrarouge, bleu pâle</tspan></text><line x1="368.1" y1="242" x2="542.9" y2="242" stroke="var(--svg-blue)" stroke-width="7" stroke-linecap="round"/><text x="40" y="290" class="t-small">Barres : ce que ton œil (360–830 nm) reçoit, émis de 360·D à 830·D nm.</text></svg>
+        </figure>
+        <figure class="large">
+          <div class="paire">
+            <figure>
+              <img src="/theorie/img/v050-ir.webp" width="1600" height="738" loading="lazy" decoding="async" alt="Vision relativiste à 15 m/s : à gauche de l’avenue, un panneau vertical vert-jaune vif se détache devant une façade bleutée.">
+              <figcaption><span class="etiquette rel">Relativiste</span> le panneau brille</figcaption>
+            </figure>
+            <figure>
+              <img src="/theorie/img/v050-ir-classique.webp" width="1600" height="738" loading="lazy" decoding="async" alt="Même instant en vision classique : le même panneau est un rectangle noir devant une façade violette.">
+              <figcaption><span class="etiquette">Classique</span> le panneau est noir</figcaption>
+            </figure>
+          </div>
+          <figcaption>
+            <strong>Le panneau infrarouge de l’avenue, à une cinquantaine de mètres, à 15 m/s.</strong> Il ne
+            renvoie que de l’infrarouge : à l’arrêt ou en vision classique, il est noir. En roulant vers lui
+            (D ≈ 1,7), son infrarouge arrive au-dessus de 480 nm, dans le vert, le jaune et le rouge : il devient
+            vert-jaune.
+          </figcaption>
+        </figure>
+        <p>
+          Au-delà de D ≈ 2,3 (69 % de c, droit devant), tu ne vois plus du tout la lumière visible des façades
+          qui sont devant toi : seulement leur infrarouge. Voilà pourquoi la ville, devant toi, devient d’un bleu
+          pâle presque uniforme à grande vitesse : ce sont ses reflets infrarouges, décalés jusqu’au bleu.
+        </p>
+
+        <h3 id="d-projecteur">7. L’effet projecteur</h3>
+        <p>
+          En plus de changer de couleur, la lumière de devant devient beaucoup plus intense, et celle de
+          derrière s’éteint presque. Tu fonces dans le flot de lumière : tu reçois plus de lumière par seconde,
+          chaque grain de lumière porte plus d’énergie, et l’aberration concentre devant toi la lumière de tout
+          un côté. À 22,8 m/s, une façade droit devant t’envoie environ 55 fois plus de lumière qu’à l’arrêt.
+        </p>
+        <p>
+          Ton œil s’adapte, comme en sortant d’un tunnel : le jeu baisse l’exposition pour qu’une façade moyenne,
+          vue de face, garde sa luminosité. Par contraste, les côtés et l’arrière paraissent sombres.
+        </p>
+        <figure class="large">
+          <div class="paire">
+            <figure>
+              <img src="/theorie/img/v090.webp" width="1600" height="738" loading="lazy" decoding="async" alt="Vision relativiste à 27 m/s : toute la ville tient dans un cercle lumineux au centre, les bâtiments au bout de l’avenue sont gris-bleu clair, le bord de l’image est sombre avec des franges violettes et bleu-vert, deux lampadaires orangés en haut.">
+              <figcaption><span class="etiquette rel">Relativiste</span> 27 m/s</figcaption>
+            </figure>
+            <figure>
+              <img src="/theorie/img/v090-classique.webp" width="1600" height="738" loading="lazy" decoding="async" alt="Même instant en vision classique : façades turquoise, bleues, violettes, rouges et jaunes le long de l’avenue.">
+              <figcaption><span class="etiquette">Classique</span> 27 m/s</figcaption>
+            </figure>
+          </div>
+          <figcaption>
+            <strong>À 27 m/s (90 % de c).</strong> Tout ce qui est à moins de 122° de l’avant tient dans l’écran,
+            qui n’en montre que 90°. Le centre est éclatant, les bords s’assombrissent. Droit devant, D = 4,35 ;
+            γ = 2,29. En haut à gauche et à droite : deux lampadaires qui sont en réalité presque à côté de toi.
+          </figcaption>
+        </figure>
+
+        <h3 id="d-classique">8. La vision classique, pour comparer</h3>
+        <p>
+          Maintiens la touche <kbd>C</kbd> (ou <kbd>Maj</kbd>, ou le bouton 👁 sur un écran tactile) : le jeu
+          montre la même ville, au même instant de l’horloge de la ville, sans aucun effet. Pas de retard de la
+          lumière, pas d’aberration, pas de Doppler, pas de projecteur : ce qu’on verrait si la lumière était
+          infiniment rapide. Les horloges, elles, continuent de suivre la relativité. La vision classique ne
+          change que ce que tu vois.
+        </p>
+        <figure class="large">
+          <div class="paire">
+            <figure>
+              <img src="/theorie/img/v095.webp" width="1600" height="738" loading="lazy" decoding="async" alt="Vision relativiste à 28,5 m/s : un tunnel lumineux bleu pâle au centre, l’avenue minuscule tout au fond, le reste de l’image gris-bleu sombre.">
+              <figcaption><span class="etiquette rel">Relativiste</span> 28,5 m/s</figcaption>
+            </figure>
+            <figure>
+              <img src="/theorie/img/v095-classique.webp" width="1600" height="738" loading="lazy" decoding="async" alt="Même instant en vision classique : l’avenue droite entre de hautes façades rouges, violettes, orange et jaunes.">
+              <figcaption><span class="etiquette">Classique</span> 28,5 m/s</figcaption>
+            </figure>
+          </div>
+          <figcaption>
+            <strong>À 28,5 m/s (95 % de c).</strong> En vision relativiste, la ville entière se ramasse dans un
+            tunnel lumineux au centre de l’écran ; en vision classique, l’avenue est toute droite. Droit devant,
+            D = 6,2 ; γ = 3,2.
+          </figcaption>
+        </figure>
+
+        <h3 id="d-retenir">9. Ce qu’il faut retenir</h3>
+        <ul>
+          <li>Rien ne dépasse c. Plus tu t’en approches, plus il est difficile d’accélérer.</li>
+          <li>Quand tu vas vite, ta montre avance moins vite que l’horloge de la ville.</li>
+          <li>Tu vois toujours le passé, avec un retard égal à la distance divisée par c.</li>
+          <li>À grande vitesse, le décor se resserre vers l’avant, se teinte de bleu devant et de rouge derrière.</li>
+          <li>L’infrarouge et l’ultraviolet, invisibles à l’arrêt, deviennent visibles.</li>
+          <li>Devant, tout devient plus lumineux ; derrière, plus sombre.</li>
+        </ul>
+        <p class="niveau-suivant">
+          <a class="bouton plein" href="#intermediaire" data-level-tab="intermediaire">Passer au niveau intermédiaire</a>
+          <a class="bouton" href="../">Essayer dans le jeu</a>
+        </p>
+      </section>
+
+      <!-- ================================================================== -->
+      <section id="intermediaire" class="niveau" data-level="intermediaire" aria-labelledby="intermediaire-titre">
+        <h2 id="intermediaire-titre" class="titre-niveau"><span class="badge">Niveau 2</span>Intermédiaire : les équations du jeu</h2>
+        <p>
+          Les mêmes effets, avec leurs équations, celles que le jeu calcule à chaque image. Notations :
+          c est la vitesse de la lumière (30 m/s par défaut, réglable de 10 à 100 m/s), v ta vitesse dans la
+          ville et β = v/c ; a = c/10 est la poussée du moteur (3 m/s² à c = 30) ; τ (tau) est le temps de ta
+          montre, t celui de la ville.
+        </p>
+        <aside class="note">
+          <span class="encadre-titre">Changer c</span>
+          <p>
+            Les exemples sont calculés à c = 30 m/s, a = 3 m/s². Le jeu garde c/a = 10 s pour tout réglage : à
+            c = 100 m/s (a = 10 m/s²), les vitesses et les distances sont multipliées par 10/3, les temps ne
+            changent pas, et les couleurs ne dépendent que de β. L’unité de longueur naturelle est
+            L = c²/a = 10·c mètres : 300 m à c = 30, 1 000 m à c = 100.
+          </p>
+        </aside>
+
+        <nav class="sommaire" aria-labelledby="intermediaire-sommaire">
+          <h3 id="intermediaire-sommaire">Sommaire</h3>
+          <ol>
+            <li><a href="#i-gamma">Le facteur de Lorentz γ</a></li>
+            <li><a href="#i-dilatation">Dilatation du temps</a></li>
+            <li><a href="#i-acceleration">Accélérer à poussée constante</a></li>
+            <li><a href="#i-addition">Additionner des vitesses</a></li>
+            <li><a href="#i-retard">Le temps retardé</a></li>
+            <li><a href="#i-aberration">L’aberration</a></li>
+            <li><a href="#i-doppler">Le facteur Doppler D</a></li>
+            <li><a href="#i-couleurs">Couleurs : λ divisée par D</a></li>
+            <li><a href="#i-projecteur">L’effet projecteur en D⁴</a></li>
+            <li><a href="#i-rindler">L’horizon de Rindler</a></li>
+            <li><a href="#i-tableau">Récapitulatif chiffré</a></li>
+          </ol>
+        </nav>
+
+        <h3 id="i-gamma">1. Le facteur de Lorentz γ</h3>
+        <p>Tout part d’un nombre, le facteur de Lorentz :</p>
+        <div class="eq eq-multi"><math display="block" alttext="gamma égale 1 sur racine de 1 moins bêta au carré, avec bêta égal v sur c"><mrow><mi>γ</mi><mo>=</mo><mfrac><mrow><mn>1</mn></mrow><mrow><msqrt><mrow><mn>1</mn><mo>−</mo><msup><mrow><mi>β</mi></mrow><mrow><mn>2</mn></mrow></msup></mrow></msqrt></mrow></mfrac></mrow></math><math display="block"><mrow><mi>β</mi><mo>=</mo><mfrac><mrow><mi>v</mi></mrow><mrow><mi>c</mi></mrow></mfrac></mrow></math></div>
+        <p>
+          γ vaut 1 à l’arrêt, 1,15 à β = 0,5 (15 m/s), 1,54 à β = 0,76 (22,8 m/s), 2,29 à β = 0,9 (27 m/s) et
+          10 au plafond du jeu, β = 0,995. Il est commode d’introduire aussi la <strong>rapidité</strong> φ :
+        </p>
+        <div class="eq eq-multi"><math display="block" alttext="bêta égale tangente hyperbolique de phi, gamma égale cosinus hyperbolique de phi, gamma bêta égale sinus hyperbolique de phi"><mrow><mi>β</mi><mo>=</mo><mspace width="0.17em"/><mi>tanh</mi><mo>&#x2061;</mo><mspace width="0.17em"/><mi>φ</mi></mrow></math><math display="block"><mrow><mi>γ</mi><mo>=</mo><mspace width="0.17em"/><mi>cosh</mi><mo>&#x2061;</mo><mspace width="0.17em"/><mi>φ</mi></mrow></math><math display="block"><mrow><mi>γ</mi><mi>β</mi><mo>=</mo><mspace width="0.17em"/><mi>sinh</mi><mo>&#x2061;</mo><mspace width="0.17em"/><mi>φ</mi></mrow></math></div>
+        <p>
+          La rapidité, contrairement à la vitesse, n’a pas de plafond, et en ligne droite elle s’additionne
+          simplement. Le jeu la limite à φ = 3.
+        </p>
+
+        <h3 id="i-dilatation">2. Dilatation du temps</h3>
+        <p>
+          Pendant que ta montre avance de Δτ, les horloges de la ville que tu croises (synchronisées entre elles
+          dans la ville) avancent de :
+        </p>
+        <div class="eq"><math display="block" alttext="delta t égale gamma fois delta tau"><mrow><mi mathvariant="normal">Δ</mi><mi>t</mi><mo>=</mo><mi>γ</mi><mi mathvariant="normal">Δ</mi><mi>τ</mi></mrow></math></div>
+        <p>
+          C’est l’écart affiché par le jeu entre « Ta montre » et « Horloge de la ville ». Ton temps, le temps
+          propre, est la somme de ces petits morceaux le long de ton trajet :
+        </p>
+        <div class="eq"><math display="block" alttext="tau égale l’intégrale de d t sur gamma"><mrow><mi>τ</mi><mo>=</mo><mo>∫</mo><mfrac><mrow><mi mathvariant="normal">d</mi><mi>t</mi></mrow><mrow><mi>γ</mi></mrow></mfrac><mo>=</mo><mo>∫</mo><msqrt><mrow><mn>1</mn><mo>−</mo><mfrac><mrow><msup><mrow><mi>v</mi></mrow><mrow><mn>2</mn></mrow></msup></mrow><mrow><msup><mrow><mi>c</mi></mrow><mrow><mn>2</mn></mrow></msup></mrow></mfrac></mrow></msqrt><mi mathvariant="normal">d</mi><mi>t</mi></mrow></math></div>
+        <div class="exemple">
+          <span class="encadre-titre">Exemple</span>
+          <p>
+            À 27 m/s (γ = 2,29), 10 s de montre font 22,9 s de ville. Jumeaux : aller-retour de L = 300 m, en
+            poussant jusqu’à mi-chemin puis en freinant, dans chaque sens. La rapidité culmine à arcosh(3/2) et :
+          </p>
+          <div class="eq eq-multi"><math display="block" alttext="tau égale 4 c sur a argument cosinus hyperbolique de trois demis, environ 38,50 secondes ; t égale 4 c sur a racine de neuf quarts moins un, environ 44,72 secondes"><mrow><mi>τ</mi><mo>=</mo><mn>4</mn><mfrac><mrow><mi>c</mi></mrow><mrow><mi>a</mi></mrow></mfrac><mi>arcosh</mi><mo>&#x2061;</mo><mspace width="0.17em"/><mrow><mo>(</mo><mrow><mfrac><mrow><mn>3</mn></mrow><mrow><mn>2</mn></mrow></mfrac></mrow><mo>)</mo></mrow><mo>≈</mo><mn>38,50</mn><mspace width="0.25em"/><mtext>s</mtext></mrow></math><math display="block"><mrow><mi>t</mi><mo>=</mo><mn>4</mn><mfrac><mrow><mi>c</mi></mrow><mrow><mi>a</mi></mrow></mfrac><msqrt><mrow><msup><mrow><mrow><mo>(</mo><mrow><mfrac><mrow><mn>3</mn></mrow><mrow><mn>2</mn></mrow></mfrac></mrow><mo>)</mo></mrow></mrow><mrow><mn>2</mn></mrow></msup><mo>−</mo><mn>1</mn></mrow></msqrt><mo>≈</mo><mn>44,72</mn><mspace width="0.25em"/><mtext>s</mtext></mrow></math></div>
+          <p>soit 6,2 s d’écart au retour, pour tout c (le rythme du jeu, c/a = 10 s, ne dépend pas de c).</p>
+        </div>
+
+        <h3 id="i-acceleration">3. Accélérer à poussée constante</h3>
+        <p>
+          Le moteur fournit une accélération propre a constante : celle que tu ressens à bord. Ce n’est pas
+          dv/dt dans la ville. Ce qui augmente régulièrement, c’est la rapidité : φ = aτ/c. D’où, depuis l’arrêt :
+        </p>
+<div class="eq eq-pile"><math display="block" alttext="v égale c tangente hyperbolique de a tau sur c"><mrow><mi>v</mi><mo>=</mo><mi>c</mi><mspace width="0.17em"/><mi>tanh</mi><mo>&#x2061;</mo><mspace width="0.17em"/><mrow><mo>(</mo><mrow><mfrac><mrow><mi>a</mi><mi>τ</mi></mrow><mrow><mi>c</mi></mrow></mfrac></mrow><mo>)</mo></mrow></mrow></math><math display="block" alttext="t égale c sur a sinus hyperbolique de a tau sur c"><mrow><mi>t</mi><mo>=</mo><mfrac><mrow><mi>c</mi></mrow><mrow><mi>a</mi></mrow></mfrac><mi>sinh</mi><mo>&#x2061;</mo><mspace width="0.17em"/><mrow><mo>(</mo><mrow><mfrac><mrow><mi>a</mi><mi>τ</mi></mrow><mrow><mi>c</mi></mrow></mfrac></mrow><mo>)</mo></mrow></mrow></math><math display="block" alttext="x égale c carré sur a fois, cosinus hyperbolique de a tau sur c, moins 1"><mrow><mi>x</mi><mo>=</mo><mfrac><mrow><msup><mrow><mi>c</mi></mrow><mrow><mn>2</mn></mrow></msup></mrow><mrow><mi>a</mi></mrow></mfrac><mrow><mo>(</mo><mrow><mi>cosh</mi><mo>&#x2061;</mo><mspace width="0.17em"/><mrow><mo>(</mo><mrow><mfrac><mrow><mi>a</mi><mi>τ</mi></mrow><mrow><mi>c</mi></mrow></mfrac></mrow><mo>)</mo></mrow><mo>−</mo><mn>1</mn></mrow><mo>)</mo></mrow></mrow></math></div>
+        <figure class="large">
+          <svg class="schema" viewBox="0 0 640 330" role="img" aria-labelledby="svg-vitesse-t svg-vitesse-d" xmlns="http://www.w3.org/2000/svg"><title id="svg-vitesse-t">Vitesse sous poussée constante</title><desc id="svg-vitesse-d">Courbe de la vitesse en fonction du temps propre, pour c = 30 m/s et a = 3 m/s². En pointillés, la droite de Newton v = a·τ dépasse 30 m/s après 10 secondes. La courbe relativiste, 30·tanh(τ/10), passe par 15 m/s à 5,5 s, 22,8 m/s à 10 s, 27 m/s à 14,7 s, et s’approche de 30 m/s sans jamais l’atteindre.</desc><line x1="52" y1="278" x2="616" y2="278" stroke="var(--svg-grid)" stroke-width="1"/><text x="44" y="282" text-anchor="end" class="t-tick">0</text><line x1="52" y1="211.9" x2="616" y2="211.9" stroke="var(--svg-grid)" stroke-width="1"/><text x="44" y="215.9" text-anchor="end" class="t-tick">10</text><line x1="52" y1="145.8" x2="616" y2="145.8" stroke="var(--svg-grid)" stroke-width="1"/><text x="44" y="149.8" text-anchor="end" class="t-tick">20</text><line x1="52" y1="79.7" x2="616" y2="79.7" stroke="var(--svg-grid)" stroke-width="1"/><text x="44" y="83.7" text-anchor="end" class="t-tick">30</text><text x="52" y="296" text-anchor="middle" class="t-tick">0</text><text x="164.8" y="296" text-anchor="middle" class="t-tick">5</text><text x="277.6" y="296" text-anchor="middle" class="t-tick">10</text><text x="390.4" y="296" text-anchor="middle" class="t-tick">15</text><text x="503.2" y="296" text-anchor="middle" class="t-tick">20</text><text x="616" y="296" text-anchor="middle" class="t-tick">25</text><line x1="52" y1="278" x2="616" y2="278" stroke="var(--svg-axis)" stroke-width="1.5"/><line x1="52" y1="34" x2="52" y2="278" stroke="var(--svg-axis)" stroke-width="1.5"/><text x="616" y="314" text-anchor="end" class="t-small">τ, temps sur ta montre (s)</text><text x="52" y="26" text-anchor="start" class="t-small">vitesse (m/s)</text><line x1="52" y1="79.7" x2="616" y2="79.7" stroke="var(--svg-red)" stroke-width="2" stroke-dasharray="6 4"/><text x="612" y="71.7" text-anchor="end" class="t-small">c = 30 m/s, jamais atteinte</text><path d="M52 278L53.4 276.8L54.7 275.6L56.1 274.4L57.4 273.2L58.8 272.1L60.1 270.9L61.5 269.7L62.8 268.5L64.2 267.3L65.5 266.1L66.9 264.9L68.2 263.7L69.6 262.5L71 261.3L72.3 260.2L73.7 259L75 257.8L76.4 256.6L77.7 255.4L79.1 254.2L80.4 253L81.8 251.8L83.1 250.6L84.5 249.4L85.8 248.3L87.2 247.1L88.5 245.9L89.9 244.7L91.3 243.5L92.6 242.3L94 241.1L95.3 239.9L96.7 238.7L98 237.5L99.4 236.4L100.7 235.2L102.1 234L103.4 232.8L104.8 231.6L106.1 230.4L107.5 229.2L108.9 228L110.2 226.8L111.6 225.6L112.9 224.5L114.3 223.3L115.6 222.1L117 220.9L118.3 219.7L119.7 218.5L121 217.3L122.4 216.1L123.7 214.9L125.1 213.7L126.4 212.6L127.8 211.4L129.2 210.2L130.5 209L131.9 207.8L133.2 206.6L134.6 205.4L135.9 204.2L137.3 203L138.6 201.8L140 200.7L141.3 199.5L142.7 198.3L144 197.1L145.4 195.9L146.8 194.7L148.1 193.5L149.5 192.3L150.8 191.1L152.2 189.9L153.5 188.8L154.9 187.6L156.2 186.4L157.6 185.2L158.9 184L160.3 182.8L161.6 181.6L163 180.4L164.3 179.2L165.7 178L167.1 176.9L168.4 175.7L169.8 174.5L171.1 173.3L172.5 172.1L173.8 170.9L175.2 169.7L176.5 168.5L177.9 167.3L179.2 166.1L180.6 165L181.9 163.8L183.3 162.6L184.7 161.4L186 160.2L187.4 159L188.7 157.8L190.1 156.6L191.4 155.4L192.8 154.2L194.1 153.1L195.5 151.9L196.8 150.7L198.2 149.5L199.5 148.3L200.9 147.1L202.2 145.9L203.6 144.7L205 143.5L206.3 142.3L207.7 141.1L209 140L210.4 138.8L211.7 137.6L213.1 136.4L214.4 135.2L215.8 134L217.1 132.8L218.5 131.6L219.8 130.4L221.2 129.3L222.6 128.1L223.9 126.9L225.3 125.7L226.6 124.5L228 123.3L229.3 122.1L230.7 120.9L232 119.7L233.4 118.5L234.7 117.4L236.1 116.2L237.4 115L238.8 113.8L240.2 112.6L241.5 111.4L242.9 110.2L244.2 109L245.6 107.8L246.9 106.6L248.3 105.5L249.6 104.3L251 103.1L252.3 101.9L253.7 100.7L255 99.5L256.4 98.3L257.7 97.1L259.1 95.9L260.5 94.7L261.8 93.5L263.2 92.4L264.5 91.2L265.9 90L267.2 88.8L268.6 87.6L269.9 86.4L271.3 85.2L272.6 84L274 82.8L275.3 81.6L276.7 80.5L278.1 79.3L279.4 78.1L280.8 76.9L282.1 75.7L283.5 74.5L284.8 73.3L286.2 72.1L287.5 70.9L288.9 69.8L290.2 68.6L291.6 67.4L292.9 66.2L294.3 65L295.6 63.8L297 62.6L298.4 61.4L299.7 60.2L301.1 59L302.4 57.9L303.8 56.7L305.1 55.5L306.5 54.3L307.8 53.1L309.2 51.9L310.5 50.7L311.9 49.5L313.2 48.3L314.6 47.1L316 46L317.3 44.8L318.7 43.6L320 42.4L321.4 41.2L322.7 40" fill="none" stroke="var(--svg-muted)" stroke-width="2" stroke-dasharray="2 4"/><text x="291.1" y="59.8" text-anchor="end" class="t-small">Newton : v = a·τ</text><path d="M52 278L54.8 275.5L57.6 273L60.5 270.6L63.3 268.1L66.1 265.6L68.9 263.2L71.7 260.7L74.6 258.2L77.4 255.8L80.2 253.3L83 250.9L85.8 248.5L88.7 246.1L91.5 243.6L94.3 241.2L97.1 238.9L99.9 236.5L102.8 234.1L105.6 231.8L108.4 229.4L111.2 227.1L114 224.8L116.9 222.5L119.7 220.2L122.5 218L125.3 215.7L128.1 213.5L131 211.3L133.8 209.1L136.6 206.9L139.4 204.8L142.2 202.6L145.1 200.5L147.9 198.4L150.7 196.4L153.5 194.3L156.3 192.3L159.2 190.3L162 188.3L164.8 186.3L167.6 184.4L170.4 182.5L173.3 180.6L176.1 178.7L178.9 176.9L181.7 175.1L184.5 173.3L187.4 171.5L190.2 169.7L193 168L195.8 166.3L198.6 164.6L201.5 163L204.3 161.3L207.1 159.7L209.9 158.1L212.7 156.6L215.6 155L218.4 153.5L221.2 152L224 150.6L226.8 149.1L229.7 147.7L232.5 146.3L235.3 144.9L238.1 143.6L240.9 142.2L243.8 140.9L246.6 139.7L249.4 138.4L252.2 137.2L255 135.9L257.9 134.7L260.7 133.6L263.5 132.4L266.3 131.3L269.1 130.2L272 129.1L274.8 128L277.6 127L280.4 125.9L283.2 124.9L286.1 123.9L288.9 122.9L291.7 122L294.5 121.1L297.3 120.1L300.2 119.2L303 118.4L305.8 117.5L308.6 116.6L311.4 115.8L314.3 115L317.1 114.2L319.9 113.4L322.7 112.7L325.5 111.9L328.4 111.2L331.2 110.5L334 109.8L336.8 109.1L339.6 108.4L342.5 107.7L345.3 107.1L348.1 106.5L350.9 105.8L353.7 105.2L356.6 104.6L359.4 104.1L362.2 103.5L365 102.9L367.8 102.4L370.7 101.9L373.5 101.4L376.3 100.8L379.1 100.4L381.9 99.9L384.8 99.4L387.6 98.9L390.4 98.5L393.2 98L396 97.6L398.9 97.2L401.7 96.8L404.5 96.4L407.3 96L410.1 95.6L413 95.2L415.8 94.8L418.6 94.5L421.4 94.1L424.2 93.8L427.1 93.4L429.9 93.1L432.7 92.8L435.5 92.5L438.3 92.2L441.2 91.9L444 91.6L446.8 91.3L449.6 91L452.4 90.7L455.3 90.5L458.1 90.2L460.9 90L463.7 89.7L466.5 89.5L469.4 89.2L472.2 89L475 88.8L477.8 88.6L480.6 88.3L483.5 88.1L486.3 87.9L489.1 87.7L491.9 87.5L494.7 87.3L497.6 87.2L500.4 87L503.2 86.8L506 86.6L508.8 86.5L511.7 86.3L514.5 86.1L517.3 86L520.1 85.8L522.9 85.7L525.8 85.5L528.6 85.4L531.4 85.2L534.2 85.1L537 85L539.9 84.8L542.7 84.7L545.5 84.6L548.3 84.5L551.1 84.4L554 84.2L556.8 84.1L559.6 84L562.4 83.9L565.2 83.8L568.1 83.7L570.9 83.6L573.7 83.5L576.5 83.4L579.3 83.3L582.2 83.2L585 83.2L587.8 83.1L590.6 83L593.4 82.9L596.3 82.8L599.1 82.7L601.9 82.7L604.7 82.6L607.5 82.5L610.4 82.5L613.2 82.4L616 82.3" fill="none" stroke="var(--accent)" stroke-width="2.5"/><text x="458.1" y="152.4" class="t-strong">v = c·tanh(aτ/c)</text><circle cx="175.9" cy="178.8" r="5" fill="var(--accent)" stroke="var(--svg-bg)" stroke-width="2"/><text x="183.9" y="196.8" class="t-small">β = 0,5</text><circle cx="277.6" cy="127" r="5" fill="var(--accent)" stroke="var(--svg-bg)" stroke-width="2"/><text x="285.6" y="145" class="t-small">β = 0,76</text><circle cx="384.1" cy="99.5" r="5" fill="var(--accent)" stroke="var(--svg-bg)" stroke-width="2"/><text x="392.1" y="117.5" class="t-small">β = 0,9</text></svg>
+        </figure>
+        <div class="exemple">
+          <span class="encadre-titre">Exemple</span>
+          <p>
+            10 s de poussée depuis l’arrêt : v = 30·tanh 1 = 22,85 m/s, t = 10·sinh 1 = 11,75 s,
+            x = 300·(cosh 1 − 1) = 162,9 m. À c = 100 m/s : 76,16 m/s, 11,75 s et 543,1 m. Le jeu le vérifie à
+            un millionième près, quel que soit le nombre d’images par seconde.
+          </p>
+        </div>
+        <p>Freiner est le même mouvement à l’envers. Distance d’arrêt depuis le facteur γ :</p>
+        <div class="eq"><math display="block" alttext="distance de freinage égale c carré sur a fois gamma moins 1"><mrow><mi mathvariant="normal">d</mi><mo>=</mo><mfrac><mrow><msup><mrow><mi>c</mi></mrow><mrow><mn>2</mn></mrow></msup></mrow><mrow><mi>a</mi></mrow></mfrac><mrow><mo>(</mo><mrow><mi>γ</mi><mo>−</mo><mn>1</mn></mrow><mo>)</mo></mrow></mrow></math></div>
+        <p>
+          Soit 46 m depuis 15 m/s, 163 m depuis 22,8 m/s, 388 m depuis 27 m/s. Le temps naturel du jeu est
+          c/a = 10 s et sa longueur naturelle L = c²/a = 300 m.
+        </p>
+
+        <h3 id="i-addition">4. Additionner des vitesses</h3>
+        <p>Deux vitesses dans la même direction ne s’ajoutent pas, elles se composent :</p>
+        <div class="eq eq-multi"><math display="block" alttext="w égale u plus v sur 1 plus u v sur c carré ; les rapidités s’additionnent"><mrow><mi>w</mi><mo>=</mo><mfrac><mrow><mi>u</mi><mo>+</mo><mi>v</mi></mrow><mrow><mrow><mn>1</mn><mo>+</mo><mfrac><mrow><mi>u</mi><mi>v</mi></mrow><mrow><msup><mrow><mi>c</mi></mrow><mrow><mn>2</mn></mrow></msup></mrow></mfrac></mrow></mrow></mfrac></mrow></math><math display="block"><mrow><msub><mrow><mi>φ</mi></mrow><mrow><mi>w</mi></mrow></msub><mo>=</mo><msub><mrow><mi>φ</mi></mrow><mrow><mi>u</mi></mrow></msub><mo>+</mo><msub><mrow><mi>φ</mi></mrow><mrow><mi>v</mi></mrow></msub></mrow></math></div>
+        <p>
+          Exemple à c = 30 : 20 m/s « plus » 20 m/s font 40/(1 + 400/900) = 27,7 m/s, pas 40. Le résultat reste
+          sous c. À chaque image, le jeu compose ta vitesse avec le petit gain c·tanh(aΔτ/c) ≈ aΔτ, avec la
+          version en deux dimensions de cette loi (niveau expert). C’est pour cela que v = aτ est faux : chaque
+          Δv = aΔτ est mesuré dans ton référentiel du moment, pas dans celui de la ville.
+        </p>
+
+        <h3 id="i-retard">5. Le temps retardé</h3>
+        <p>La lumière qui t’arrive à l’instant t d’un objet immobile situé à la distance d est partie à :</p>
+        <div class="eq"><math display="block" alttext="t e égale t moins d sur c"><mrow><msub><mrow><mi>t</mi></mrow><mrow><mi>e</mi></mrow></msub><mo>=</mo><mi>t</mi><mo>−</mo><mfrac><mrow><mi mathvariant="normal">d</mi></mrow><mrow><mi>c</mi></mrow></mfrac></mrow></math></div>
+        <p>Pour un objet qui bouge, sa position dépend de l’instant d’émission, d’où une équation implicite :</p>
+        <div class="eq"><math display="block" alttext="c fois t moins t e égale la distance entre l’observateur et la position de l’objet à l’instant t e"><mrow><mi>c</mi><mrow><mo>(</mo><mrow><mi>t</mi><mo>−</mo><msub><mrow><mi>t</mi></mrow><mrow><mi>e</mi></mrow></msub></mrow><mo>)</mo></mrow><mo>=</mo><mrow><mo fence="true">|</mo><mrow><msub><mrow><mi mathvariant="normal">𝐱</mi></mrow><mrow><mi>obs</mi></mrow></msub><mo>−</mo><mi mathvariant="normal">𝐩</mi><mrow><mo>(</mo><mrow><msub><mrow><mi>t</mi></mrow><mrow><mi>e</mi></mrow></msub></mrow><mo>)</mo></mrow></mrow><mo fence="true">|</mo></mrow></mrow></math></div>
+        <div class="exemple">
+          <span class="encadre-titre">Exemple</span>
+          <p>
+            Le pont du niveau 4, vu à 163 m (la distance qu’il faut pour s’arrêter depuis 22,8 m/s) : son image a
+            163/30 = 5,4 s de retard. À c = 100, la même situation se joue à 543 m, avec le même retard. En roulant
+            vers une horloge de la ville, tu la vois défiler D fois plus vite que ta montre (× 2,7 à 22,8 m/s), et non γ fois : tu vois ses
+            images de plus en plus récentes.
+          </p>
+        </div>
+
+        <h3 id="i-aberration">6. L’aberration</h3>
+        <p>
+          Soit θ l’angle, mesuré dans la ville, entre ta vitesse et la direction d’un objet, et θ′ l’angle sous
+          lequel tu le vois :
+        </p>
+        <div class="eq"><math display="block" alttext="cosinus thêta prime égale cosinus thêta plus bêta, sur 1 plus bêta cosinus thêta"><mrow><mi>cos</mi><mo>&#x2061;</mo><mspace width="0.17em"/><msup><mrow><mi>θ</mi></mrow><mrow><mo>′</mo></mrow></msup><mo>=</mo><mfrac><mrow><mi>cos</mi><mo>&#x2061;</mo><mspace width="0.17em"/><mi>θ</mi><mo>+</mo><mi>β</mi></mrow><mrow><mn>1</mn><mo>+</mo><mi>β</mi><mspace width="0.17em"/><mi>cos</mi><mo>&#x2061;</mo><mspace width="0.17em"/><mi>θ</mi></mrow></mfrac></mrow></math></div>
+        <p>
+          Un objet exactement sur le côté (θ = 90°) est vu à θ′ tel que cos θ′ = β : 60° à β = 0,5, 40,4° à
+          β = 0,76, 25,8° à β = 0,9. L’écran montre 90° (θ′ ≤ 45°) : à β = 0,76, il contient tout ce qui est à
+          moins de 97° de l’avant ; à β = 0,9, jusqu’à 122°.
+        </p>
+        <figure class="large">
+          <svg class="schema" viewBox="0 0 640 340" role="img" aria-labelledby="svg-aberration-courbe-t svg-aberration-courbe-d" xmlns="http://www.w3.org/2000/svg"><title id="svg-aberration-courbe-t">Angle vu en fonction de l’angle réel</title><desc id="svg-aberration-courbe-d">Pour β = 0, la droite θ′ = θ. Quand β augmente, les courbes passent sous la diagonale : à β = 0,9, un objet situé à 90 degrés sur le côté est vu à 26 degrés devant, et l’écran (θ′ jusqu’à 45 degrés) montre tout ce qui est à moins de 122 degrés de l’avant.</desc><line x1="52" y1="288" x2="616" y2="288" stroke="var(--svg-grid)" stroke-width="1"/><text x="44" y="292" text-anchor="end" class="t-tick">0</text><line x1="52" y1="226" x2="616" y2="226" stroke="var(--svg-grid)" stroke-width="1"/><text x="44" y="230" text-anchor="end" class="t-tick">45</text><line x1="52" y1="164" x2="616" y2="164" stroke="var(--svg-grid)" stroke-width="1"/><text x="44" y="168" text-anchor="end" class="t-tick">90</text><line x1="52" y1="102" x2="616" y2="102" stroke="var(--svg-grid)" stroke-width="1"/><text x="44" y="106" text-anchor="end" class="t-tick">135</text><line x1="52" y1="40" x2="616" y2="40" stroke="var(--svg-grid)" stroke-width="1"/><text x="44" y="44" text-anchor="end" class="t-tick">180</text><text x="52" y="306" text-anchor="middle" class="t-tick">0</text><text x="193" y="306" text-anchor="middle" class="t-tick">45</text><text x="334" y="306" text-anchor="middle" class="t-tick">90</text><text x="475" y="306" text-anchor="middle" class="t-tick">135</text><text x="616" y="306" text-anchor="middle" class="t-tick">180</text><line x1="52" y1="288" x2="616" y2="288" stroke="var(--svg-axis)" stroke-width="1.5"/><line x1="52" y1="34" x2="52" y2="288" stroke="var(--svg-axis)" stroke-width="1.5"/><text x="616" y="324" text-anchor="end" class="t-small">θ, direction dans la ville (degrés depuis l’avant)</text><text x="52" y="26" text-anchor="start" class="t-small">θ′, direction vue (degrés)</text><rect x="52" y="226" width="564" height="62" fill="var(--svg-wedge)"/><text x="609.7" y="277" text-anchor="end" class="t-small">dans l’écran (θ′ ≤ 45°)</text><path d="M52 288L54.8 286.8L57.6 285.5L60.5 284.3L63.3 283L66.1 281.8L68.9 280.6L71.7 279.3L74.6 278.1L77.4 276.8L80.2 275.6L83 274.4L85.8 273.1L88.7 271.9L91.5 270.6L94.3 269.4L97.1 268.2L99.9 266.9L102.8 265.7L105.6 264.4L108.4 263.2L111.2 262L114 260.7L116.9 259.5L119.7 258.2L122.5 257L125.3 255.8L128.1 254.5L131 253.3L133.8 252L136.6 250.8L139.4 249.6L142.2 248.3L145.1 247.1L147.9 245.8L150.7 244.6L153.5 243.4L156.3 242.1L159.2 240.9L162 239.6L164.8 238.4L167.6 237.2L170.4 235.9L173.3 234.7L176.1 233.4L178.9 232.2L181.7 231L184.5 229.7L187.4 228.5L190.2 227.2L193 226L195.8 224.8L198.6 223.5L201.5 222.3L204.3 221L207.1 219.8L209.9 218.6L212.7 217.3L215.6 216.1L218.4 214.8L221.2 213.6L224 212.4L226.8 211.1L229.7 209.9L232.5 208.6L235.3 207.4L238.1 206.2L240.9 204.9L243.8 203.7L246.6 202.4L249.4 201.2L252.2 200L255 198.7L257.9 197.5L260.7 196.2L263.5 195L266.3 193.8L269.1 192.5L272 191.3L274.8 190L277.6 188.8L280.4 187.6L283.2 186.3L286.1 185.1L288.9 183.8L291.7 182.6L294.5 181.4L297.3 180.1L300.2 178.9L303 177.6L305.8 176.4L308.6 175.2L311.4 173.9L314.3 172.7L317.1 171.4L319.9 170.2L322.7 169L325.5 167.7L328.4 166.5L331.2 165.2L334 164L336.8 162.8L339.6 161.5L342.5 160.3L345.3 159L348.1 157.8L350.9 156.6L353.7 155.3L356.6 154.1L359.4 152.8L362.2 151.6L365 150.4L367.8 149.1L370.7 147.9L373.5 146.6L376.3 145.4L379.1 144.2L381.9 142.9L384.8 141.7L387.6 140.4L390.4 139.2L393.2 138L396 136.7L398.9 135.5L401.7 134.2L404.5 133L407.3 131.8L410.1 130.5L413 129.3L415.8 128L418.6 126.8L421.4 125.6L424.2 124.3L427.1 123.1L429.9 121.8L432.7 120.6L435.5 119.4L438.3 118.1L441.2 116.9L444 115.6L446.8 114.4L449.6 113.2L452.4 111.9L455.3 110.7L458.1 109.4L460.9 108.2L463.7 107L466.5 105.7L469.4 104.5L472.2 103.2L475 102L477.8 100.8L480.6 99.5L483.5 98.3L486.3 97L489.1 95.8L491.9 94.6L494.7 93.3L497.6 92.1L500.4 90.8L503.2 89.6L506 88.4L508.8 87.1L511.7 85.9L514.5 84.6L517.3 83.4L520.1 82.2L522.9 80.9L525.8 79.7L528.6 78.4L531.4 77.2L534.2 76L537 74.7L539.9 73.5L542.7 72.2L545.5 71L548.3 69.8L551.1 68.5L554 67.3L556.8 66L559.6 64.8L562.4 63.6L565.2 62.3L568.1 61.1L570.9 59.8L573.7 58.6L576.5 57.4L579.3 56.1L582.2 54.9L585 53.6L587.8 52.4L590.6 51.2L593.4 49.9L596.3 48.7L599.1 47.4L601.9 46.2L604.7 45L607.5 43.7L610.4 42.5L613.2 41.2L616 40" fill="none" stroke="var(--svg-muted)" stroke-width="2"/><line x1="64.5" y1="46" x2="95.9" y2="46" stroke="var(--svg-muted)" stroke-width="3"/><text x="102.1" y="51" class="t-small">β = 0</text><path d="M52 288L54.8 287.3L57.6 286.6L60.5 285.9L63.3 285.1L66.1 284.4L68.9 283.7L71.7 283L74.6 282.3L77.4 281.5L80.2 280.8L83 280.1L85.8 279.4L88.7 278.7L91.5 278L94.3 277.2L97.1 276.5L99.9 275.8L102.8 275.1L105.6 274.3L108.4 273.6L111.2 272.9L114 272.1L116.9 271.4L119.7 270.7L122.5 269.9L125.3 269.2L128.1 268.5L131 267.7L133.8 267L136.6 266.3L139.4 265.5L142.2 264.8L145.1 264L147.9 263.3L150.7 262.5L153.5 261.8L156.3 261L159.2 260.2L162 259.5L164.8 258.7L167.6 258L170.4 257.2L173.3 256.4L176.1 255.6L178.9 254.9L181.7 254.1L184.5 253.3L187.4 252.5L190.2 251.7L193 250.9L195.8 250.1L198.6 249.3L201.5 248.5L204.3 247.7L207.1 246.9L209.9 246.1L212.7 245.3L215.6 244.5L218.4 243.7L221.2 242.8L224 242L226.8 241.2L229.7 240.3L232.5 239.5L235.3 238.6L238.1 237.8L240.9 236.9L243.8 236.1L246.6 235.2L249.4 234.3L252.2 233.4L255 232.6L257.9 231.7L260.7 230.8L263.5 229.9L266.3 229L269.1 228.1L272 227.1L274.8 226.2L277.6 225.3L280.4 224.4L283.2 223.4L286.1 222.5L288.9 221.5L291.7 220.6L294.5 219.6L297.3 218.6L300.2 217.6L303 216.7L305.8 215.7L308.6 214.7L311.4 213.7L314.3 212.7L317.1 211.6L319.9 210.6L322.7 209.6L325.5 208.5L328.4 207.5L331.2 206.4L334 205.3L336.8 204.3L339.6 203.2L342.5 202.1L345.3 201L348.1 199.9L350.9 198.7L353.7 197.6L356.6 196.5L359.4 195.3L362.2 194.2L365 193L367.8 191.8L370.7 190.6L373.5 189.4L376.3 188.2L379.1 187L381.9 185.7L384.8 184.5L387.6 183.3L390.4 182L393.2 180.7L396 179.4L398.9 178.1L401.7 176.8L404.5 175.5L407.3 174.2L410.1 172.8L413 171.5L415.8 170.1L418.6 168.7L421.4 167.3L424.2 165.9L427.1 164.5L429.9 163L432.7 161.6L435.5 160.1L438.3 158.7L441.2 157.2L444 155.7L446.8 154.2L449.6 152.6L452.4 151.1L455.3 149.5L458.1 148L460.9 146.4L463.7 144.8L466.5 143.2L469.4 141.5L472.2 139.9L475 138.3L477.8 136.6L480.6 134.9L483.5 133.2L486.3 131.5L489.1 129.8L491.9 128L494.7 126.3L497.6 124.5L500.4 122.7L503.2 120.9L506 119.1L508.8 117.3L511.7 115.5L514.5 113.6L517.3 111.7L520.1 109.9L522.9 108L525.8 106.1L528.6 104.1L531.4 102.2L534.2 100.3L537 98.3L539.9 96.4L542.7 94.4L545.5 92.4L548.3 90.4L551.1 88.4L554 86.3L556.8 84.3L559.6 82.3L562.4 80.2L565.2 78.2L568.1 76.1L570.9 74L573.7 71.9L576.5 69.8L579.3 67.7L582.2 65.6L585 63.5L587.8 61.4L590.6 59.3L593.4 57.1L596.3 55L599.1 52.9L601.9 50.7L604.7 48.6L607.5 46.4L610.4 44.3L613.2 42.1L616 40" fill="none" stroke="var(--svg-text)" stroke-width="2"/><line x1="64.5" y1="70" x2="95.9" y2="70" stroke="var(--svg-text)" stroke-width="3"/><text x="102.1" y="75" class="t-small">β = 0,5</text><path d="M52 288L54.8 287.5L57.6 287.1L60.5 286.6L63.3 286.2L66.1 285.7L68.9 285.3L71.7 284.8L74.6 284.3L77.4 283.9L80.2 283.4L83 283L85.8 282.5L88.7 282.1L91.5 281.6L94.3 281.1L97.1 280.7L99.9 280.2L102.8 279.7L105.6 279.3L108.4 278.8L111.2 278.3L114 277.9L116.9 277.4L119.7 276.9L122.5 276.5L125.3 276L128.1 275.5L131 275L133.8 274.6L136.6 274.1L139.4 273.6L142.2 273.1L145.1 272.6L147.9 272.2L150.7 271.7L153.5 271.2L156.3 270.7L159.2 270.2L162 269.7L164.8 269.2L167.6 268.7L170.4 268.2L173.3 267.7L176.1 267.2L178.9 266.7L181.7 266.2L184.5 265.7L187.4 265.2L190.2 264.6L193 264.1L195.8 263.6L198.6 263.1L201.5 262.5L204.3 262L207.1 261.5L209.9 260.9L212.7 260.4L215.6 259.8L218.4 259.3L221.2 258.7L224 258.2L226.8 257.6L229.7 257.1L232.5 256.5L235.3 255.9L238.1 255.3L240.9 254.8L243.8 254.2L246.6 253.6L249.4 253L252.2 252.4L255 251.8L257.9 251.2L260.7 250.6L263.5 249.9L266.3 249.3L269.1 248.7L272 248.1L274.8 247.4L277.6 246.8L280.4 246.1L283.2 245.5L286.1 244.8L288.9 244.1L291.7 243.4L294.5 242.7L297.3 242.1L300.2 241.4L303 240.7L305.8 239.9L308.6 239.2L311.4 238.5L314.3 237.7L317.1 237L319.9 236.2L322.7 235.5L325.5 234.7L328.4 233.9L331.2 233.1L334 232.3L336.8 231.5L339.6 230.7L342.5 229.9L345.3 229.1L348.1 228.2L350.9 227.3L353.7 226.5L356.6 225.6L359.4 224.7L362.2 223.8L365 222.9L367.8 221.9L370.7 221L373.5 220L376.3 219.1L379.1 218.1L381.9 217.1L384.8 216.1L387.6 215L390.4 214L393.2 212.9L396 211.9L398.9 210.8L401.7 209.7L404.5 208.5L407.3 207.4L410.1 206.2L413 205.1L415.8 203.9L418.6 202.6L421.4 201.4L424.2 200.1L427.1 198.9L429.9 197.6L432.7 196.2L435.5 194.9L438.3 193.5L441.2 192.1L444 190.7L446.8 189.3L449.6 187.8L452.4 186.3L455.3 184.8L458.1 183.2L460.9 181.7L463.7 180.1L466.5 178.4L469.4 176.8L472.2 175.1L475 173.3L477.8 171.6L480.6 169.8L483.5 168L486.3 166.1L489.1 164.2L491.9 162.3L494.7 160.3L497.6 158.3L500.4 156.3L503.2 154.2L506 152.1L508.8 150L511.7 147.8L514.5 145.5L517.3 143.3L520.1 141L522.9 138.6L525.8 136.2L528.6 133.8L531.4 131.3L534.2 128.8L537 126.2L539.9 123.6L542.7 120.9L545.5 118.3L548.3 115.5L551.1 112.8L554 109.9L556.8 107.1L559.6 104.2L562.4 101.3L565.2 98.3L568.1 95.3L570.9 92.2L573.7 89.1L576.5 86L579.3 82.9L582.2 79.7L585 76.5L587.8 73.3L590.6 70L593.4 66.7L596.3 63.4L599.1 60.1L601.9 56.8L604.7 53.5L607.5 50.1L610.4 46.7L613.2 43.4L616 40" fill="none" stroke="var(--svg-blue)" stroke-width="2"/><line x1="64.5" y1="94" x2="95.9" y2="94" stroke="var(--svg-blue)" stroke-width="3"/><text x="102.1" y="99" class="t-small">β = 0,76</text><path d="M52 288L54.8 287.7L57.6 287.4L60.5 287.1L63.3 286.9L66.1 286.6L68.9 286.3L71.7 286L74.6 285.7L77.4 285.4L80.2 285.1L83 284.9L85.8 284.6L88.7 284.3L91.5 284L94.3 283.7L97.1 283.4L99.9 283.1L102.8 282.8L105.6 282.6L108.4 282.3L111.2 282L114 281.7L116.9 281.4L119.7 281.1L122.5 280.8L125.3 280.5L128.1 280.2L131 279.9L133.8 279.6L136.6 279.3L139.4 279L142.2 278.7L145.1 278.4L147.9 278.1L150.7 277.8L153.5 277.5L156.3 277.2L159.2 276.9L162 276.6L164.8 276.3L167.6 275.9L170.4 275.6L173.3 275.3L176.1 275L178.9 274.7L181.7 274.3L184.5 274L187.4 273.7L190.2 273.4L193 273L195.8 272.7L198.6 272.4L201.5 272L204.3 271.7L207.1 271.4L209.9 271L212.7 270.7L215.6 270.3L218.4 270L221.2 269.6L224 269.3L226.8 268.9L229.7 268.6L232.5 268.2L235.3 267.8L238.1 267.5L240.9 267.1L243.8 266.7L246.6 266.3L249.4 265.9L252.2 265.6L255 265.2L257.9 264.8L260.7 264.4L263.5 264L266.3 263.6L269.1 263.2L272 262.8L274.8 262.3L277.6 261.9L280.4 261.5L283.2 261.1L286.1 260.6L288.9 260.2L291.7 259.8L294.5 259.3L297.3 258.8L300.2 258.4L303 257.9L305.8 257.5L308.6 257L311.4 256.5L314.3 256L317.1 255.5L319.9 255L322.7 254.5L325.5 254L328.4 253.5L331.2 252.9L334 252.4L336.8 251.9L339.6 251.3L342.5 250.7L345.3 250.2L348.1 249.6L350.9 249L353.7 248.4L356.6 247.8L359.4 247.2L362.2 246.6L365 245.9L367.8 245.3L370.7 244.6L373.5 244L376.3 243.3L379.1 242.6L381.9 241.9L384.8 241.2L387.6 240.5L390.4 239.7L393.2 239L396 238.2L398.9 237.4L401.7 236.6L404.5 235.8L407.3 235L410.1 234.1L413 233.2L415.8 232.3L418.6 231.4L421.4 230.5L424.2 229.6L427.1 228.6L429.9 227.6L432.7 226.6L435.5 225.6L438.3 224.5L441.2 223.4L444 222.3L446.8 221.2L449.6 220L452.4 218.9L455.3 217.6L458.1 216.4L460.9 215.1L463.7 213.8L466.5 212.4L469.4 211L472.2 209.6L475 208.1L477.8 206.6L480.6 205.1L483.5 203.5L486.3 201.9L489.1 200.2L491.9 198.4L494.7 196.6L497.6 194.8L500.4 192.9L503.2 190.9L506 188.9L508.8 186.8L511.7 184.7L514.5 182.5L517.3 180.2L520.1 177.8L522.9 175.4L525.8 172.9L528.6 170.3L531.4 167.6L534.2 164.8L537 161.9L539.9 159L542.7 155.9L545.5 152.8L548.3 149.5L551.1 146.2L554 142.7L556.8 139.1L559.6 135.4L562.4 131.6L565.2 127.7L568.1 123.6L570.9 119.5L573.7 115.2L576.5 110.8L579.3 106.3L582.2 101.7L585 97L587.8 92.2L590.6 87.3L593.4 82.3L596.3 77.2L599.1 72L601.9 66.8L604.7 61.5L607.5 56.2L610.4 50.8L613.2 45.4L616 40" fill="none" stroke="var(--accent)" stroke-width="2"/><line x1="64.5" y1="118" x2="95.9" y2="118" stroke="var(--accent)" stroke-width="3"/><text x="102.1" y="123" class="t-small">β = 0,9</text></svg>
+        </figure>
+        <p>
+          Le jeu applique cette transformation à chaque sommet des bâtiments, en gardant leur distance. Les
+          façades sont découpées en petits morceaux pour que leurs arêtes droites puissent se courber.
+        </p>
+
+        <h3 id="i-doppler">7. Le facteur Doppler D</h3>
+        <p>Les fréquences reçues sont multipliées par :</p>
+        <div class="eq"><math display="block" alttext="D égale gamma fois 1 plus bêta cosinus thêta, égale 1 sur gamma fois 1 moins bêta cosinus thêta prime"><mrow><mi>D</mi><mo>=</mo><mi>γ</mi><mrow><mo>(</mo><mrow><mn>1</mn><mo>+</mo><mi>β</mi><mspace width="0.17em"/><mi>cos</mi><mo>&#x2061;</mo><mspace width="0.17em"/><mi>θ</mi></mrow><mo>)</mo></mrow><mo>=</mo><mfrac><mrow><mn>1</mn></mrow><mrow><mrow><mi>γ</mi><mrow><mo>(</mo><mrow><mn>1</mn><mo>−</mo><mi>β</mi><mspace width="0.17em"/><mi>cos</mi><mo>&#x2061;</mo><mspace width="0.17em"/><msup><mrow><mi>θ</mi></mrow><mrow><mo>′</mo></mrow></msup></mrow><mo>)</mo></mrow></mrow></mrow></mfrac></mrow></math></div>
+        <div class="eq eq-multi"><math display="block" alttext="D devant égale racine de 1 plus bêta sur 1 moins bêta, égale e puissance phi ; D derrière égale e puissance moins phi"><mrow><msub><mrow><mi>D</mi></mrow><mrow><mi>devant</mi></mrow></msub><mo>=</mo><msqrt><mrow><mfrac><mrow><mn>1</mn><mo>+</mo><mi>β</mi></mrow><mrow><mn>1</mn><mo>−</mo><mi>β</mi></mrow></mfrac></mrow></msqrt><mo>=</mo><msup><mrow><mi>e</mi></mrow><mrow><mi>φ</mi></mrow></msup></mrow></math><math display="block"><mrow><msub><mrow><mi>D</mi></mrow><mrow><mi>derrière</mi></mrow></msub><mo>=</mo><msup><mrow><mi>e</mi></mrow><mrow><mo>−</mo><mi>φ</mi></mrow></msup></mrow></math></div>
+        <p>
+          Sur le côté dans la ville (θ = 90°), D = γ &gt; 1 : c’est l’effet Doppler transverse, une pure dilatation
+          du temps. Mais vu sur le côté de l’écran (θ′ = 90°), D = 1/γ &lt; 1. À 22,8 m/s : D = 2,72 droit devant,
+          1,54 pour un objet réellement sur le côté, 0,37 droit derrière.
+        </p>
+
+        <h3 id="i-couleurs">8. Couleurs : λ divisée par D</h3>
+        <div class="eq eq-multi"><math display="block" alttext="lambda vue égale lambda émise sur D ; nu vue égale D nu émise"><mrow><msub><mrow><mi>λ</mi></mrow><mrow><mi>vue</mi></mrow></msub><mo>=</mo><mfrac><mrow><msub><mrow><mi>λ</mi></mrow><mrow><mi>émise</mi></mrow></msub></mrow><mrow><mi>D</mi></mrow></mfrac></mrow></math><math display="block"><mrow><msub><mrow><mi>ν</mi></mrow><mrow><mi>vue</mi></mrow></msub><mo>=</mo><mi>D</mi><msub><mrow><mi>ν</mi></mrow><mrow><mi>émise</mi></mrow></msub></mrow></math></div>
+        <p>
+          Autrement dit, ce que tu vois à la longueur d’onde λ a été émis à D·λ. L’œil voit de 360 à 830 nm : il
+          reçoit donc la lumière émise entre 360·D et 830·D nm (voir le <a href="#d-invisible">schéma du
+          niveau débutant</a>). Au-delà de D = 830/360 ≈ 2,31, soit β &gt; 0,68 droit devant, il ne reste plus rien
+          de la lumière visible émise : seul l’infrarouge.
+        </p>
+        <div class="exemple">
+          <span class="encadre-titre">Exemple : la Porte Verte</span>
+          <p>
+            Une lampe rouge à 640 nm paraît verte quand 640/D est entre 510 et 562 nm, soit D entre 1,14 et 1,25.
+            Droit devant, D = √((1 + β)/(1 − β)) : β entre 0,13 et 0,22, c’est-à-dire de 3,9 à 6,7 m/s (de 13 à
+            22 m/s à c = 100).
+          </p>
+        </div>
+
+        <h3 id="i-projecteur">9. L’effet projecteur en D⁴</h3>
+        <p>La luminance d’une surface, toutes longueurs d’onde confondues, est multipliée par D⁴ :</p>
+        <div class="eq"><math display="block" alttext="I vue égale D puissance 4 fois I émise"><mrow><msub><mrow><mi>I</mi></mrow><mrow><mi>vue</mi></mrow></msub><mo>=</mo><msup><mrow><mi>D</mi></mrow><mrow><mn>4</mn></mrow></msup><msub><mrow><mi>I</mi></mrow><mrow><mi>émise</mi></mrow></msub></mrow></math></div>
+        <p>
+          Un facteur D pour l’énergie de chaque photon, un autre pour leur cadence d’arrivée, et D² parce que
+          l’aberration resserre l’angle solide. Droit devant : × 55 à 22,8 m/s (D = e), × 361 à 27 m/s ;
+          derrière, × 0,018 à 22,8 m/s. Le jeu applique D⁴ exactement jusqu’à D = 8, puis plafonne, et compense
+          la luminosité d’ensemble par une exposition E, comme l’œil : E = 0,093 à 22,8 m/s, 0,039 à 27 m/s.
+        </p>
+
+        <h3 id="i-rindler">10. L’horizon de Rindler</h3>
+        <p>Sous poussée constante depuis l’arrêt, ta ligne d’univers est une hyperbole :</p>
+        <div class="eq"><math display="block" alttext="x plus c carré sur a, au carré, moins c t au carré, égale c carré sur a au carré"><mrow><msup><mrow><mrow><mo>(</mo><mrow><mi>x</mi><mo>+</mo><mfrac><mrow><msup><mrow><mi>c</mi></mrow><mrow><mn>2</mn></mrow></msup></mrow><mrow><mi>a</mi></mrow></mfrac></mrow><mo>)</mo></mrow></mrow><mrow><mn>2</mn></mrow></msup><mo>−</mo><msup><mrow><mrow><mo>(</mo><mrow><mi>c</mi><mi>t</mi></mrow><mo>)</mo></mrow></mrow><mrow><mn>2</mn></mrow></msup><mo>=</mo><msup><mrow><mrow><mo>(</mo><mrow><mfrac><mrow><msup><mrow><mi>c</mi></mrow><mrow><mn>2</mn></mrow></msup></mrow><mrow><mi>a</mi></mrow></mfrac></mrow><mo>)</mo></mrow></mrow><mrow><mn>2</mn></mrow></msup></mrow></math></div>
+        <p>
+          Elle s’approche de la droite de lumière x = ct − c²/a sans jamais la toucher. Un éclair émis au
+          départ à plus de c²/a derrière toi (300 m à c = 30) ne te rattrape jamais, tant que tu accélères :
+          c’est un horizon, comme celui d’un trou noir, mais dû seulement à ton accélération.
+        </p>
+        <figure class="large">
+          <svg class="schema" viewBox="0 0 640 380" role="img" aria-labelledby="svg-rindler-t svg-rindler-d" xmlns="http://www.w3.org/2000/svg"><title id="svg-rindler-t">Horizon de Rindler</title><desc id="svg-rindler-d">Diagramme d’espace-temps. Tu pars de l’arrêt en x = 0 et tu accélères sans arrêt : ta ligne d’univers est une hyperbole qui s’approche de la droite de lumière partie de x = −L, sans jamais la toucher. Un flash émis à 0,6 L derrière toi au départ te rattrape ; un flash émis à 1,3 L derrière toi ne te rattrape jamais, tant que tu accélères.</desc><line x1="52" y1="328" x2="616" y2="328" stroke="var(--svg-grid)" stroke-width="1"/><text x="44" y="332" text-anchor="end" class="t-tick">0</text><line x1="52" y1="232" x2="616" y2="232" stroke="var(--svg-grid)" stroke-width="1"/><text x="44" y="236" text-anchor="end" class="t-tick">1</text><line x1="52" y1="136" x2="616" y2="136" stroke="var(--svg-grid)" stroke-width="1"/><text x="44" y="140" text-anchor="end" class="t-tick">2</text><line x1="52" y1="40" x2="616" y2="40" stroke="var(--svg-grid)" stroke-width="1"/><text x="44" y="44" text-anchor="end" class="t-tick">3</text><text x="65.4" y="346" text-anchor="middle" class="t-tick">-1,5</text><text x="132.6" y="346" text-anchor="middle" class="t-tick">-1</text><text x="199.7" y="346" text-anchor="middle" class="t-tick">-0,5</text><text x="266.9" y="346" text-anchor="middle" class="t-tick">0</text><text x="334" y="346" text-anchor="middle" class="t-tick">0,5</text><text x="401.1" y="346" text-anchor="middle" class="t-tick">1</text><text x="468.3" y="346" text-anchor="middle" class="t-tick">1,5</text><text x="535.4" y="346" text-anchor="middle" class="t-tick">2</text><text x="602.6" y="346" text-anchor="middle" class="t-tick">2,5</text><line x1="52" y1="328" x2="616" y2="328" stroke="var(--svg-axis)" stroke-width="1.5"/><line x1="52" y1="34" x2="52" y2="328" stroke="var(--svg-axis)" stroke-width="1.5"/><text x="616" y="364" text-anchor="end" class="t-small">x, position dans la ville (en L = c²/a = 300 m)</text><text x="52" y="26" text-anchor="start" class="t-small">c·t (en L)</text><line x1="132.6" y1="328" x2="535.4" y2="40" stroke="var(--svg-red)" stroke-width="2" stroke-dasharray="6 4"/><text x="602.6" y="284.8" text-anchor="end" class="t-small">tirets rouges : horizon</text><text x="602.6" y="308.8" text-anchor="end" class="t-small">(flash parti à L derrière)</text><line x1="186.3" y1="328" x2="327.3" y2="227.2" stroke="var(--svg-blue)" stroke-width="2"/><circle cx="327.3" cy="227.2" r="5" fill="var(--svg-blue)" stroke="var(--svg-bg)" stroke-width="2"/><text x="337.3" y="243.2" class="t-small">rattrapé</text><line x1="92.3" y1="328" x2="481.7" y2="49.6" stroke="var(--svg-muted)" stroke-width="2"/><text x="86.3" y="320" text-anchor="end" class="t-small">1,3 L</text><text x="194.3" y="320" text-anchor="start" class="t-small">0,6 L</text><text x="434.7" y="78.4" text-anchor="end" class="t-small">ne te rattrape jamais</text><path d="M266.9 328L266.9 327.1L266.9 326.3L266.9 325.4L266.9 324.5L267 323.7L267.1 322.8L267.1 321.9L267.2 321.1L267.3 320.2L267.4 319.3L267.5 318.5L267.6 317.6L267.8 316.7L267.9 315.9L268.1 315L268.3 314.1L268.4 313.3L268.6 312.4L268.8 311.5L269 310.6L269.3 309.7L269.5 308.9L269.7 308L270 307.1L270.3 306.2L270.6 305.3L270.8 304.4L271.1 303.6L271.5 302.7L271.8 301.8L272.1 300.9L272.5 300L272.8 299.1L273.2 298.2L273.6 297.3L274 296.3L274.4 295.4L274.8 294.5L275.2 293.6L275.7 292.7L276.1 291.8L276.6 290.8L277 289.9L277.5 289L278 288L278.5 287.1L279.1 286.2L279.6 285.2L280.1 284.3L280.7 283.3L281.3 282.4L281.8 281.4L282.4 280.5L283 279.5L283.6 278.5L284.3 277.5L284.9 276.6L285.6 275.6L286.2 274.6L286.9 273.6L287.6 272.6L288.3 271.6L289 270.6L289.8 269.6L290.5 268.6L291.3 267.6L292 266.5L292.8 265.5L293.6 264.5L294.4 263.4L295.2 262.4L296.1 261.3L296.9 260.3L297.8 259.2L298.6 258.2L299.5 257.1L300.4 256L301.3 254.9L302.3 253.8L303.2 252.8L304.1 251.7L305.1 250.5L306.1 249.4L307.1 248.3L308.1 247.2L309.1 246.1L310.2 244.9L311.2 243.8L312.3 242.6L313.4 241.5L314.5 240.3L315.6 239.1L316.7 237.9L317.8 236.7L319 235.5L320.2 234.3L321.4 233.1L322.6 231.9L323.8 230.7L325 229.5L326.3 228.2L327.5 227L328.8 225.7L330.1 224.4L331.4 223.2L332.7 221.9L334.1 220.6L335.4 219.3L336.8 218L338.2 216.7L339.6 215.3L341.1 214L342.5 212.6L344 211.3L345.4 209.9L346.9 208.6L348.4 207.2L350 205.8L351.5 204.4L353.1 203L354.7 201.5L356.3 200.1L357.9 198.7L359.5 197.2L361.2 195.7L362.9 194.3L364.6 192.8L366.3 191.3L368 189.8L369.7 188.2L371.5 186.7L373.3 185.2L375.1 183.6L376.9 182L378.8 180.5L380.7 178.9L382.5 177.3L384.4 175.7L386.4 174L388.3 172.4L390.3 170.7L392.3 169.1L394.3 167.4L396.3 165.7L398.4 164L400.5 162.3L402.6 160.6L404.7 158.8L406.8 157.1L409 155.3L411.2 153.5L413.4 151.7L415.6 149.9L417.9 148.1L420.1 146.2L422.4 144.4L424.8 142.5L427.1 140.6L429.5 138.7L431.9 136.8L434.3 134.8L436.7 132.9L439.2 130.9L441.7 129L444.2 127L446.8 124.9L449.3 122.9L451.9 120.9L454.5 118.8L457.2 116.7L459.9 114.6L462.6 112.5L465.3 110.4L468 108.2L470.8 106.1L473.6 103.9L476.5 101.7L479.3 99.5L482.2 97.2L485.1 95L488.1 92.7L491.1 90.4L494.1 88.1L497.1 85.7L500.2 83.4L503.3 81L506.4 78.6L509.5 76.2L512.7 73.7L515.9 71.3L519.2 68.8L522.5 66.3L525.8 63.8L529.1 61.3L532.5 58.7L535.9 56.1L539.3 53.5L542.8 50.9L546.3 48.2L549.9 45.6" fill="none" stroke="var(--accent)" stroke-width="2.5"/><text x="569" y="78.4" text-anchor="start" class="t-strong">toi</text><text x="542.1" y="96.4" text-anchor="start" class="t-small">(poussée a)</text></svg>
+        </figure>
+
+        <h3 id="i-tableau">11. Récapitulatif chiffré</h3>
+        <p class="legende-tableau" id="i-tableau-legende">Poussée constante depuis l’arrêt, c = 30 m/s, a = 3 m/s² (temps identiques pour tout c ; distances et
+              vitesses × 10/3 à c = 100).</p>
+        <div class="tableau" tabindex="0" role="region" aria-labelledby="i-tableau-legende">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">β</th>
+                <th scope="col">v (m/s)</th>
+                <th scope="col">γ</th>
+                <th scope="col">τ (s)</th>
+                <th scope="col">t (s)</th>
+                <th scope="col">x (m)</th>
+                <th scope="col">D devant</th>
+                <th scope="col">D derrière</th>
+                <th scope="col">côté vu à</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><th scope="row">0,3</th><td>9,00</td><td>1,048</td><td>3,10</td><td>3,14</td><td>14,5</td><td>1,36</td><td>0,734</td><td>72,5 °</td></tr>
+              <tr><th scope="row">0,5</th><td>15,00</td><td>1,155</td><td>5,49</td><td>5,77</td><td>46,4</td><td>1,73</td><td>0,577</td><td>60,0 °</td></tr>
+              <tr><th scope="row">0,6</th><td>18,00</td><td>1,250</td><td>6,93</td><td>7,50</td><td>75,0</td><td>2,00</td><td>0,500</td><td>53,1 °</td></tr>
+              <tr><th scope="row">0,762</th><td>22,85</td><td>1,543</td><td>10,00</td><td>11,75</td><td>163</td><td>2,72</td><td>0,368</td><td>40,4 °</td></tr>
+              <tr><th scope="row">0,8</th><td>24,00</td><td>1,667</td><td>10,99</td><td>13,33</td><td>200</td><td>3,00</td><td>0,333</td><td>36,9 °</td></tr>
+              <tr><th scope="row">0,9</th><td>27,00</td><td>2,294</td><td>14,72</td><td>20,65</td><td>388</td><td>4,36</td><td>0,229</td><td>25,8 °</td></tr>
+              <tr><th scope="row">0,95</th><td>28,50</td><td>3,203</td><td>18,32</td><td>30,42</td><td>661</td><td>6,24</td><td>0,160</td><td>18,2 °</td></tr>
+              <tr><th scope="row">0,995</th><td>29,85</td><td>10,068</td><td>30,00</td><td>100,18</td><td>2 720</td><td>20,09</td><td>0,050</td><td>5,7 °</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>
+          « Côté vu à » : angle apparent, depuis l’avant, d’un objet situé exactement sur ton côté. Au plafond
+          du jeu (φ = 3), D devant vaut 20 et le projecteur, plafonné à 8⁴, n’est plus exact.
+        </p>
+        <p class="niveau-suivant">
+          <a class="bouton plein" href="#expert" data-level-tab="expert">Passer au niveau expert</a>
+          <a class="bouton" href="#debutant" data-level-tab="debutant">Revenir au niveau débutant</a>
+        </p>
+      </section>
+
+      <!-- ================================================================== -->
+      <section id="expert" class="niveau" data-level="expert" aria-labelledby="expert-titre">
+        <h2 id="expert-titre" class="titre-niveau"><span class="badge">Niveau 3</span>Expert : le modèle, du quadrivecteur au pixel</h2>
+        <p>
+          Ce niveau détaille les choix du moteur : pourquoi telle forme exacte plutôt qu’une autre, ce qui est
+          physique, ce qui est une convention de rendu, et ce qui est laissé de côté. Métrique de signature
+          (−, +, +, +), c explicite. Les liens renvoient au <a href="https://github.com/hugohismans/aSlower">code
+          source</a> (branche <code>main</code>).
+        </p>
+
+        <nav class="sommaire" aria-labelledby="expert-sommaire">
+          <h3 id="expert-sommaire">Sommaire</h3>
+          <ol>
+            <li><a href="#e-quadri">Quadrivecteurs et vitesse propre</a></li>
+            <li><a href="#e-segment">Le segment hyperbolique exact</a></li>
+            <li><a href="#e-thomas">Fermi-Walker et Thomas-Wigner</a></li>
+            <li><a href="#e-boost">Aberration et Doppler par un boost</a></li>
+            <li><a href="#e-invariant">Invariance de <math><msub><mi>I</mi><mi>ν</mi></msub><mo>/</mo><msup><mi>ν</mi><mn>3</mn></msup></math> : D⁴ et D⁵</a></li>
+            <li><a href="#e-spectre">Le modèle spectral</a></li>
+            <li><a href="#e-corps-noir">Corps noirs : T devient D·T</a></li>
+            <li><a href="#e-sommet">Transformation par sommet</a></li>
+            <li><a href="#e-rendu">Culling, subdivision, ciel</a></li>
+            <li><a href="#e-newton">Temps retardé : Newton sécurisé</a></li>
+            <li><a href="#e-terrell">Effet Terrell-Penrose</a></li>
+            <li><a href="#e-limites">Ce que le jeu simplifie</a></li>
+            <li><a href="#e-references">Références et code</a></li>
+          </ol>
+        </nav>
+
+        <h3 id="e-quadri">1. Quadrivecteurs et vitesse propre</h3>
+        <div class="eq eq-multi"><math display="block" alttext="X égale c t, x ; U égale d X sur d tau égale gamma c, u ; u égale gamma v ; U scalaire U égale moins c carré"><mrow><mi mathvariant="normal">𝐗</mi><mo>=</mo><mrow><mo>(</mo><mrow><mi>c</mi><mi>t</mi><mo>,</mo><mi mathvariant="normal">𝐱</mi></mrow><mo>)</mo></mrow></mrow></math><math display="block"><mrow><mi mathvariant="normal">𝐔</mi><mo>=</mo><mfrac><mrow><mrow><mi mathvariant="normal">d</mi><mi mathvariant="normal">𝐗</mi></mrow></mrow><mrow><mi mathvariant="normal">d</mi><mi>τ</mi></mrow></mfrac><mo>=</mo><mrow><mo>(</mo><mrow><mi>γ</mi><mi>c</mi><mo>,</mo><mi mathvariant="normal">𝐮</mi></mrow><mo>)</mo></mrow></mrow></math><math display="block"><mrow><mi mathvariant="normal">𝐮</mi><mo>=</mo><mi>γ</mi><mi mathvariant="normal">𝐯</mi></mrow></math><math display="block"><mrow><mi mathvariant="normal">𝐔</mi><mo>·</mo><mi mathvariant="normal">𝐔</mi><mo>=</mo><mo>−</mo><msup><mrow><mi>c</mi></mrow><mrow><mn>2</mn></mrow></msup></mrow></math></div>
+        <p>
+          L’état du véhicule est sa position, sa <strong>vitesse propre</strong> u = γv (partie spatiale de la
+          quadrivitesse) et ses deux horloges, en double précision. On en déduit tout le reste :
+        </p>
+        <div class="eq eq-multi"><math display="block" alttext="gamma égale racine de 1 plus norme de u au carré sur c carré ; v égale u sur gamma ; norme de u égale c sinus hyperbolique phi"><mrow><mi>γ</mi><mo>=</mo><msqrt><mrow><mn>1</mn><mo>+</mo><mfrac><mrow><msup><mrow><mrow><mo fence="true">|</mo><mrow><mi mathvariant="normal">𝐮</mi></mrow><mo fence="true">|</mo></mrow></mrow><mrow><mn>2</mn></mrow></msup></mrow><mrow><msup><mrow><mi>c</mi></mrow><mrow><mn>2</mn></mrow></msup></mrow></mfrac></mrow></msqrt></mrow></math><math display="block"><mrow><mi mathvariant="normal">𝐯</mi><mo>=</mo><mfrac><mrow><mi mathvariant="normal">𝐮</mi></mrow><mrow><mi>γ</mi></mrow></mfrac></mrow></math><math display="block"><mrow><mrow><mo fence="true">|</mo><mrow><mi mathvariant="normal">𝐮</mi></mrow><mo fence="true">|</mo></mrow><mo>=</mo><mi>c</mi><mspace width="0.17em"/><mi>sinh</mi><mo>&#x2061;</mo><mspace width="0.17em"/><mi>φ</mi></mrow></math></div>
+        <p>
+          Avec u comme état, |v| &lt; c est garanti pour tout u fini, sans test ni renormalisation. En flottants
+          64 bits, v = c·tanh φ s’arrondirait à c vers φ ≈ 18 ; côté GPU, en 32 bits, β s’arrondit à 1 vers
+          φ ≈ 9. Le jeu plafonne φ à 3 (β = 0,995, γ = 10), borne fixée par la couverture de la table Doppler
+          (|log₂ D| ≤ 4,5). Code : <a href="https://github.com/hugohismans/aSlower/blob/main/src/physics/relativity.js"><code>relativity.js</code></a>,
+          <a href="https://github.com/hugohismans/aSlower/blob/main/src/physics/player.js"><code>player.js</code></a>.
+        </p>
+
+        <h3 id="e-segment">2. Le segment hyperbolique exact</h3>
+        <p>
+          Sous une poussée propre α constante dans le référentiel comobile initial, pendant le temps propre h, la
+          ligne d’univers est un arc d’hyperbole. Avec :
+        </p>
+        <div class="eq eq-multi"><math display="block" alttext="psi égale norme de alpha fois h sur c ; S égale sinus hyperbolique psi sur psi ; K égale cosinus hyperbolique psi moins 1 sur psi carré ; A égale alpha plus alpha scalaire u zéro fois u zéro, sur c carré fois gamma zéro plus 1"><mrow><mi>ψ</mi><mo>=</mo><mfrac><mrow><mrow><mrow><mo fence="true">|</mo><mrow><mi mathvariant="normal">𝛂</mi></mrow><mo fence="true">|</mo></mrow><mi>h</mi></mrow></mrow><mrow><mi>c</mi></mrow></mfrac></mrow></math><math display="block"><mrow><mi>S</mi><mo>=</mo><mfrac><mrow><mi>sinh</mi><mo>&#x2061;</mo><mspace width="0.17em"/><mi>ψ</mi></mrow><mrow><mi>ψ</mi></mrow></mfrac></mrow></math><math display="block"><mrow><mi>K</mi><mo>=</mo><mfrac><mrow><mi>cosh</mi><mo>&#x2061;</mo><mspace width="0.17em"/><mi>ψ</mi><mo>−</mo><mn>1</mn></mrow><mrow><msup><mrow><mi>ψ</mi></mrow><mrow><mn>2</mn></mrow></msup></mrow></mfrac></mrow></math><math display="block"><mrow><mi mathvariant="normal">𝐀</mi><mo>=</mo><mi mathvariant="normal">𝛂</mi><mo>+</mo><mfrac><mrow><mrow><mrow><mo>(</mo><mrow><mi mathvariant="normal">𝛂</mi><mo>·</mo><msub><mi mathvariant="normal">𝐮</mi><mrow><mn>0</mn></mrow></msub></mrow><mo>)</mo></mrow><msub><mi mathvariant="normal">𝐮</mi><mrow><mn>0</mn></mrow></msub></mrow></mrow><mrow><mrow><msup><mrow><mi>c</mi></mrow><mrow><mn>2</mn></mrow></msup><mrow><mo>(</mo><mrow><msub><mrow><mi>γ</mi></mrow><mrow><mn>0</mn></mrow></msub><mo>+</mo><mn>1</mn></mrow><mo>)</mo></mrow></mrow></mrow></mfrac></mrow></math></div>
+        <p>le pas exact s’écrit :</p>
+<div class="eq eq-pile"><math display="block" alttext="u 1 égale cosinus hyperbolique psi u 0 plus h S A"><mrow><msub><mi mathvariant="normal">𝐮</mi><mrow><mn>1</mn></mrow></msub><mo>=</mo><mspace width="0.17em"/><mi>cosh</mi><mo>&#x2061;</mo><mspace width="0.17em"/><mi>ψ</mi><msub><mi mathvariant="normal">𝐮</mi><mrow><mn>0</mn></mrow></msub><mo>+</mo><mi>h</mi><mi>S</mi><mi mathvariant="normal">𝐀</mi></mrow></math><math display="block" alttext="delta x égale h S u 0 plus h carré K A"><mrow><mi mathvariant="normal">Δ</mi><mi mathvariant="normal">𝐱</mi><mo>=</mo><mi>h</mi><mi>S</mi><msub><mi mathvariant="normal">𝐮</mi><mrow><mn>0</mn></mrow></msub><mo>+</mo><msup><mrow><mi>h</mi></mrow><mrow><mn>2</mn></mrow></msup><mi>K</mi><mi mathvariant="normal">𝐀</mi></mrow></math><math display="block" alttext="delta t égale h S gamma 0 plus h carré K alpha scalaire u 0 sur c carré"><mrow><mi mathvariant="normal">Δ</mi><mi>t</mi><mo>=</mo><mi>h</mi><mi>S</mi><msub><mrow><mi>γ</mi></mrow><mrow><mn>0</mn></mrow></msub><mo>+</mo><msup><mrow><mi>h</mi></mrow><mrow><mn>2</mn></mrow></msup><mi>K</mi><mfrac><mrow><mrow><mi mathvariant="normal">𝛂</mi><mo>·</mo><msub><mi mathvariant="normal">𝐮</mi><mrow><mn>0</mn></mrow></msub></mrow></mrow><mrow><msup><mrow><mi>c</mi></mrow><mrow><mn>2</mn></mrow></msup></mrow></mfrac></mrow></math></div>
+        <p>
+          C’est exactement la composition v₁ = v₀ ⊕ c·tanh(ψ)·α̂ (à 4,5·10⁻¹⁴ près en pratique), avec la loi
+          vectorielle, non commutative :
+        </p>
+        <div class="eq"><math display="block" alttext="v composé w égale v plus w parallèle plus w perpendiculaire sur gamma v, le tout sur 1 plus v scalaire w sur c carré"><mrow><mi mathvariant="normal">𝐯</mi><mo>⊕</mo><mi mathvariant="normal">𝐰</mi><mo>=</mo><mfrac><mrow><mrow><mi mathvariant="normal">𝐯</mi><mo>+</mo><msub><mrow><mi mathvariant="normal">𝐰</mi></mrow><mrow><mo>∥</mo></mrow></msub><mo>+</mo><mfrac><mrow><msub><mrow><mi mathvariant="normal">𝐰</mi></mrow><mrow><mo>⊥</mo></mrow></msub></mrow><mrow><msub><mrow><mi>γ</mi></mrow><mrow><mi>v</mi></mrow></msub></mrow></mfrac></mrow></mrow><mrow><mrow><mn>1</mn><mo>+</mo><mfrac><mrow><mrow><mi mathvariant="normal">𝐯</mi><mo>·</mo><mi mathvariant="normal">𝐰</mi></mrow></mrow><mrow><msup><mrow><mi>c</mi></mrow><mrow><mn>2</mn></mrow></msup></mrow></mfrac></mrow></mrow></mfrac></mrow></math></div>
+        <p>
+          <strong>Pourquoi Δv = aΔτ n’est exact qu’à pas infinitésimal.</strong> a est l’accélération dans le
+          référentiel comobile instantané, qui change au cours du pas ; Δv = aΔτ est la tangente de la
+          solution, pas la solution. Appliquée telle quelle à chaque image, elle donne 542,10 m au lieu de
+          543,08 m à 60 images/s pour le test « 10 s de poussée à c = 100 », et 541,12 m à 30 images/s : le
+          résultat dépend de la cadence. La forme hyperbolique, elle, est exacte pour n’importe quel découpage,
+          y compris un pas unique de 10 s (écart mesuré ≤ 2·10⁻¹¹). Les sous-pas internes (≤ 1/60 s et ≤ 1 m)
+          ne servent qu’aux collisions et au virage : en virage avec poussée, un schéma de Strang d’ordre 2
+          laisse 0,39 mm d’écart après 10 s.
+        </p>
+
+        <h3 id="e-thomas">3. Fermi-Walker et Thomas-Wigner</h3>
+        <p>
+          Pendant un segment, la direction de poussée est fixe dans le référentiel comobile <em>initial</em> :
+          elle est transportée par Fermi-Walker, sans rotation propre. Ce n’est pas la même chose que des axes
+          du monde « reboostés » à chaque instant : deux boosts non colinéaires se composent en un boost suivi
+          d’une rotation (rotation de Wigner), d’où le caractère non commutatif de ⊕. Le long d’une trajectoire
+          courbe, l’effet cumulé est la précession de Thomas :
+        </p>
+        <div class="eq eq-multi"><math display="block" alttext="oméga T égale gamma carré sur gamma plus 1, fois a vectoriel v sur c carré ; par tour : 2 pi fois gamma moins 1"><mrow><msub><mrow><mi mathvariant="normal">𝛚</mi></mrow><mrow><mi>T</mi></mrow></msub><mo>=</mo><mfrac><mrow><msup><mrow><mi>γ</mi></mrow><mrow><mn>2</mn></mrow></msup></mrow><mrow><mi>γ</mi><mo>+</mo><mn>1</mn></mrow></mfrac><mfrac><mrow><mrow><mi mathvariant="normal">𝐚</mi><mo>×</mo><mi mathvariant="normal">𝐯</mi></mrow></mrow><mrow><msup><mrow><mi>c</mi></mrow><mrow><mn>2</mn></mrow></msup></mrow></mfrac></mrow></math><math display="block"><mrow><mtext>par tour : </mtext><mn>2</mn><mi>π</mi><mrow><mo>(</mo><mrow><mi>γ</mi><mo>−</mo><mn>1</mn></mrow><mo>)</mo></mrow></mrow></math></div>
+        <p>
+          En virage circulaire, un gyroscope embarqué tournerait de 2π(γ − 1) par tour : trois tours complets à
+          γ = 4 sur l’anneau du niveau 6. <strong>Pourquoi le jeu l’ignore</strong> : la conduite est « arcade ».
+          La route fournit la force latérale, hors du budget du moteur, et le cap du véhicule est collé à sa
+          vitesse dans la ville ; la caméra regarde le long de v. Le jeu ne suit donc aucune orientation propre
+          (pas de gyroscope), et la vue est obtenue par un boost pur depuis la ville, sans rotation. C’est un
+          choix de modèle, documenté, pas une approximation numérique : la précession existe, mais rien dans le
+          jeu ne la mesure.
+        </p>
+
+        <h3 id="e-boost">4. Aberration et Doppler par un boost</h3>
+        <p>Le boost de Lorentz de vitesse βc, sans rotation, s’écrit :</p>
+        <div class="eq eq-multi"><math display="block" alttext="c t prime égale gamma fois c t moins bêta scalaire x ; x prime égale x plus gamma carré sur gamma plus 1 fois bêta scalaire x fois bêta, moins gamma c t bêta"><mrow><mi>c</mi><msup><mrow><mi>t</mi></mrow><mrow><mo>′</mo></mrow></msup><mo>=</mo><mi>γ</mi><mrow><mo>(</mo><mrow><mi>c</mi><mi>t</mi><mo>−</mo><mi mathvariant="normal">𝛃</mi><mo>·</mo><mi mathvariant="normal">𝐱</mi></mrow><mo>)</mo></mrow></mrow></math><math display="block"><mrow><msup><mrow><mi mathvariant="normal">𝐱</mi></mrow><mrow><mo>′</mo></mrow></msup><mo>=</mo><mi mathvariant="normal">𝐱</mi><mo>+</mo><mfrac><mrow><msup><mrow><mi>γ</mi></mrow><mrow><mn>2</mn></mrow></msup></mrow><mrow><mi>γ</mi><mo>+</mo><mn>1</mn></mrow></mfrac><mrow><mo>(</mo><mrow><mi mathvariant="normal">𝛃</mi><mo>·</mo><mi mathvariant="normal">𝐱</mi></mrow><mo>)</mo></mrow><mi mathvariant="normal">𝛃</mi><mo>−</mo><mi>γ</mi><mi>c</mi><mi>t</mi><mi mathvariant="normal">𝛃</mi></mrow></math></div>
+        <p>
+          La lumière reçue d’un point immobile vu dans la direction monde n, à la distance r, relie deux
+          événements séparés par un intervalle de genre lumière : l’émission précède la réception de r/c. En
+          boostant cette séparation, on obtient en une ligne le facteur Doppler, la distance apparente et la
+          direction apparente :
+        </p>
+        <div class="eq eq-multi"><math display="block" alttext="c t, x égale moins r, r n ; donc r prime égale D r, avec D égale gamma fois 1 plus bêta scalaire n"><mrow><mrow><mo>(</mo><mrow><mi>c</mi><mi>t</mi><mo>,</mo><mi mathvariant="normal">𝐱</mi></mrow><mo>)</mo></mrow><mo>=</mo><mrow><mo>(</mo><mrow><mo>−</mo><mi>r</mi><mo>,</mo><mi>r</mi><mi mathvariant="normal">𝐧</mi></mrow><mo>)</mo></mrow><mo>⟹</mo><msup><mrow><mi>r</mi></mrow><mrow><mo>′</mo></mrow></msup><mo>=</mo><mi>D</mi><mi>r</mi></mrow></math><math display="block"><mrow><mi>D</mi><mo>=</mo><mi>γ</mi><mrow><mo>(</mo><mrow><mn>1</mn><mo>+</mo><mi mathvariant="normal">𝛃</mi><mo>·</mo><mi mathvariant="normal">𝐧</mi></mrow><mo>)</mo></mrow></mrow></math></div>
+        <div class="eq"><math display="block" alttext="n prime égale n plus, gamma carré sur gamma plus 1 fois bêta scalaire n plus gamma, fois bêta, le tout sur D"><mrow><msup><mrow><mi mathvariant="normal">𝐧</mi></mrow><mrow><mo>′</mo></mrow></msup><mo>=</mo><mfrac><mrow><mrow><mi mathvariant="normal">𝐧</mi><mo>+</mo><mrow><mo>(</mo><mrow><mfrac><mrow><msup><mrow><mi>γ</mi></mrow><mrow><mn>2</mn></mrow></msup></mrow><mrow><mi>γ</mi><mo>+</mo><mn>1</mn></mrow></mfrac><mrow><mo>(</mo><mrow><mi mathvariant="normal">𝛃</mi><mo>·</mo><mi mathvariant="normal">𝐧</mi></mrow><mo>)</mo></mrow><mo>+</mo><mi>γ</mi></mrow><mo>)</mo></mrow><mi mathvariant="normal">𝛃</mi></mrow></mrow><mrow><mi>D</mi></mrow></mfrac></mrow></math></div>
+        <p>
+          (On a utilisé (γ − 1)/β² = γ²/(γ + 1), qui évite la division par β à l’arrêt.) C’est le calcul que fait
+          le shader pour chaque sommet. Le ciel, lui, part de la direction de chaque pixel et a besoin de
+          l’inverse exacte :
+        </p>
+        <div class="eq eq-multi"><math display="block" alttext="n égale D fois n prime plus, gamma carré sur gamma plus 1 fois bêta scalaire n prime moins gamma, fois bêta ; D égale 1 sur gamma fois 1 moins bêta scalaire n prime"><mrow><mi mathvariant="normal">𝐧</mi><mo>=</mo><mi>D</mi><mrow><mo>(</mo><mrow><msup><mrow><mi mathvariant="normal">𝐧</mi></mrow><mrow><mo>′</mo></mrow></msup><mo>+</mo><mrow><mo>(</mo><mrow><mfrac><mrow><msup><mrow><mi>γ</mi></mrow><mrow><mn>2</mn></mrow></msup></mrow><mrow><mi>γ</mi><mo>+</mo><mn>1</mn></mrow></mfrac><mrow><mo>(</mo><mrow><mi mathvariant="normal">𝛃</mi><mo>·</mo><msup><mrow><mi mathvariant="normal">𝐧</mi></mrow><mrow><mo>′</mo></mrow></msup></mrow><mo>)</mo></mrow><mo>−</mo><mi>γ</mi></mrow><mo>)</mo></mrow><mi mathvariant="normal">𝛃</mi></mrow><mo>)</mo></mrow></mrow></math><math display="block"><mrow><mi>D</mi><mo>=</mo><mfrac><mrow><mn>1</mn></mrow><mrow><mrow><mi>γ</mi><mrow><mo>(</mo><mrow><mn>1</mn><mo>−</mo><mi mathvariant="normal">𝛃</mi><mo>·</mo><msup><mrow><mi mathvariant="normal">𝐧</mi></mrow><mrow><mo>′</mo></mrow></msup></mrow><mo>)</mo></mrow></mrow></mrow></mfrac></mrow></math></div>
+
+        <h3 id="e-invariant">5. Invariance de <math><msub><mi>I</mi><mi>ν</mi></msub><mo>/</mo><msup><mi>ν</mi><mn>3</mn></msup></math> : d’où viennent D⁴ et D⁵</h3>
+        <p>
+          La luminance spectrale divisée par <math><msup><mi>ν</mi><mn>3</mn></msup></math> est proportionnelle à la densité des photons dans l’espace des
+          phases, un invariant de Lorentz. Donc :
+        </p>
+        <div class="eq"><math display="block" alttext="I nu sur nu cube est invariant, donc I prime de nu prime égale D cube fois I nu de nu prime sur D"><mrow><mfrac><mrow><msub><mrow><mi>I</mi></mrow><mrow><mi>ν</mi></mrow></msub></mrow><mrow><msup><mrow><mi>ν</mi></mrow><mrow><mn>3</mn></mrow></msup></mrow></mfrac><mo>=</mo><mi>invariant</mi><mo>⟹</mo><msubsup><mrow><mi>I</mi></mrow><mrow><msup><mrow><mi>ν</mi></mrow><mrow><mo>′</mo></mrow></msup></mrow><mrow><mo>′</mo></mrow></msubsup><mrow><mo>(</mo><mrow><msup><mrow><mi>ν</mi></mrow><mrow><mo>′</mo></mrow></msup></mrow><mo>)</mo></mrow><mo>=</mo><msup><mrow><mi>D</mi></mrow><mrow><mn>3</mn></mrow></msup><msub><mrow><mi>I</mi></mrow><mrow><mi>ν</mi></mrow></msub><mrow><mo>(</mo><mrow><mfrac><mrow><msup><mrow><mi>ν</mi></mrow><mrow><mo>′</mo></mrow></msup></mrow><mrow><mi>D</mi></mrow></mfrac></mrow><mo>)</mo></mrow></mrow></math></div>
+        <div class="eq eq-multi"><math display="block" alttext="I prime égale D puissance 4 I ; I lambda prime de lambda égale D puissance 5 I lambda de D lambda"><mrow><msup><mrow><mi>I</mi></mrow><mrow><mo>′</mo></mrow></msup><mo>=</mo><msup><mrow><mi>D</mi></mrow><mrow><mn>4</mn></mrow></msup><mi>I</mi></mrow></math><math display="block"><mrow><msubsup><mrow><mi>I</mi></mrow><mrow><mi>λ</mi></mrow><mrow><mo>′</mo></mrow></msubsup><mrow><mo>(</mo><mrow><mi>λ</mi></mrow><mo>)</mo></mrow><mo>=</mo><msup><mrow><mi>D</mi></mrow><mrow><mn>5</mn></mrow></msup><msub><mrow><mi>I</mi></mrow><mrow><mi>λ</mi></mrow></msub><mrow><mo>(</mo><mrow><mi>D</mi><mi>λ</mi></mrow><mo>)</mo></mrow></mrow></math></div>
+        <p>
+          En intégrant sur <math><mi>ν</mi></math>, on gagne un facteur D : la luminance totale varie en D⁴. Par unité de longueur
+          d’onde, on en gagne un de plus (dλ = −c <math><mi mathvariant="normal">d</mi><mi>ν</mi><mo>/</mo><msup><mi>ν</mi><mn>2</mn></msup></math>) : D⁵. Le jeu sépare ces facteurs : la matrice de couleur
+          M(D) contient le seul jacobien D (dλ<sub>émise</sub>/dλ<sub>vue</sub>), et l’effet projecteur
+          applique le reste, D⁴, plafonné à 8⁴ = 4 096 (exact jusqu’à D = 8, soit γ ≈ 4,1 de face ; la borne garde
+          aussi les valeurs loin du maximum des flottants 16 bits, 65 504). OpenRelativity appliquait D² ; le jeu
+          applique l’exposant physique, et un test le verrouille par l’invariance du corps noir (section 7).
+        </p>
+
+        <h3 id="e-spectre">6. Le modèle spectral</h3>
+        <p>
+          Trois canaux RVB ne suffisent pas : un décalage Doppler fait entrer l’infrarouge et l’ultraviolet dans le
+          visible. Chaque surface porte donc <strong>cinq réflectances</strong> (r, g, b, ir, uv) sur des bases en
+          créneaux qui partitionnent l’unité sur [0 ; ∞[ en longueur d’onde émise : uv sous 360 nm, b de 360 à
+          490, g de 490 à 590, r de 590 à 830, ir au-delà de 830 nm (plateau jusqu’à l’infini). La ville est
+          éclairée par un soleil corps noir E à 5 800 K. Couleur de la base k vue avec D :
+        </p>
+        <div class="eq"><math display="block" alttext="M k de D égale N fois RGB de l’intégrale de 360 à 830 nanomètres de x barre de lambda, D, E de D lambda, rho k de D lambda, d lambda"><mrow><msub><mrow><mi>M</mi></mrow><mrow><mi>k</mi></mrow></msub><mrow><mo>(</mo><mrow><mi>D</mi></mrow><mo>)</mo></mrow><mo>=</mo><mi mathvariant="normal">𝐍</mi><mo>·</mo><mi>RGB</mi><mo>&#x2061;</mo><mspace width="0.17em"/><mrow><mo>(</mo><mrow><msubsup><mrow><mo>∫</mo></mrow><mrow><mn>360</mn></mrow><mrow><mn>830</mn></mrow></msubsup><mrow><mover accent="true"><mrow><mi>x</mi></mrow><mo>¯</mo></mover><mrow><mo>(</mo><mrow><mi>λ</mi></mrow><mo>)</mo></mrow></mrow><mi>D</mi><mi>E</mi><mrow><mo>(</mo><mrow><mi>D</mi><mi>λ</mi></mrow><mo>)</mo></mrow><msub><mrow><mi>ρ</mi></mrow><mrow><mi>k</mi></mrow></msub><mrow><mo>(</mo><mrow><mi>D</mi><mi>λ</mi></mrow><mo>)</mo></mrow><mi mathvariant="normal">d</mi><mi>λ</mi></mrow><mo>)</mo></mrow></mrow></math></div>
+        <ul>
+          <li>
+            x̄ (et ȳ, z̄) : ajustement analytique multi-lobes des fonctions colorimétriques CIE 1931 de Wyman, Sloan et
+            Shirley (2013) ; intégration de Simpson par support, aux bornes exactes λ = frontière/D (erreur
+            relative ≤ 2·10⁻⁶).
+          </li>
+          <li>RGB : passage de XYZ au sRGB linéaire (blanc D65, IEC 61966-2-1).</li>
+          <li>
+            𝐍 : inverse du bloc 3×3 (r, g, b) à D = 1, appliquée aux cinq colonnes. C’est l’adaptation de l’œil au
+            soleil : un blanc au soleil vaut (1, 1, 1), et M(1) = [I | 0]. Au repos, ir et uv sont exactement
+            invisibles, puisque leurs bases n’ont aucun support entre 360 et 830 nm.
+          </li>
+        </ul>
+        <p>
+          Exemples calculés : à D = 2, les colonnes g et b s’annulent, r ne laisse qu’un soupçon de violet
+          (0,005 ; −0,003 ; 0,041) et ir vaut (0,49 ; 0,68 ; 1,03) : une façade vue de face est la couleur, bleu
+          pâle, de son infrarouge. À D = 0,5, seule la colonne uv survit, (0,31 ; 0,16 ; 0,06) : brun orangé.
+        </p>
+        <p>Chaîne complète d’un fragment, identique en JavaScript (tests, règles du jeu) et en GLSL :</p>
+        <div class="eq"><math display="block" alttext="couleur égale tone mapping de, gamut de la somme des rho k M k de D, fois min de D puissance 4 et 8 puissance 4, fois l’exposition E"><mrow><mi>c</mi><mo>=</mo><mi>T</mi><mrow><mo>(</mo><mrow><mi>gamut</mi><mrow><mo>(</mo><mrow><mo>∑</mo><msub><mrow><mi>ρ</mi></mrow><mrow><mi>k</mi></mrow></msub><msub><mrow><mi>M</mi></mrow><mrow><mi>k</mi></mrow></msub><mrow><mo>(</mo><mrow><mi>D</mi></mrow><mo>)</mo></mrow></mrow><mo>)</mo></mrow><mo>·</mo><mspace width="0.17em"/><mi>min</mi><mo>&#x2061;</mo><mspace width="0.17em"/><mrow><mo>(</mo><mrow><msup><mrow><mi>D</mi></mrow><mrow><mn>4</mn></mrow></msup><mo>,</mo><msup><mrow><mn>8</mn></mrow><mrow><mn>4</mn></mrow></msup></mrow><mo>)</mo></mrow><mo>·</mo><mi>E</mi></mrow><mo>)</mo></mrow></mrow></math></div>
+        <ul>
+          <li>
+            <strong>Table (LUT)</strong> : texture demi-flottante de 257 texels sur log₂ D ∈ [−4,5 ; 4,5], de
+            taille impaire pour que D = 1 tombe au centre d’un texel (lecture u = (x(N − 1) + 0,5)/N, filtrage
+            linéaire, sans mipmaps). Lignes : les cinq colonnes de M, deux corps noirs (2 700 K et 6 500 K) et le
+            ciel dégagé.
+          </li>
+          <li>
+            <strong>Gamut</strong> : une couleur hors gamut est désaturée vers le gris de même luminance, ce qui
+            garde la teinte (elle porte l’information du jeu).
+          </li>
+          <li>
+            <strong>Exposition E</strong> = 1/G(e<sup>φ</sup>), où G est le gain, projecteur compris, d’une façade
+            de référence (gris 0,6 ; ir 0,3 ; uv 0,15) vue de face : elle garde sa luminance du repos, et les
+            rapports de luminance dans l’image restent physiques. E = 0,31 à β = 0,3 ; 0,093 à β = 0,76 ;
+            0,039 à β = 0,9.
+          </li>
+          <li>
+            <strong>Compression T</strong> : identité jusqu’au genou 0,75, puis compression exponentielle du
+            maximum des trois canaux, appliquée en facteur commun (teinte conservée).
+          </li>
+          <li>
+            Doppler <strong>par fragment</strong> (position relative à l’œil en varying highp) : calculé par
+            sommet, il donnait des taches de teinte jusqu’à ΔE 30.
+          </li>
+        </ul>
+        <p>
+          Pourquoi pas le modèle d’OpenRelativity (trois raies étroites à 615, 550 et 463 nm) ? Vue de face, la
+          luminance y tombe sous 10 % vers β = 0,28 et presque à zéro vers β = 0,5 : illisible dans la plage du jeu.
+          Il reste disponible en préréglage de comparaison. Le ciel dégagé a un spectre continu,
+          ∝ (550/λ)⁴ + 0,35·(550/λ)<sup>1,3</sup> (Rayleigh et aérosols), nul sous 295 nm (ozone) : décalé, il reste
+          lisse. Code : <a href="https://github.com/hugohismans/aSlower/blob/main/src/physics/spectrum.js"><code>spectrum.js</code></a>,
+          <a href="https://github.com/hugohismans/aSlower/blob/main/src/render/dopplerLut.js"><code>dopplerLut.js</code></a>,
+          <a href="https://github.com/hugohismans/aSlower/blob/main/src/render/shaders/rel_doppler.glsl"><code>rel_doppler.glsl</code></a>.
+        </p>
+
+        <h3 id="e-corps-noir">7. Corps noirs : T devient D·T</h3>
+        <p>La loi de Planck a une propriété remarquable :</p>
+        <div class="eq eq-multi"><math display="block" alttext="D puissance 5 B lambda de D lambda, T égale B lambda de lambda, D T ; loi de Planck"><mrow><msup><mrow><mi>D</mi></mrow><mrow><mn>5</mn></mrow></msup><msub><mrow><mi>B</mi></mrow><mrow><mi>λ</mi></mrow></msub><mrow><mo>(</mo><mrow><mi>D</mi><mi>λ</mi><mo>,</mo><mi>T</mi></mrow><mo>)</mo></mrow><mo>=</mo><msub><mrow><mi>B</mi></mrow><mrow><mi>λ</mi></mrow></msub><mrow><mo>(</mo><mrow><mi>λ</mi><mo>,</mo><mi>D</mi><mi>T</mi></mrow><mo>)</mo></mrow></mrow></math><math display="block"><mrow><msub><mrow><mi>B</mi></mrow><mrow><mi>λ</mi></mrow></msub><mrow><mo>(</mo><mrow><mi>λ</mi><mo>,</mo><mi>T</mi></mrow><mo>)</mo></mrow><mo>=</mo><mfrac><mrow><mrow><mn>2</mn><mi>h</mi><msup><mrow><mi>c</mi></mrow><mrow><mn>2</mn></mrow></msup></mrow></mrow><mrow><msup><mrow><mi>λ</mi></mrow><mrow><mn>5</mn></mrow></msup></mrow></mfrac><mfrac><mrow><mn>1</mn></mrow><mrow><mrow><msup><mrow><mi>e</mi></mrow><mrow><mrow><mfrac><mrow><mi>h</mi><mi>c</mi></mrow><mrow><mi>λ</mi><mi>k</mi><mi>T</mi></mrow></mfrac></mrow></mrow></msup><mo>−</mo><mn>1</mn></mrow></mrow></mfrac></mrow></math></div>
+        <p>
+          Un corps noir vu avec le facteur D est un corps noir de température D·T. Les lampadaires (2 700 K)
+          utilisent la ligne de LUT 𝐍·RGB(B(λ, D·T))/D⁴, normalisée, multipliée par le projecteur D⁴ : on
+          retrouve exactement le corps noir à D·T, sans compter deux fois D⁴. La même identité sert de test de
+          l’exposant : pour un blanc plat (r + g + b + ir + uv ≡ 1) éclairé par le soleil,
+          D⁴·M(D)·blanc = 𝐍·RGB(B(D·5 800 K)) à 10⁻⁴ près pour D ∈ {0,5 ; 2 ; 6 ; 20}. Les lampes à raie, elles,
+          utilisent la couleur de la raie à λ₀/D, multipliée par le même projecteur.
+        </p>
+
+        <h3 id="e-sommet">8. Transformation par sommet</h3>
+        <p>
+          Pour le décor immobile, OpenRelativity tourne le repère, résout le temps d’émission puis applique la
+          transformation de Lorentz. Pour un point fixe dans la ville, ces trois étapes se réduisent à la forme
+          fermée de la section 4, sans rotation ni arc cosinus :
+        </p>
+        <pre><code>// rel = P − œil (monde), r = |rel| ; uG2 = γ²/(γ+1) vient du CPU (double précision)
+highp vec3 relAberrate(highp vec3 rel) {
+  highp float r = length(rel);
+  highp float bn = dot(uBeta, rel) / max(r, 1e-6);          // β·n
+  highp float D = uGamma * (1.0 + bn);
+  return (rel + (uG2 * bn + uGamma) * r * uBeta) / D;       // n′·r
+}</code></pre>
+        <p>
+          <strong>Conservation de r.</strong> Le sommet est placé en œil + n′·r, à sa distance <em>monde</em> r, et
+          non à r′ = D·r. L’image ne dépend que des directions : elle est inchangée. En revanche, near/far, le
+          brouillard et le tri restent indépendants de β, et le test de profondeur reste juste : deux points sur
+          un même rayon apparent ont la même direction monde, donc le même D, et leur ordre est conservé. highp
+          est obligatoire. En vision classique, le CPU passe β<sub>eff</sub> = kβ (k de 1 à 0) : aucun k dans le
+          GLSL. Code : <a href="https://github.com/hugohismans/aSlower/blob/main/src/render/shaders/rel_vertex.glsl"><code>rel_vertex.glsl</code></a>.
+        </p>
+
+        <h3 id="e-rendu">9. Culling, subdivision, ciel</h3>
+        <ul>
+          <li>
+            <strong>Culling</strong> : le culling par frustum de three.js teste les positions monde, avant le
+            shader. À β = 0,76, il supprimerait la moitié des îlots visibles, puisque l’aberration ramène devant ce
+            qui est sur le côté. Il est désactivé (<code>frustumCulled = false</code>) et remplacé par une coupe à
+            la distance de visibilité, exacte puisque r est conservé et que le brouillard, en distance monde, y est
+            opaque. Un culling par « cône apparent » est prévu.
+          </li>
+          <li>
+            <strong>Subdivision et niveaux de détail</strong> : l’aberration courbe les droites, mais seulement
+            entre sommets. Les façades sont subdivisées (pas de 1,5 / 5 / 15 m selon trois niveaux de détail) ; le
+            niveau k est permis si son pas s<sub>k</sub> ≤ κ·d<sub>min</sub>, avec
+            <math alttext="kappa égale min de 0,2 et racine de 8 epsilon sur gamma bêta"><mrow><mi>κ</mi><mo>=</mo><mspace width="0.17em"/><mi>min</mi><mo>&#x2061;</mo><mspace width="0.17em"/><mrow><mo>(</mo><mrow><mn>0,2</mn><mo>,</mo><msqrt><mrow><mfrac><mrow><mn>8</mn><mi>ε</mi></mrow><mrow><mi>γ</mi><mi>β</mi></mrow></mfrac></mrow></msqrt></mrow><mo>)</mo></mrow></mrow></math>, où ε est la tolérance angulaire (2 px CSS) et d<sub>min</sub> la distance apparente du point
+            le plus proche de l’îlot. Image propre à environ 3 px près jusqu’à γ ≈ 2,5.
+          </li>
+          <li>
+            <strong>Ciel, sol, brouillard</strong> : une passe plein écran. Pour chaque pixel, aberration inverse
+            exacte, intersection analytique avec le plan du sol (sans branchement avant la lecture de texture),
+            brouillard en distance monde mélangé avant le Doppler (correct pour un milieu immobile dans la ville),
+            puis la même chaîne de couleur. Code : <a href="https://github.com/hugohismans/aSlower/blob/main/src/render/shaders/environment.frag.glsl"><code>environment.frag.glsl</code></a>,
+            <a href="https://github.com/hugohismans/aSlower/blob/main/src/render/lod.js"><code>lod.js</code></a>.
+          </li>
+        </ul>
+
+        <h3 id="e-newton">10. Temps retardé : Newton sécurisé</h3>
+        <p>
+          Pour un objet mobile de trajectoire p(t), on cherche le retard d = t − t<sub>e</sub> ≥ 0, racine de :
+        </p>
+        <div class="eq eq-multi"><math display="block" alttext="G de d égale d moins distance sur c ; G prime de d égale 1 moins n chapeau scalaire w sur c, supérieur ou égal à 1 moins bêta, positif"><mrow><mi>G</mi><mrow><mo>(</mo><mrow><mi mathvariant="normal">d</mi></mrow><mo>)</mo></mrow><mo>=</mo><mi mathvariant="normal">d</mi><mo>−</mo><mfrac><mrow><mrow><mo fence="true">|</mo><mrow><msub><mrow><mi mathvariant="normal">𝐱</mi></mrow><mrow><mi>obs</mi></mrow></msub><mo>−</mo><mi mathvariant="normal">𝐩</mi><mrow><mo>(</mo><mrow><mi>t</mi><mo>−</mo><mi mathvariant="normal">d</mi></mrow><mo>)</mo></mrow></mrow><mo fence="true">|</mo></mrow></mrow><mrow><mi>c</mi></mrow></mfrac></mrow></math><math display="block"><mrow><msup><mrow><mi>G</mi></mrow><mrow><mo>′</mo></mrow></msup><mrow><mo>(</mo><mrow><mi mathvariant="normal">d</mi></mrow><mo>)</mo></mrow><mo>=</mo><mn>1</mn><mo>−</mo><mfrac><mrow><mrow><mover accent="true"><mrow><mi mathvariant="normal">𝐧</mi></mrow><mo>^</mo></mover><mo>·</mo><mi mathvariant="normal">𝐰</mi></mrow></mrow><mrow><mi>c</mi></mrow></mfrac><mo>≥</mo><mn>1</mn><mo>−</mo><mi>β</mi><mo>&gt;</mo><mn>0</mn></mrow></math></div>
+        <p>
+          G est strictement croissante et G(0) ≤ 0 : il y a au plus une racine, qui existe si la vitesse de
+          l’objet reste sous c dans le passé. Le solveur tient un encadrement [lo ; hi] (bornes incluses), fait
+          un pas de Newton, bascule en bissection si le pas sort de l’encadrement (ou en pas de point fixe tant
+          qu’aucune borne haute n’est connue), et s’arrête dès que le résidu est nul. Amorce : la valeur de
+          l’image précédente, ou la forme fermée du mouvement uniforme (l’équation du second degré
+          d’OpenRelativity), écrite sans annulation, avec δ = x<sub>obs</sub> − p(t) :
+        </p>
+        <div class="eq"><math display="block" alttext="retard d égale delta scalaire w plus racine de delta scalaire w au carré plus c carré moins w carré fois norme de delta au carré, le tout sur c carré moins w carré"><mrow><mi mathvariant="normal">d</mi><mo>=</mo><mfrac><mrow><mrow><mrow><mo>(</mo><mrow><mi mathvariant="normal">𝛅</mi><mo>·</mo><mi mathvariant="normal">𝐰</mi></mrow><mo>)</mo></mrow><mo>+</mo><msqrt><mrow><msup><mrow><mrow><mo>(</mo><mrow><mi mathvariant="normal">𝛅</mi><mo>·</mo><mi mathvariant="normal">𝐰</mi></mrow><mo>)</mo></mrow></mrow><mrow><mn>2</mn></mrow></msup><mo>+</mo><mrow><mo>(</mo><mrow><msup><mrow><mi>c</mi></mrow><mrow><mn>2</mn></mrow></msup><mo>−</mo><msup><mrow><mi>w</mi></mrow><mrow><mn>2</mn></mrow></msup></mrow><mo>)</mo></mrow><msup><mrow><mrow><mo fence="true">|</mo><mrow><mi mathvariant="normal">𝛅</mi></mrow><mo fence="true">|</mo></mrow></mrow><mrow><mn>2</mn></mrow></msup></mrow></msqrt></mrow></mrow><mrow><mrow><msup><mrow><mi>c</mi></mrow><mrow><mn>2</mn></mrow></msup><mo>−</mo><msup><mrow><mi>w</mi></mrow><mrow><mn>2</mn></mrow></msup></mrow></mrow></mfrac></mrow></math></div>
+        <p>
+          (forme conjuguée |δ|²/(√… − δ·w) quand δ·w &lt; 0). Deux à cinq itérations suffisent jusqu’à β = 0,99,
+          contre plus de mille pour le point fixe. Le solveur est livré et testé ; le rendu des objets mobiles
+          viendra avec les niveaux concernés. Les objets fixes qui changent d’état (portes, ponts) utilisent
+          t − d/c. Code : <a href="https://github.com/hugohismans/aSlower/blob/main/src/physics/retarded.js"><code>retarded.js</code></a>.
+        </p>
+
+        <h3 id="e-terrell">11. Effet Terrell-Penrose</h3>
+        <p>
+          On ne « voit » pas la contraction des longueurs. Terrell et Penrose ont montré en 1959 que la
+          contraction, combinée aux différences de temps de trajet de la lumière, fait paraître un objet
+          lointain tourné plutôt qu’aplati, et qu’une sphère garde un contour circulaire. Pour le décor
+          immobile, le jeu n’a rien à ajouter : l’image d’une scène statique vue par un observateur en mouvement
+          est exactement l’image au repos, aberrée. La contraction de la ville dans ton référentiel et le retard
+          de la lumière y sont déjà inclus. Pour les objets mobiles, une correction quadratique par sommet,
+          exacte à vitesse constante, et un Doppler relatif D = γ(1 + n·β)/(γ<sub>w</sub>(1 + n·β<sub>w</sub>))
+          sont prévus.
+        </p>
+
+        <h3 id="e-limites">12. Ce que le jeu simplifie ou ne simule pas</h3>
+        <ul>
+          <li>
+            <strong>Conduite arcade</strong> : la route fournit la force latérale (jusqu’à 16 à 30·a sur l’anneau
+            du niveau 6), seules la poussée et le frein sont limités à a. Pas de précession de Thomas (section 3).
+          </li>
+          <li>
+            <strong>Temps simulé</strong> : Δτ est plafonné à 0,1 s par image (on ne simule pas un joueur absent),
+            horloges gelées en pause.
+          </li>
+          <li>
+            <strong>Spectres</strong> : cinq bandes en créneaux plutôt que des spectres de réflectance continus ;
+            soleil corps noir sans absorption atmosphérique ; fonctions colorimétriques analytiques.
+          </li>
+          <li>
+            <strong>Projecteur</strong> plafonné à D = 8 (au-delà, à partir de β ≈ 0,97 droit devant, la luminance
+            est sous-estimée) ; adaptation de l’exposition : un choix perceptif, pas physique.
+          </li>
+          <li>
+            <strong>Éclairage</strong> : couleurs plates et ombres cuites ; les lampadaires ne projettent pas de
+            lumière ; pas de réflexions, pas de polarisation.
+          </li>
+          <li>
+            <strong>Géométrie</strong> : les courbes restent polygonales entre sommets (au-delà de γ ≈ 2,5, quelques
+            pixels d’écart) ; observateur ponctuel, champ de 90° en paysage.
+          </li>
+          <li>
+            <strong>Objets mobiles</strong> : pas encore rendus (solveur prêt). <strong>Son</strong> : aucun, à
+            dessein : à 343 m/s, il irait plus vite que la lumière de la ville.
+          </li>
+          <li><strong>Gravité</strong> : aucune ; la ville est plate, l’horizon de Rindler est purement cinématique.</li>
+        </ul>
+
+        <h3 id="e-references">13. Références et code</h3>
+        <ul>
+          <li>A. Einstein, « Zur Elektrodynamik bewegter Körper », <cite>Annalen der Physik</cite> 17, 891–921 (1905).</li>
+          <li>P. Langevin, « L’évolution de l’espace et du temps », <cite>Scientia</cite> 10, 31–54 (1911).</li>
+          <li>J. Terrell, « Invisibility of the Lorentz Contraction », <cite>Physical Review</cite> 116, 1041–1045 (1959).</li>
+          <li>
+            R. Penrose, « The apparent shape of a relativistically moving sphere », <cite>Proceedings of the
+            Cambridge Philosophical Society</cite> 55, 137–139 (1959).
+          </li>
+          <li>W. Rindler, <cite>Relativity: Special, General, and Cosmological</cite>, 2ᵉ éd., Oxford University Press (2006) : mouvement hyperbolique et horizon.</li>
+          <li>G. B. Rybicki et A. P. Lightman, <cite>Radiative Processes in Astrophysics</cite>, Wiley (1979), chap. 4 : invariance de <math><msub><mi>I</mi><mi>ν</mi></msub><mo>/</mo><msup><mi>ν</mi><mn>3</mn></msup></math>.</li>
+          <li>
+            G. Kortemeyer, P. Tan et S. Schirra, « A Slower Speed of Light: Developing intuition about special
+            relativity with games », <cite>Proceedings of Foundations of Digital Games</cite> (2013) ; MIT Game Lab,
+            <cite>A Slower Speed of Light</cite> (2012) ; <a href="https://github.com/MITGameLab/OpenRelativity">OpenRelativity</a> (licence MIT).
+          </li>
+          <li>
+            C. Wyman, P.-P. Sloan et P. Shirley, « Simple Analytic Approximations to the CIE XYZ Color Matching
+            Functions », <cite>Journal of Computer Graphics Techniques</cite> 2(2), 1–11 (2013).
+          </li>
+        </ul>
+        <p>
+          Code source : <a href="https://github.com/hugohismans/aSlower">github.com/hugohismans/aSlower</a> ; plan
+          détaillé et décisions dans
+          <a href="https://github.com/hugohismans/aSlower/blob/main/docs/conception.md"><code>docs/conception.md</code></a> ;
+          tests de la physique dans
+          <a href="https://github.com/hugohismans/aSlower/blob/main/tests/player.test.js"><code>tests/player.test.js</code></a> et
+          <a href="https://github.com/hugohismans/aSlower/blob/main/tests/spectrum.test.js"><code>tests/spectrum.test.js</code></a>.
+        </p>
+        <p class="niveau-suivant">
+          <a class="bouton plein" href="../">Retour au jeu</a>
+          <a class="bouton" href="#intermediaire" data-level-tab="intermediaire">Revenir au niveau intermédiaire</a>
+        </p>
+      </section>
+    </main>
+
+    <footer class="page">
+      <div class="pied">
+        <h2>Crédits</h2>
+        <ul>
+          <li>
+            Inspiré de <cite>A Slower Speed of Light</cite> (MIT Game Lab, 2012). Shaders relativistes et logique
+            de mouvement adaptés d’<a href="https://github.com/MITGameLab/OpenRelativity">OpenRelativity</a>
+            (MIT Game Lab), licence MIT, Copyright (c) 2013 Massachusetts Institute of Technology
+            (<a href="../licences/openrelativity-MIT.txt">texte de la licence</a>).
+          </li>
+          <li>Merci à Gerd Kortemeyer et au MIT Game Lab.</li>
+          <li>Rendu 3D : <a href="https://threejs.org">three.js</a>, licence MIT. Couleurs : fonctions de Wyman, Sloan et Shirley (JCGT, 2013).</li>
+          <li>
+            Équations : police STIX Two Math, © The STIX Fonts Project Authors, licence SIL Open Font License 1.1
+            (<a href="fonts/OFL-STIX-Two-Math.txt">texte de la licence</a>).
+          </li>
+          <li>
+            Liste complète : <a href="../">Crédits du jeu</a> (bouton « Crédits » de l’écran titre) et
+            <a href="https://github.com/hugohismans/aSlower/blob/main/THIRD_PARTY_NOTICES.md">avis de tiers</a>.
+          </li>
+        </ul>
+        <p>
+          Projet indépendant de Hugo Hismans, non affilié au MIT ni au MIT Game Lab, ni approuvé par eux. Textes et
+          schémas sous licence CC BY 4.0, code sous licence MIT. Captures d’écran tirées du jeu (c = 30 m/s,
+          avenue de test).
+        </p>
+        <p><a class="bouton plein" href="../">Retour au jeu</a></p>
+      </div>
+    </footer>
+  </body>
+</html>

@@ -1,4 +1,5 @@
 // Configuration Vite : site statique publié sur GitHub Pages sous /aSlower/ (la casse compte).
+import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
 
 export default defineConfig({
@@ -11,6 +12,11 @@ export default defineConfig({
     // Texte complet des licences des dépendances (three.js : MIT), publié avec le jeu.
     license: { fileName: 'licences/npm-dependencies.txt' },
     rolldownOptions: {
+      // Deux pages : le jeu (index.html) et la page « Théorie » (theorie/index.html → /aSlower/theorie/).
+      input: {
+        index: fileURLToPath(new URL('index.html', import.meta.url)),
+        theorie: fileURLToPath(new URL('theorie/index.html', import.meta.url)),
+      },
       output: {
         // Garde les commentaires /*! … */ : en-têtes d'attribution OpenRelativity (licence MIT).
         comments: { legal: true },
