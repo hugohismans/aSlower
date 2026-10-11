@@ -6,8 +6,10 @@ Les constantes partagées sont dans `src/physics/constants.js` (ne pas les dupli
 
 **Vitesse de la lumière : réglage du joueur** (décision du 2026-10-11). Entier c de
 `C_MIN = 10` à `C_MAX = 100` m/s, `C_DEFAULT = 30`. Les constantes physiques de la partie
-viennent de `physicsFor(c)` → `{c, a = c/10, lengthUnit = c²/a = 10·c}` (gelé ; RangeError
-hors plage ou non entier) ; `TIME_UNIT = c/a = 10 s` pour tout c. Le code du jeu ne lit jamais
+viennent de `physicsFor(c)` → `{c, a = c/ACCEL_TIME, lengthUnit = c·LENGTH_TIME}` (gelé ;
+RangeError hors plage ou non entier), avec `ACCEL_TIME = 5` et `LENGTH_TIME = 10` : a = c/5,
+c/a = 5 s pour tout c (0,76·c en 5 s de poussée), L = 10·c m = 2·c²/a (décision 11 ; L valait
+c²/a quand a valait c/10). Le code du jeu ne lit jamais
 les exports `C`, `A`, `LENGTH_UNIT` (= `DEFAULT_PHYSICS`, réglage par défaut) : ils ne servent
 que de valeurs par défaut des fonctions pures et aux tests. La partie injecte ses constantes
 dans le joueur (`createPlayer({physics})`), la scène (`lengthUnit`), et tout le reste lit
@@ -261,7 +263,7 @@ Tous les `ShaderMaterial` partagent `REL` par référence (jamais `clone()`).
 ```js
 buildCity(scene, palette, {lodSteps = [1.5, 5, 15], lengthUnit = LENGTH_UNIT} = {})
   // scene : JSON de src/data/scenes/*.json ; palette : src/data/palette.json ;
-  // lengthUnit : L = c²/a de la partie (longueurs de jeu de la scène, voir layout.js)
+  // lengthUnit : L = 10·c de la partie (longueurs de jeu de la scène, voir layout.js)
   // → {chunks, emitters, streets, start, visibility, bounds, buildings}
   //   chunks[i] = {id, center: {x, y, z} (jeu), radius, nearestDistance(px, py) → m,
   //                lod(k) → THREE.BufferGeometry (créée à la demande, mise en cache),

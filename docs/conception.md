@@ -2,9 +2,9 @@
 
 > Contrat entre modules (signatures, repères, attributs, imports permis) : [`docs/interfaces.md`](interfaces.md). En cas de désaccord sur une signature, c'est le contrat qui fait foi ; ce document donne le pourquoi.
 
-Statut : **jalon 3 intégré** (niveaux 1 à 3, à valider sur l'iPhone, §9) ; jalon 2 intégré ; jalon 1 terminé le 2026-10-11. Décisions de l'auteur du 2026-10-11 intégrées (voir §11, dont la décision 10 : **la vitesse de la lumière est un réglage du joueur**, entier de 10 à 100 m/s, 30 m/s par défaut, a = c/10).
+Statut : **jalon 3 intégré** (niveaux 1 à 3, à valider sur l'iPhone, §9) ; jalon 2 intégré ; jalon 1 terminé le 2026-10-11. Décisions de l'auteur du 2026-10-11 intégrées (voir §11, dont la décision 10 : **la vitesse de la lumière est un réglage du joueur**, entier de 10 à 100 m/s, 30 m/s par défaut ; et la décision 11 : **a = c/5**).
 
-> **Unités naturelles.** Le moteur garde c/a = **T = 10 s** quel que soit le réglage ; l'unité de longueur vaut **L = c²/a = 10·c m** (300 m au réglage par défaut c = 30 m/s, 1 000 m à c = 100 m/s, valeur du cahier des charges). Les distances de jeu ci-dessous sont données en L (et en mètres à c = 30), les vitesses en fractions de c (β) ; les temps ne dépendent pas de c. Les éléments à l'échelle humaine (îlots de 56 m, rues, hauteurs, lampadaires tous les 40 m, œil à 1,6 m) restent en mètres. Le dépôt `hugohismans/aSlower` est public ; GitHub Pages y est publié en mode « GitHub Actions ». Les prototypes jetables du bac à sable (§0) ont servi de base au code du jalon 1. Publication sur <https://hugohismans.github.io/aSlower/> (la casse de l'URL compte).
+> **Unités naturelles.** Le moteur garde c/a = **T = 5 s** (`ACCEL_TIME`) quel que soit le réglage ; l'unité de longueur des niveaux vaut **L = c·`LENGTH_TIME` = 10·c m** (300 m au réglage par défaut c = 30 m/s, 1 000 m à c = 100 m/s, valeur du cahier des charges). Depuis la décision 11 (a = c/5), L = 2·c²/a : la longueur naturelle du mouvement, c²/a = 5·c m (150 m à c = 30), en vaut la moitié ; jusque-là (a = c/10), L valait c²/a. Les distances de jeu ci-dessous sont données en L (et en mètres à c = 30), les vitesses en fractions de c (β) ; les temps ne dépendent pas de c. Les éléments à l'échelle humaine (îlots de 56 m, rues, hauteurs, lampadaires tous les 40 m, œil à 1,6 m) restent en mètres. Le dépôt `hugohismans/aSlower` est public ; GitHub Pages y est publié en mode « GitHub Actions ». Les prototypes jetables du bac à sable (§0) ont servi de base au code du jalon 1. Publication sur <https://hugohismans.github.io/aSlower/> (la casse de l'URL compte).
 
 Méthode : six analyses en parallèle (shaders et physique d'OpenRelativity, mathématiques, rendu Three.js, outillage et contrôles, game design), puis une relecture critique sous quatre angles. Chaque objection a été contre-vérifiée et tous les chiffres ci-dessous ont été recalculés par script.
 
@@ -19,7 +19,7 @@ Méthode : six analyses en parallèle (shaders et physique d'OpenRelativity, mat
   - objets mobiles jamais contractés ;
   - intensité en D² au lieu de D⁴ ;
   - frottement non invariant par rotation.
-- **Valeurs des tests obligatoires** (cahier des charges, c = 100 m/s et a = 10 m/s², injectées dans les tests), recalculées : v = 76,159416 m/s, t = 11,752012 s, x = 543,080635 m. Au réglage par défaut (c = 30, a = 3) : v = 30·tanh 1 = 22,847825 m/s, t = 10·sinh 1 = 11,752012 s, x = 300·(cosh 1 − 1) = 162,924190 m.
+- **Valeurs des tests obligatoires** (cahier des charges, c = 100 m/s et a = 10 m/s², injectées dans les tests), recalculées : v = 76,159416 m/s, t = 11,752012 s, x = 543,080635 m. Au réglage par défaut (c = 30, a = 6), les 10 s de poussée donnent φ = 2 : v = 30·tanh 2 = 28,920827 m/s, t = 5·sinh 2 = 18,134302 s, x = 150·(cosh 2 − 1) = 414,329354 m.
 - **Prototypes jetables** (bac à sable, rien dans le dépôt) :
   - intégrateur exact ;
   - solveur de temps retardé ;
@@ -32,22 +32,22 @@ Méthode : six analyses en parallèle (shaders et physique d'OpenRelativity, mat
 
 ## 1. Constats qui modifient le cahier des charges
 
-### 1.1 L'échelle naturelle est L = c²/a
-Avec a = c/10, les unités naturelles sont **L = c²/a = 10·c m** et **T = c/a = 10 s**. Au réglage par défaut (c = 30 m/s ≈ 108 km/h, a = 3 m/s²), L = 300 m ; à c = 100 m/s (cahier des charges, a = 10 m/s²), L = 1 000 m.
+### 1.1 L'échelle naturelle : c²/a et L = 10·c
+Avec a = c/5 (décision 11), les unités naturelles du mouvement sont **c²/a = 5·c m** et **T = c/a = 5 s** ; l'unité de longueur des niveaux reste **L = 10·c m = 2·c²/a** (elle valait c²/a avec a = c/10). Au réglage par défaut (c = 30 m/s ≈ 108 km/h, a = 6 m/s²), c²/a = 150 m et L = 300 m ; à c = 100 m/s (a = 20 m/s² ; le cahier des charges demandait 10 m/s²), c²/a = 500 m et L = 1 000 m.
 
 | Pour… | il faut… (en L, puis à c = 30 m/s) | à c = 100 m/s |
 |---|---|---|
-| atteindre γ = 2 (β = 0,866) | 13,2 s de poussée et **L** (autant pour freiner) : 26,0 m/s, **300 m** | 86,6 m/s, 1 000 m |
-| s'arrêter depuis β = 0,5 / 0,76 / 0,9 | (γ − 1)·L = 0,155 / 0,543 / 1,294 L : depuis 15 / 22,8 / 27 m/s, 46 / 163 / 388 m | 155 / 543 / 1 294 m |
+| atteindre γ = 2 (β = 0,866) | 6,6 s de poussée et c²/a = **0,5·L** (autant pour freiner) : 26,0 m/s, **150 m** | 86,6 m/s, 500 m |
+| s'arrêter depuis β = 0,5 / 0,76 / 0,9 | (γ − 1)·c²/a = 0,077 / 0,272 / 0,647 L : depuis 15 / 22,8 / 27 m/s, 23 / 81 / 194 m | 77 / 272 / 647 m |
 | tourner à fond à β = 0,2 / 0,5 / 0,76 / 0,9 (conduite arcade, §3) | rayon γβ·c/TURN_RATE = 0,020 / 0,058 / 0,117 / 0,206 L : 6 / 17 / 35 / 62 m (r = \|u\|/TURN_RATE, TURN_RATE = 1,0 rad/s pour tout c) | 20 / 58 / 117 / 206 m |
-| échapper à un flash (horizon de Rindler) | L d'avance : 300 m | 1 000 m |
+| échapper à un flash (horizon de Rindler) | c²/a = 0,5·L d'avance : 150 m | 500 m |
 
 La « petite ville » mesure environ 3 L × 2 L (0,9 × 0,6 km à c = 30) : îlots de 50 à 60 m (échelle humaine, pour tout c), avenues droites de 2 à 3 L (4 L pour la seule scène de test J1 : 1 200 m). Chaque niveau charge un quartier de 0,7 à 2,4 L (210 à 720 m à c = 30). La lumière la traverse en 30 s, pour tout c : c'est une petite ville pour un véhicule. À c = 30, la ville compte donc 3,3 fois moins d'îlots par L qu'à c = 100 : moins de géométrie, mais des niveaux plus « serrés » (moins de rues entre deux points de jeu), à valider niveau par niveau.
 
 ### 1.2 Sur un trajet simple, foncer gagne sur les deux horloges
 Pour un trajet A→B fixé, τ = ∫dx/(γv) et t = ∫dx/v **diminuent tous les deux** quand on va plus vite. Exemple sur L (300 m à c = 30 ; mêmes temps pour tout c) :
-- à β = 0,2 (6 m/s à c = 30) : τ = 51 s et t = 52 s ;
-- à fond (poussée puis freinage) : τ = 19,3 s et t = 22,4 s.
+- à β = 0,2 (6 m/s à c = 30) : τ = 50 s et t = 51 s ;
+- à fond (poussée puis freinage) : τ = 13,2 s et t = 17,3 s.
 
 Avec une simple échéance « avant t = X », le dilemme n'existe donc pas. La vraie tension entre τ et t vient des **fenêtres « pas avant »** : client absent, pont levé, pommes pas mûres. Attendre sur place coûte 1 s de batterie par seconde de ville, alors que rouler vite fait passer la ville au prix de 1/γ. Le paradoxe des jumeaux devient la solution : pour « sauter dans le futur » de la ville sans vider sa batterie, on fait un détour rapide.
 
@@ -70,12 +70,12 @@ Erreur ≤ 2e-11 sur les trois valeurs, quel que soit le découpage, y compris u
 | Cahier des charges | Plan | Pourquoi |
 |---|---|---|
 | « petite ville » | ≈ 3 L × 2 L (0,9 × 0,6 km à c = 30), quartiers par niveau | §1.1 |
-| c = 100 m/s | c réglable par le joueur, entier de 10 à 100 m/s, 30 par défaut ; a = c/10 | décision 10 |
+| c = 100 m/s | c réglable par le joueur, entier de 10 à 100 m/s, 30 par défaut ; a = c/5 | décisions 10 et 11 |
 | foncer pas toujours gagnant | fenêtres « pas avant » | §1.2 (décision 2) |
 | Δv = a·Δτ, Δt = γ·Δτ | forme exacte équivalente | §1.4 |
 | approximation spectrale RGB | 5 canaux (r, g, b, IR, UV) × soleil à 5 800 K | §1.3 (décision 3) |
 | Δτ = temps réel écoulé | Δτ plafonné à 0,1 s par image, horloges gelées en pause et pendant les bulles bloquantes du tutoriel | ne pas simuler un joueur absent |
-| a = 10 m/s² au maximum | a = c/10 (3 m/s² à c = 30, 10 m/s² à c = 100) pour la poussée et le frein seulement ; la route fournit la force latérale (conduite arcade), y compris sur l'anneau du niveau 6 (16 à 30·a centripètes : 48 à 90 m/s² à c = 30) | sinon des kilomètres pour tourner (décision 1) |
+| a = 10 m/s² au maximum | a = c/5 (6 m/s² à c = 30, 20 m/s² à c = 100) pour la poussée et le frein seulement ; la route fournit la force latérale (conduite arcade), y compris sur l'anneau du niveau 6 (8 à 15·a centripètes : 48 à 90 m/s² à c = 30) | accélération plus franche (décision 11) ; sinon des kilomètres pour tourner (décision 1) |
 | respect des délais = critère de score | un retard coûte seulement l'étoile « Ponctuel » ; l'échec ne vient que de la batterie vide et du flash | décision 6 |
 | gyroscope, bulles | J2 (J1 : tactile glisser + clavier) | priorité au risque technique |
 | objets mobiles | solveur pur et testé en J1, rendu en J4 | les niveaux mobiles arrivent en J4 |
@@ -130,10 +130,10 @@ Pause sur `visibilitychange`.
   - Δt = h·S·γ₀ + h²·K·(α·u₀)/c²
 
   C'est identique à v₀ ⊕ c·tanh(η)·n, à 4,5e-14 près. `relativity.js` expose aussi la composition vectorielle (ordre v_ancien ⊕ w, non commutative) pour la pédagogie et les tests.
-- **Exactitude** : exact en ligne droite et en virage pur. En virage avec poussée, schéma de Strang d'ordre 2 (0,39 mm d'écart après 10 s de poussée pleine, volant à mi-course, à 60 Hz). La rotation de Thomas-Wigner n'est pas simulée, car aucune orientation propre n'est suivie ; c'est documenté.
+- **Exactitude** : exact en ligne droite et en virage pur. En virage avec poussée, schéma de Strang d'ordre 2 (moins d'un millimètre d'écart après 10 s de poussée pleine, volant à mi-course, à 60 Hz). La rotation de Thomas-Wigner n'est pas simulée, car aucune orientation propre n'est suivie ; c'est documenté.
 
 ### Conduite (modèle « voiture arcade », décision 1)
-- **La route fournit la force latérale**, hors du budget du moteur : a = c/10 (accélération propre ; 3 m/s² à c = 30) ne vaut que pour la poussée et le frein, tous deux le long du cap, donc colinéaires à u. Pas de cercle d'adhérence.
+- **La route fournit la force latérale**, hors du budget du moteur : a = c/5 (accélération propre ; 6 m/s² à c = 30) ne vaut que pour la poussée et le frein, tous deux le long du cap, donc colinéaires à u. Pas de cercle d'adhérence.
 - Le cap suit la vitesse quand on roule ; le virage fait tourner u (et le cap) à |u| constant.
 - Taux de virage en temps propre : dθ/dτ = −steer·TURN_RATE (`steer` > 0 : à droite, sens horaire ; TURN_RATE = 1,0 rad/s dans `constants.js`). Dans la ville, le rayon vaut r = |u|/TURN_RATE = γv/TURN_RATE, volant à fond : 0,117·L à β = 0,76 et 0,206·L à β = 0,9, soit 35 m à 22,8 m/s et 62 m à 27 m/s à c = 30 (117 et 206 m à c = 100). TURN_RATE ne dépend pas de c (les temps du jeu non plus) : les rayons suivent la ville, à l'échelle de L.
 - **À l'arrêt**, le volant fait pivoter le cap sur place à PIVOT_RATE (0,8 rad/s) ; la poussée part ensuite dans la direction du cap.
@@ -154,18 +154,18 @@ Pause sur `visibilitychange`.
 - Historique en anneau seulement pour les objets réactifs. Objet masqué si t_e < t_apparition.
 
 ### Tests Vitest (J1)
-**Obligatoires** (cahier des charges, **exécutés avec c = 100, a = 10 injectés** : `createPlayer({physics: {c: 100, a: 10}})`). Depuis l'arrêt, τ = 10 s. Valeurs attendues calculées dans le test : 100·tanh 1, 10·sinh 1, 1000·(cosh 1 − 1) (76,159416 m/s, 11,752012 s, 543,080635 m). Les mêmes tests tournent aussi avec les constantes du jeu par défaut (c = 30, a = 3 : 22,847825 m/s, 11,752012 s, 162,924190 m) et avec c = 10 (a = 1 : 7,615942 m/s, 11,752012 s, 54,308063 m), valeurs c·tanh 1, (c/a)·sinh 1, (c²/a)(cosh 1 − 1).
+**Obligatoires** (cahier des charges, **exécutés avec c = 100, a = 10 injectés** : `createPlayer({physics: {c: 100, a: 10}})`). Depuis l'arrêt, τ = 10 s. Valeurs attendues calculées dans le test : 100·tanh 1, 10·sinh 1, 1000·(cosh 1 − 1) (76,159416 m/s, 11,752012 s, 543,080635 m). Les mêmes tests tournent aussi avec c = 30, a = 3 injectés (22,847825 m/s, 11,752012 s, 162,924190 m) et c = 10, a = 1 injectés (7,615942 m/s, 11,752012 s, 54,308063 m), valeurs c·tanh 1, (c/a)·sinh 1, (c²/a)(cosh 1 − 1) ; et avec les constantes du jeu (a = c/5, φ = 2 après 10 s) : par défaut c = 30, a = 6 (28,920827 m/s, 18,134302 s, 414,329354 m), et c = 10, a = 2 (9,640276 m/s, 18,134302 s, 138,109785 m).
 - Tolérances : v et t à 1e-6, x à 1e-5 m.
 - Quatre découpages : 1/60, 1/30, aléatoire à graine fixe sommant à 10 s, un appel unique `step(10)`.
 - Ces tolérances détectent aussi un retour accidentel à un schéma approché (jusqu'à 1e-2 m d'erreur).
 
 **Complémentaires** :
-- freinage depuis φ = 1 : arrêt à (c²/a)(cosh 1 − 1), sans recul (543,080635 m à c = 100, 162,924190 m à c = 30) ;
-- accélérer puis freiner : 2·(c²/a)(cosh 1 − 1), t = 23,504024 s (1 086,161270 m à c = 100, 325,848381 m à c = 30) ;
+- freinage depuis φ = 1 : arrêt à (c²/a)(cosh 1 − 1), sans recul (543,080635 m à c = 100, a = 10 ; 162,924190 m à c = 30, a = 3) ;
+- accélérer puis freiner : 2·(c²/a)(cosh 1 − 1), t = 23,504024 s pour c/a = 10 s (1 086,161270 m à c = 100, a = 10 ; 325,848381 m à c = 30, a = 3) ;
 - virage pur : |u| conservé à 1e-12 ;
-- jumeaux, aller-retour de L : τ = 38,497 s, t = 44,721 s pour tout c (1 000 m à c = 100, 300 m à c = 30) ;
+- jumeaux, aller-retour de c²/a avec c/a = 10 s injecté : τ = 38,497 s, t = 44,721 s pour tout c (1 000 m à c = 100, 300 m à c = 30) ; avec les constantes du jeu (c/a = 5 s), un aller-retour de L = 2·c²/a donne τ = 4·5·arcosh 2 = 26,339 s et t = 4·5·√3 = 34,641 s ;
 - injection de c dans `relativity.js` et `retarded.js` (c = 100 et c = 30 : mêmes résultats sans dimension, temps identiques) ;
-- `physicsFor` (plage, entiers, a = c/10), réglage de c (`game/settings.js` : saisie refusée ou ramenée, `?c=`, stockage `aslower:v1:reglages`), scènes paramétriques (avenue de 4·L pour c = 10, 30 et 100, quartier qui contient le disque de visibilité, sans chevauchement), HUD (jauge et décimales près de c pour plusieurs c) ;
+- `physicsFor` (plage, entiers, a = c/5, L = 10·c), réglage de c (`game/settings.js` : saisie refusée ou ramenée, `?c=`, stockage `aslower:v1:reglages`), scènes paramétriques (avenue de 4·L pour c = 10, 30 et 100, quartier qui contient le disque de visibilité, sans chevauchement), HUD (jauge et décimales près de c pour plusieurs c) ;
 - cohérence de `snapshot` : |v| = |u|/γ et γ = 1/√(1 − v²/c²) ;
 - composition : non-commutativité, colinéaire = addition des rapidités ;
 - plafond : après 1 000 s de poussée, φ = φ_max et |v| = c·tanh φ_max ;
@@ -344,27 +344,27 @@ Position des objets à l'instant t de la **ville**, passée par la même aberrat
 
 ### Les six niveaux
 
-Les distances sont en L = c²/a = 10·c m et les vitesses en β (fractions de c) ; entre parenthèses, les valeurs au réglage par défaut **c = 30 m/s (L = 300 m)**. Les temps (délais, batterie, horloges) ne dépendent pas de c. Pour c = 100 m/s (cahier des charges, L = 1 000 m), multiplier les mètres et les m/s par 10/3 : ce sont les chiffres du premier jet. Les tailles des objets (pont, pommier, lampes) sont à l'échelle humaine : vus de 3,3 fois plus près à c = 30, ils paraissent 3,3 fois plus grands.
+Les distances sont en L = 10·c m (= 2·c²/a depuis la décision 11) et les vitesses en β (fractions de c) ; entre parenthèses, les valeurs au réglage par défaut **c = 30 m/s (L = 300 m)**. Les temps (délais, batterie, horloges) ne dépendent pas de c. Pour c = 100 m/s (cahier des charges, L = 1 000 m), multiplier les mètres et les m/s par 10/3 : ce sont les chiffres du premier jet. Les tailles des objets (pont, pommier, lampes) sont à l'échelle humaine : vus de 3,3 fois plus près à c = 30, ils paraissent 3,3 fois plus grands.
 
 | N° | Titre proposé | Notion | Mécanique (chiffres vérifiés, à recalibrer par le bot) |
 |---|---|---|---|
-| 1 | Premier jour | inertie, frein, Doppler | **Livré (J3)** : deux livraisons dans une grille d'îlots (boulangerie à 0,3·L, puis virage à droite au premier carrefour après 0,3·L + 40 m et Mme Ampère à 0,42·L ; 130 + 70 + 126 m à c = 30). Relâcher garde la vitesse ; il faut 0,048·L (14,5 m) pour s'arrêter à β = 0,3 (9 m/s). Batterie large (150 s), pas de délai. |
-| 2 | Le Grand Boulevard | deux horloges | **Livré (J3)** : l'Hôtel Lorentz à ≈ 1,6·L sur le boulevard (480 m), délai 45 s à l'horloge de la ville (à β ≤ 0,3, retard : l'étoile « Ponctuel » est perdue) ; Mme FitzGerald plus bas sur le boulevard (≈ 0,7·L), absente avant t = 90 s (délai 115 s) ; batterie de 100 s. Le chemin direct arrive ≈ 40 s trop tôt : attendre (ou flâner dans les ruelles à γ ≈ 1) coûte 1 s de batterie par seconde de ville ; un tour et demi de la place de l'Horloge (rayon 0,2·L) à β = 0,85 (γ ≈ 1,9) fait passer la ville à moindre coût : 65 s de batterie contre 82 s (dτ = dt/γ). |
+| 1 | Premier jour | inertie, frein, Doppler | **Livré (J3)** : deux livraisons dans une grille d'îlots (boulangerie à 0,3·L, puis virage à droite au premier carrefour après 0,3·L + 40 m et Mme Ampère à 0,42·L ; 130 + 70 + 126 m à c = 30). Relâcher garde la vitesse ; il faut 0,024·L (7,2 m) pour s'arrêter à β = 0,3 (9 m/s). Batterie large (150 s), pas de délai. |
+| 2 | Le Grand Boulevard | deux horloges | **Livré (J3)** : l'Hôtel Lorentz à ≈ 1,6·L sur le boulevard (480 m), délai 45 s à l'horloge de la ville (à β ≤ 0,3, retard : l'étoile « Ponctuel » est perdue) ; Mme FitzGerald plus bas sur le boulevard (≈ 0,7·L), absente avant t = 90 s (délai 115 s) ; batterie de 100 s. Le chemin direct arrive ≈ 40 s trop tôt : attendre (ou flâner dans les ruelles à γ ≈ 1) coûte 1 s de batterie par seconde de ville ; un tour et demi de la place de l'Horloge (rayon 0,2·L) à β = 0,85 (γ ≈ 1,9) fait passer la ville à moindre coût : 60 s de batterie contre 80 s (dτ = dt/γ). |
 | 3 | La Porte Verte | Doppler | **Livré (J3)** : lampe rouge (raie fixée à 640 nm, comme dans le test J1) à voir verte : **β ≈ 0,13 à 0,22, soit ≈ 4,0 à 6,8 m/s** dans l'axe (porte à 0,4·L) ; lampe infrarouge à 900 nm, « éteinte », vue verte vers **β = 0,44–0,52 (13,3–15,5 m/s)** (porte à 1·L). Trop vite, la lampe bleuit puis noircit (UV), et c'est le choc : reprise sur la ligne d'élan (+3 s). Batterie de 120 s ; délais 60 s et 150 s. |
-| 4 | Le Pont Rømer | retard de la lumière | Pont-levis dont l'horaire est en heure de la ville (panneau). **Le niveau démarre lancé** à β ≈ 0,76 (22,8 m/s), profil de référence inscrit dans le JSON. Décision au **point de non-retour** : à β = 0,76, il faut 0,543·L (163 m) pour s'arrêter, et l'image du pont a alors 5,4 s de retard (pour tout c). Le pont est signalé par de grands feux : le tablier ne fait que ≈ 30 px à 163 m (≈ 9 px à 543 m, à c = 100). Le pont peut paraître baissé alors qu'il est déjà levé. Débloque le contour fantôme. |
-| 5 | La Pellicule | horizon de Rindler | Flash à t = 20 s, 0,4·L (120 m) derrière le studio. **Condition de victoire** : atteindre l'abri (0,8·L = 240 m, hors de la ligne de vue du flash) avant le front, soit partir vers le nord avant t ≈ 17 s (≈ 18 s si l'on part à β = 0,1, 3 m/s). Avec l'approche prévue (0,3·L = 90 m puis un virage), on ne part vers le nord qu'à t ≈ 12 s, à environ β = 0,1. **Bonus « au-delà de l'horizon »** si l'on part avant t = 14,0 s depuis l'arrêt (L = 300 m d'avance), ou 14,95 s à β = 0,1 (0,905·L = 272 m d'avance) : fenêtre réelle d'environ 3 s. La lumière ne te rattrape alors jamais tant que tu accélères. Compte à rebours du flash affiché. |
-| 6 | Le Pommier de Langevin | paradoxe des jumeaux | Pommes mûres à t = 200 s, batterie de 120 s : attendre est impossible. Anneau (Ø L = 300 m), φ_max fixé pour γ ≤ 4. Faire passer 200 s de ville coûte 72 à 83 s de batterie sur l'anneau, et environ **101 à 111 s** avec l'accès, les 0,5·L (150 m) jusqu'au pommier et la livraison (marge de 9 à 19 s, à recalibrer par le bot). Le pommier, au centre de l'anneau, est vu avec D = γ : il vieillit **visiblement** ×γ (étapes : fleurs, fruits verts, mûrs, tombés). C'est un **pommier géant**, sans quoi il ne ferait que 2 à 3 px à 500 m (c = 100) : ≈ 45 m à c = 100 ; à c = 30, vu de 150 m, ≈ 15 m suffisent (taille ∝ L, à recalibrer). Le bilan « Luc a vieilli de … s, toi de … s » est produit par le bot. |
+| 4 | Le Pont Rømer | retard de la lumière | Pont-levis dont l'horaire est en heure de la ville (panneau). **Le niveau démarre lancé** à β ≈ 0,76 (22,8 m/s), profil de référence inscrit dans le JSON. Décision au **point de non-retour** : à β = 0,76, il faut 0,272·L (81 m) pour s'arrêter, et l'image du pont a alors 2,7 s de retard (pour tout c). Le pont est signalé par de grands feux : le tablier ne fait que ≈ 60 px à 81 m (≈ 18 px à 272 m, à c = 100). Le pont peut paraître baissé alors qu'il est déjà levé. Débloque le contour fantôme. |
+| 5 | La Pellicule | horizon de Rindler | Flash à t = 20 s, 0,4·L (120 m) derrière le studio. **Condition de victoire** : atteindre l'abri (0,8·L = 240 m, hors de la ligne de vue du flash) avant le front, soit partir vers le nord avant t ≈ 20 s (≈ 20,5 s si l'on part à β = 0,1, 3 m/s). Avec l'approche prévue (0,3·L = 90 m puis un virage), on ne part vers le nord qu'à t ≈ 12 s, à environ β = 0,1. **Bonus « au-delà de l'horizon »** si l'on part avant t = 19,0 s depuis l'arrêt (c²/a = 0,5·L = 150 m d'avance), ou 19,5 s à β = 0,1 (0,905·c²/a = 136 m d'avance) : fenêtre réelle d'environ 7 s, bien plus large que les 3 s du premier jet (a = c/10) : instant du flash et distances à recalibrer. La lumière ne te rattrape alors jamais tant que tu accélères. Compte à rebours du flash affiché. |
+| 6 | Le Pommier de Langevin | paradoxe des jumeaux | Pommes mûres à t = 200 s, batterie de 120 s : attendre est impossible. Anneau (Ø L = 300 m), φ_max fixé pour γ ≤ 4. Faire passer 200 s de ville coûte 61 à 75 s de batterie sur l'anneau (γ = 4 à 3, poussée et freinage compris ; 72 à 83 s au premier jet, avec a = c/10), plus l'accès, les 0,5·L (150 m) jusqu'au pommier et la livraison (≈ 30 s au premier jet) : marge à recalibrer par le bot. Le pommier, au centre de l'anneau, est vu avec D = γ : il vieillit **visiblement** ×γ (étapes : fleurs, fruits verts, mûrs, tombés). C'est un **pommier géant**, sans quoi il ne ferait que 2 à 3 px à 500 m (c = 100) : ≈ 45 m à c = 100 ; à c = 30, vu de 150 m, ≈ 15 m suffisent (taille ∝ L, à recalibrer). Le bilan « Luc a vieilli de … s, toi de … s » est produit par le bot. |
 
 ### Détails qui corrigent le premier jet
 - **N3, contrat du capteur** : la porte s'ouvre si la lampe, telle qu'on la voit, a la teinte demandée pendant 0,4 s de τ, à une distance comprise entre 12 m et 0,15·L (45 m à c = 30 ; 0,2·L pour l'infrarouge), mais au moins 12 m de plage (à recalibrer à petit c). D est calculé avec la géométrie réelle (hauteur et décalage de la lampe). Au passage sous la porte, l'angle fait revenir la lampe au rouge : on n'évalue donc jamais là. Tests du bot : franchir la porte à la vitesse de référence ; à fond, c'est le choc.
-- **N4, règle juste** : ce que tu vois a r/c de retard, et le pont continue de bouger pendant ton trajet. Seul compte son état à ton arrivée : il faut se fier à l'horaire de la ville. La condition dépend de r, donc de la vitesse d'approche : 0,155·L (46 m ; 1,55 s) à β = 0,5, 0,543·L (163 m ; 5,4 s) à β = 0,76. D'où le départ lancé, qui impose le profil de référence. Le cycle (durée « baissé » ≤ r/c et ≤ P − r/c) est réglé pour que les fenêtres de réussite en vision relativiste et en vision classique soient disjointes. Tests du bot :
+- **N4, règle juste** : ce que tu vois a r/c de retard, et le pont continue de bouger pendant ton trajet. Seul compte son état à ton arrivée : il faut se fier à l'horaire de la ville. La condition dépend de r, donc de la vitesse d'approche : 0,077·L (23 m ; 0,77 s) à β = 0,5, 0,272·L (81 m ; 2,7 s) à β = 0,76. D'où le départ lancé, qui impose le profil de référence. Le cycle (durée « baissé » ≤ r/c et ≤ P − r/c) est réglé pour que les fenêtres de réussite en vision relativiste et en vision classique soient disjointes. Tests du bot :
   - à profil égal, la fenêtre exprimée en phase vue est décalée d'exactement r/c entre k = 1 et k = 0 ;
   - « je fonce dès que je le vois baissé » échoue ;
   - « je suis l'horaire » réussit.
 
   En fonçant vers le pont, on voit son « film » en accéléré : ×(1+β) par rapport à l'horloge de la ville (×1,76 à β = 0,76), soit ×D = γ(1+β) par rapport à ta montre (×2,7).
-- **N5, jauge** : elle mesure l'écart **dans ton référentiel** : g' = |Δx'| − cΔt', soit g·e^φ en ligne droite. Dans la ville, l'écart diminue toujours, même au-delà de l'horizon. La jauge porte le repère « horizon : L » (300 m à c = 30). La bulle « l'écart ne se referme plus » se déclenche sur dg'/dτ ≥ −0,005·c (−0,15 m/s à c = 30).
-- **N6, anneau** : avec la conduite arcade (décision 1), la route fournit 16 à 30·a d'accélération centripète (48 à 90 m/s² à c = 30, 160 à 300 m/s² à c = 100), hors du budget du moteur : plus besoin d'un rail d'exception. Un rayon de 0,5·L demande le volant à |u|/(0,5·L · TURN_RATE) = γβ/5, soit 0,77 à γ = 4, pour tout c (TURN_RATE = 1,0 rad/s). Un guidage facultatif pour rester sur l'anneau reste à décider en J5. Le mécanisme des « vivants » (étapes d'âge affichées en t_e) arrive en J4.
+- **N5, jauge** : elle mesure l'écart **dans ton référentiel** : g' = |Δx'| − cΔt', soit g·e^φ en ligne droite. Dans la ville, l'écart diminue toujours, même au-delà de l'horizon. La jauge porte le repère « horizon : c²/a » (0,5·L, 150 m à c = 30). La bulle « l'écart ne se referme plus » se déclenche sur dg'/dτ ≥ −0,005·c (−0,15 m/s à c = 30).
+- **N6, anneau** : avec la conduite arcade (décision 1), la route fournit 8 à 15·a d'accélération centripète (48 à 90 m/s² à c = 30, 160 à 300 m/s² à c = 100), hors du budget du moteur : plus besoin d'un rail d'exception. Un rayon de 0,5·L demande le volant à |u|/(0,5·L · TURN_RATE) = γβ/5, soit 0,77 à γ = 4, pour tout c (TURN_RATE = 1,0 rad/s). Un guidage facultatif pour rester sur l'anneau reste à décider en J5. Le mécanisme des « vivants » (étapes d'âge affichées en t_e) arrive en J4.
 
 ### Habillage (proposition, facultative)
 - Ville de Lumière-sur-Lente, entreprise Photon Express.
@@ -533,7 +533,7 @@ Un seul jalon à valider. Chaque étape est publiée sur Pages et jouable sur le
 | **J1c** | LUT Doppler par fragment, projecteur, tone mapping. Lampadaires corps noir, panneaux IR/UV. |
 | **J1d** | Passe ciel/sol/brouillard, mesurée par différence avec J1b ; leviers si nécessaire. Scène `quartier-test` (demi-côté = visibilité + 12 m arrondi aux 80 m supérieurs, pour contenir tout le disque de visibilité : ≈ 1,3 × 1,3 km à c ≥ 50, 0,8 × 0,8 km à c = 30, 0,64 × 0,64 km à c = 10) pour mesurer les appels de dessin, et super-chunks ou `BatchedMesh` si besoin. |
 
-**Scène de test** : avenue droite de **4·L** (1 200 m à c = 30, 4 km à c = 100), bordée de bâtiments aux couleurs de l'arc-en-ciel (≈ 6 par îlot de 80 m : environ 80 à c = 30, 280 à c = 100). Il faut 1,5·L pour atteindre γ ≈ 2,5 (β = 0,917 : 27,5 m/s à c = 30), autant pour freiner, et il reste L de marge (450 + 450 + 300 m à c = 30). Îlots, rues transversales et lampadaires (tous les 40 m) gardent leur espacement en mètres ; la place, la butée et les panneaux IR/UV sont placés en L. Au bout, une place avec une butée douce (pas de collision avant J3). Pas de batterie ni de délai.
+**Scène de test** : avenue droite de **4·L** (1 200 m à c = 30, 4 km à c = 100), bordée de bâtiments aux couleurs de l'arc-en-ciel (≈ 6 par îlot de 80 m : environ 80 à c = 30, 280 à c = 100). Il faut 1,5·c²/a = 0,75·L pour atteindre γ ≈ 2,5 (β = 0,917 : 27,5 m/s à c = 30), autant pour freiner, et il reste 2,5·L de marge (225 + 225 + 750 m à c = 30 ; avec a = c/10, jusqu'à la décision 11 : 1,5·L, soit 450 + 450 + 300 m). Îlots, rues transversales et lampadaires (tous les 40 m) gardent leur espacement en mètres ; la place, la butée et les panneaux IR/UV sont placés en L. Au bout, une place avec une butée douce (pas de collision avant J3). Pas de batterie ni de délai.
 
 **Livré en plus de la demande, et pourquoi** :
 - CI et Pages : tester sur le GSM, puisque le gyroscope exige HTTPS ;
@@ -630,16 +630,17 @@ branchement dans main.js, spectromètre, culling par cône apparent.
   gradués avec aides, parcours de référence et naïf). Valides à c = 10, 30 et 100 ; référence
   ★★★ sans aucun choc, naïf < 3 pour les trois c (`tests/levels.test.js`). Seuils fixés par
   `npm run calibrate` (batterieMin ≈ (τmax − 1,15·τ_ref)/τmax, tVilleMax ≈ 1,12·t_ref, sur le
-  c le plus défavorable). Chiffres du pilote à c = 30 (τ / t / batterie restante) :
+  c le plus défavorable), recalibrés après la décision 11 (a = c/5). Chiffres du pilote à c = 30
+  (τ / t / batterie restante) :
 
   | Niveau | τmax | délais (t ville) | étoiles (batterieMin / tVilleMax) | référence | naïf |
   |---|---|---|---|---|---|
-  | N1 | 150 s | — | 0,65 / 55 s | 33,0 / 35,2 s / 78 % ★★★ | β 0,1 : 109 / 110 s / 27 % ★ |
-  | N2 | 100 s | 45 s ; pas avant 90 s, délai 115 s | 0,20 / 115 s | 65,0 / 93,1 s / 34 % ★★★ | direct puis attente : 82 / 90 s / 17 % ★★ |
-  | N3 | 120 s | 60 s ; 150 s | 0,45 / 70 s | 44,1 / 46,4 s / 63 % ★★★ | fonce à β 0,6 : 12 chocs, batterie vide |
+  | N1 | 150 s | — | 0,7 / 50 s | 27,1 / 29,6 s / 81 % ★★★ | β 0,1 : 109 / 110 s / 27 % ★ |
+  | N2 | 100 s | 45 s ; pas avant 90 s, délai 115 s | 0,3 / 115 s | 59,9 / 90,5 s / 40 % ★★★ | direct puis attente : 80 / 91 s / 20 % ★★ |
+  | N3 | 120 s | 60 s ; 150 s | 0,5 / 65 s | 39,4 / 41,9 s / 67 % ★★★ | fonce à β 0,6 : chocs à répétition, batterie vide |
 
-  À c = 10 (les îlots de 80 m pèsent plus en L : niveaux plus longs) : 42 / 47, 68 / 99 et
-  56 / 59 s ; à c = 100 : 31 / 32, 64 / 91 et 39 / 41 s. Pilote (`game/bot.js`) amélioré pour
+  À c = 10 (les îlots de 80 m pèsent plus en L : niveaux plus longs) : 38 / 42, 57 / 91 et
+  52 / 55 s ; à c = 100 : 24 / 26, 61 / 91 et 34 / 36 s. Pilote (`game/bot.js`) amélioré pour
   ces niveaux : anticipation du freinage sur plusieurs points, volant « poursuite pure » (tour
   de place à β = 0,85), point frôlé compté comme atteint.
 - **Rendu** (`render/levelObjects.js`, `shaders/lamp.*.glsl`, même pipeline : aberration, Doppler,
@@ -703,9 +704,9 @@ branchement dans main.js, spectromètre, culling par cône apparent.
 
 ## 11. Décisions de l'auteur (2026-10-11)
 
-Réponses aux neuf questions du plan, puis la décision 10 (même jour). Elles priment sur toute version antérieure de ce document, qui a été mis à jour en conséquence.
+Réponses aux neuf questions du plan, puis les décisions 10 et 11 (même jour). Elles priment sur toute version antérieure de ce document, qui a été mis à jour en conséquence.
 
-1. **Conduite : arcade**, plutôt que l'adhérence honnête à a d'abord proposée. La route fournit la force latérale, hors du budget du moteur : a (= c/10 depuis la décision 10) ne vaut que pour la poussée et le frein. Le virage fait tourner u à |u| constant, dθ/dτ = −steer·TURN_RATE ; à l'arrêt, le cap pivote à PIVOT_RATE. Plus de cercle d'adhérence, plus de rail d'exception au niveau 6. L'échelle reste celle du §1.1 : L pour atteindre γ = 2, autant pour freiner (300 m à c = 30 ; §1.1, §3, §6).
+1. **Conduite : arcade**, plutôt que l'adhérence honnête à a d'abord proposée. La route fournit la force latérale, hors du budget du moteur : a (= c/10 depuis la décision 10, c/5 depuis la décision 11) ne vaut que pour la poussée et le frein. Le virage fait tourner u à |u| constant, dθ/dτ = −steer·TURN_RATE ; à l'arrêt, le cap pivote à PIVOT_RATE. Plus de cercle d'adhérence, plus de rail d'exception au niveau 6. L'échelle reste celle du §1.1 : c²/a pour atteindre γ = 2, autant pour freiner (150 m à c = 30 depuis la décision 11 ; §1.1, §3, §6).
 2. **Dilemme des horloges : choix délégué** (« je te laisse choisir la meilleure option »). Retenu : les fenêtres « pas avant », qui font du paradoxe des jumeaux la solution (§1.2). Le moteur qui consomme (optimum vers β = 0,5) n'est pas retenu : il brouillerait la règle simple « batterie = τ ».
 3. **Couleurs : le modèle le plus fidèle à la physique**, plutôt que la fidélité stricte à OpenRelativity (illisible au-delà d'environ β = 0,5). Réflectance × soleil à 5 800 K, bases infrarouge et ultraviolette, fonctions colorimétriques de Wyman et al. ; effet projecteur physique par défaut, `BEAM_EXPONENT = 4`, borné par `BEAM_MAX` (= 8⁴, D⁴ exact jusqu'à D = 8), avec adaptation de l'exposition de l'œil (§4). Le modèle d'OpenRelativity reste un préréglage de comparaison.
 4. **Orientation : paysage strictement imposé** sur appareil tactile : panneau « Tourne ton GSM » sans bouton « Jouer quand même », dès le J1 (§5).
@@ -715,6 +716,7 @@ Réponses aux neuf questions du plan, puis la décision 10 (même jour). Elles p
 8. **GitHub Pages : source « GitHub Actions »**, confirmée. Publication par `.github/workflows/deploy.yml` sur <https://hugohismans.github.io/aSlower/>.
 9. **Niveau 4 : interprétation confirmée.** « Il semble ouvert » se lit « il semble praticable » (pont baissé).
 10. **2026-10-11 : c = 30 m/s, a = 3 m/s² par défaut, puis c réglable par le joueur** : entier de 10 à 100 m/s, 30 par défaut, a = c/10. Le rapport c/a = 10 s est fixe (même rythme de jeu pour tout c) ; l'unité de longueur L = c²/a = 10·c m suit le réglage (300 m par défaut au lieu de 1 000 m). Toute la partie lit ses constantes dans `physicsFor(c)` : physique injectée (`createPlayer({physics})`, c en paramètre de `relativity.js` et `retarded.js`), scènes développées pour L (longueurs de jeu en L, échelle humaine en mètres), visibilité clamp(1,2·L ; 300 ; 600) m, butée, `?bench`, HUD (mur à c, décimales, « c = 30 m/s ») ; le rendu ne dépend que de β. Réglage sur l'écran titre (préréglages 10 / 30 / 50 / 100) et au menu pause (« Changer c », qui recommence la partie), mémorisé (`aslower:v1:reglages`), `?c=n` prioritaire. TURN_RATE (1,0 rad/s), PIVOT_RATE, sous-pas (1/60 s, 1 m), pas des LOD, hauteur de l'œil, tailles des bâtiments et largeurs des rues ne changent pas. Les tests obligatoires du cahier des charges restent exécutés avec c = 100, a = 10 injectés ; ils tournent aussi à c = 30 et c = 10. Les niveaux (J3+) seront écrits en L et en β, et calibrés par le bot pour plusieurs c (au moins 10, 30 et 100).
+11. **2026-10-11 : accélération plus franche, a = c/5** (0,76·c en 5 s au lieu de 10 s) ; l'unité de longueur des niveaux reste L = 10·c m ; pas d'effet de champ de vision artificiel (il fausserait l'aberration réelle) ; seuils d'étoiles recalibrés. Dans `constants.js` : `ACCEL_TIME = 5` (c/a, s) et `LENGTH_TIME = 10` (L/c, s), d'où c²/a = 5·c m = L/2 : les distances d'arrêt et l'horizon de Rindler sont divisés par 2, les rayons de virage (TURN_RATE) ne changent pas. Les tests obligatoires du cahier des charges restent exécutés avec c = 100, a = 10 injectés.
 
 ## 12. Glossaire FR → EN
 
@@ -727,7 +729,7 @@ Le jeu, les données JSON et la documentation sont en français ; les identifian
 | écart t − τ | gap (`formatGap`) |
 | vitesse propre u = γv | `ux`, `uy` |
 | rapidité φ, plafond de rapidité | `rapidity`, `phiMax` |
-| vitesse de la lumière (réglage), unité de longueur L = c²/a | `c` (`physicsFor`, `C_DEFAULT`), `lengthUnit` |
+| vitesse de la lumière (réglage), unité de longueur L = 10·c | `c` (`physicsFor`, `C_DEFAULT`), `lengthUnit` |
 | réglages (stockage) | settings (`game/settings.js`, clé `reglages`) |
 | cap | `heading` (`hx`, `hy`) |
 | volant, accélérateur, frein | `steer`, `thrust`, `brake` |

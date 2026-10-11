@@ -15,14 +15,14 @@ exemples chiffrés, expert avec le modèle complet et ses limites).
 
 ## Le concept
 
-Dans la ville, la lumière va à c = 30 m/s (≈ 108 km/h) et ton moteur pousse à 3 m/s².
-L'échelle naturelle du jeu est donc de quelques centaines de mètres (c²/a = 300 m) et la
-dizaine de secondes (c/a = 10 s).
+Dans la ville, la lumière va à c = 30 m/s (≈ 108 km/h) et ton moteur pousse à 6 m/s² :
+0,76·c en 5 s. L'échelle naturelle du jeu est donc de quelques centaines de mètres (les
+niveaux se mesurent en L = 10·c = 300 m) et de quelques secondes (c/a = 5 s).
 
 **La vitesse de la lumière est un réglage** : dans « Réglages » sur l'accueil (ou au menu pause,
 « Changer c », qui recommence la partie), choisis un entier de 10 à 100 m/s (préréglages
-10, 30, 50 et 100). L'accélération suit, a = c/10 : le rythme du jeu (c/a = 10 s) ne change
-pas, seules les distances changent (c²/a = 10·c mètres : 100 m à c = 10, 1 km à c = 100).
+10, 30, 50 et 100). L'accélération suit, a = c/5 : le rythme du jeu (c/a = 5 s) ne change
+pas, seules les distances changent (L = 10·c mètres : 100 m à c = 10, 1 km à c = 100).
 Plus c est bas, plus les effets arrivent tôt. Le réglage est mémorisé dans le navigateur.
 
 - **Deux horloges.** « Ta montre » mesure ton temps propre τ : c'est ta batterie.
@@ -43,7 +43,7 @@ Plus c est bas, plus les effets arrivent tôt. Le réglage est mémorisé dans l
 **Jalon 1 terminé** (socle physique et rendu) : physique exacte et testée, rendu relativiste
 (aberration, Doppler, effet projecteur, ciel et brouillard), HUD (les deux horloges et leur
 écart, une phrase sur γ, la jauge de vitesse), deux scènes de test dont les longueurs suivent
-c²/a (une avenue droite de 4·c²/a, soit 1 200 m à c = 30 m/s, et un quartier qui contient tout
+L = 10·c (une avenue droite de 4·L, soit 1 200 m à c = 30 m/s, et un quartier qui contient tout
 le disque de visibilité, 0,8 × 0,8 km à c = 30 m/s).
 
 **Jalon 2 intégré** (contrôles mobiles et pédagogie, à valider sur le GSM) : direction par
@@ -58,7 +58,7 @@ principal (« Jouer », « Conduite libre », réglage de c, Direction), sélect
 portes à lampe colorée, bilan en étoiles chiffré, échec avec indices gradués, progression
 sauvegardée (par niveau et par valeur de c), spectromètre.
 
-Les niveaux (distances en L = c²/a = 10·c m : le même niveau pour tout c, chiffres ci-dessous
+Les niveaux (distances en L = 10·c m : le même niveau pour tout c, chiffres ci-dessous
 à c = 30 m/s) :
 
 | N° | Niveau | Notion | En bref |
@@ -154,7 +154,7 @@ est plus haute que large (écran partagé, Slide Over), le panneau demande d'agr
 fenêtre. Le zoom par pincement est désactivé (il rendait le jeu injouable sur iOS).
 
 Quand tu lâches tout, le véhicule garde sa vitesse (pas de frottement) : pour s'arrêter,
-il faut freiner, et cela prend de la place : (c²/a)(γ − 1), soit 163 m depuis 22,8 m/s
+il faut freiner, et cela prend de la place : (c²/a)(γ − 1), soit 81 m depuis 22,8 m/s
 (76 % de c) à c = 30 m/s. Le frein arrête exactement, sans marche arrière.
 
 Appareil de test de l'auteur : iPhone 14 Pro Max (Safari iOS). Il faut un navigateur
@@ -180,7 +180,7 @@ Paramètres d'URL (combinables, par exemple `?scene=quartier-test&bench&c=30&dpr
 
 | Paramètre | Effet |
 |---|---|
-| `?c=30` | vitesse de la lumière de la partie, entier de 10 à 100 m/s (a = c/10). Prioritaire sur le réglage de l'accueil et jamais mémorisée ; hors plage, ramenée dans la plage ; non entière, ignorée (avec un message). Exemple : `?c=100&bench` reproduit les mesures du jalon 1 |
+| `?c=30` | vitesse de la lumière de la partie, entier de 10 à 100 m/s (a = c/5). Prioritaire sur le réglage de l'accueil et jamais mémorisée ; hors plage, ramenée dans la plage ; non entière, ignorée (avec un message). Exemple : `?c=100&bench` reproduit les mesures du jalon 1 |
 | `?scene=avenue-test` ou `?scene=quartier-test` | scène de développement à charger (`src/data/scenes/`) ; `avenue-test` par défaut |
 | `?diag` | panneau de diagnostic : images par seconde, temps d'image p50 et p95, temps CPU du rendu, appels de dessin, triangles, durée de la première image, GPU, DPR. La touche E (ou la case du panneau) coupe et rétablit la passe ciel/sol, pour mesurer son coût |
 | `?bench` | parcours de mesure automatique et déterministe (aucune entrée, pas fixe de 1/60 s par image), avec le panneau de diagnostic. Sur `avenue-test` : poussée pleine jusqu'à γ ≈ 2,5, puis freinage jusqu'à l'arrêt. Sur `quartier-test` : caméra scriptée le long d'une rue, β imposé de 0 à 0,92. À la fin, le panneau affiche p50/p95 des temps d'image, le CPU du rendu, les appels de dessin et triangles maximaux ; le résultat complet est dans `window.__benchResult` (et la console). Ajouter `&sansciel` mesure le même parcours sans la passe ciel/sol (coût de la passe par différence) |
@@ -245,8 +245,8 @@ docs/                   conception (plan, décisions, glossaire) et contrat d'in
   par seconde (en virage avec poussée, à moins d'un millimètre près). Test de référence
   (cahier des charges, exécuté avec c = 100 m/s et a = 10 m/s² injectées) : 10 s de
   poussée depuis l'arrêt donnent v = 100·tanh 1 = 76,159 m/s, t = 10·sinh 1 = 11,752 s et
-  x = 1 000·(cosh 1 − 1) = 543,081 m ; à c = 30 m/s (défaut) : 22,848 m/s, 11,752 s et
-  162,924 m.
+  x = 1 000·(cosh 1 − 1) = 543,081 m ; au réglage par défaut (c = 30 m/s, a = 6 m/s²) :
+  v = 30·tanh 2 = 28,921 m/s, t = 5·sinh 2 = 18,134 s et x = 150·(cosh 2 − 1) = 414,329 m.
 - **Conduite « arcade ».** La route fournit la force latérale, hors du budget du moteur :
   tourner fait pivoter la vitesse sans la changer. La rapidité est plafonnée (φ ≤ 3,
   soit 99,5 % de c — 29,85 m/s à c = 30 — et γ ≈ 10).
