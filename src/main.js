@@ -22,7 +22,7 @@
 import { C, LENGTH_UNIT, PHI_MAX_DEFAULT } from './physics/constants.js';
 import { createPlayer, snapshot, step } from './physics/player.js';
 import { createCamera, updateCamera } from './render/camera.js';
-import { confirmBoot, createQuality } from './render/quality.js';
+import { armBootGuard, confirmBoot, createQuality } from './render/quality.js';
 import { createRenderer, observeViewport, resizeRenderer, viewportSize, watchContextLoss } from './render/renderer.js';
 import { createWorld } from './render/scene.js';
 import { createControls } from './input/controls.js';
@@ -333,7 +333,7 @@ if (requestedScene && !(requestedScene in SCENES)) {
 const diagMode = diagModeFromUrl(window.location.search);
 const benchMode = diagMode === 'bench';
 
-// Garde-fou de démarrage : à appeler une fois, avant de créer le renderer.
+// Garde-fou de démarrage (lecture) : à appeler une fois, avant de créer le renderer.
 const quality = createQuality();
 
 const controls = createControls(dom.controls, { mode: 'drag' });
@@ -540,6 +540,7 @@ async function startGame() {
   dom.play.blur(); // sinon Espace (frein) pourrait « recliquer » le bouton
   await nextPaint();
   try {
+    armBootGuard(); // le démarrage « risqué » commence ici (contexte WebGL, shaders)
     game = await createGame();
   } catch (error) {
     console.error(error);

@@ -4,11 +4,13 @@
  * - DPR par défaut : min(devicePixelRatio, 2), plafonné pour ne pas dépasser MAX_PIXELS
  *   pixels physiques (iPhone 14 Pro Max en paysage : 932 × 430 px CSS à DPR 2 ≈ 1,6 Mpx).
  * - `?dpr=` dans l'URL impose le DPR (mesures, captures).
- * - Garde-fou : un drapeau `gl-boot` est posé au démarrage (stockage local ET de session,
- *   via storage.js, clés préfixées « aslower:v1: ») et retiré par confirmBoot() une fois
- *   les premières images affichées. S'il est encore là au démarrage suivant, la page a
- *   planté pendant le démarrage :
- *   - 1er plantage : profil « lite » (DPR 0,75, sans MSAA), mémorisé dans `gl-tier` ;
+ * - Garde-fou : un drapeau `gl-boot` est posé par armBootGuard() juste avant de créer le
+ *   renderer (pas à l'ouverture de la page : quitter l'écran titre n'est pas un plantage),
+ *   en stockage local ET de session (storage.js, clés préfixées « aslower:v1: »), et retiré
+ *   par confirmBoot() une fois les premières images affichées, ou si la page est cachée ou
+ *   fermée. S'il est encore là au démarrage suivant, la page a planté pendant le démarrage :
+ *   - 1er plantage : profil « lite » (DPR 0,75, sans MSAA), mémorisé dans `gl-tier` pendant
+ *     LITE_TTL_MS (3 jours), puis retour au profil normal ;
  *   - 2e plantage d'affilée : quality.unstable (crashes ≥ 2) → écran « WebGL instable » avec
  *     un bouton Réessayer. Jamais de coupure définitive : un jeu n'a pas de repli sans WebGL.
  */
@@ -27,6 +29,9 @@ const DPR_OVERRIDE_MAX = 4;
 const KEY_BOOT = 'gl-boot';
 const KEY_CRASH = 'gl-crash';
 const KEY_TIER = 'gl-tier';
+
+/** Durée du profil « lite » après un plantage (ms) : 3 jours, puis nouvel essai normal. */
+export const LITE_TTL_MS = 3 * 24 * 3600 * 1000;
 
 /**
  * @typedef {object} Quality
@@ -76,26 +81,41 @@ export function resolvePixelRatio(quality, cssWidth, cssHeight) {
 }
 
 /**
- * Garde-fou : constate un éventuel plantage du démarrage précédent, puis pose le drapeau
- * de ce démarrage. Le drapeau est retiré par confirmBoot(), ou à la fermeture normale de
- * la page (`pagehide`), qui n'est pas un plantage.
+ * Garde-fou, lecture seule : constate un éventuel plantage du démarrage précédent
+ * (drapeau resté posé) et lit le profil mémorisé. Ne pose pas de drapeau.
+ * @param {number} [now] horodatage (ms), pour les tests
  * @returns {{crashes: number, tier: 'default' | 'lite'}}
  */
-export function startBootGuard() {
+export function startBootGuard(now = Date.now()) {
   const pending = Boolean(local.get(KEY_BOOT, false) || session.get(KEY_BOOT, false));
   let crashes = Number(local.get(KEY_CRASH, 0)) || 0;
   if (pending) {
     crashes += 1;
     local.set(KEY_CRASH, crashes);
-    local.set(KEY_TIER, 'lite');
+    local.set(KEY_TIER, { tier: 'lite', until: now + LITE_TTL_MS });
+    clearBootFlag();
   }
+  const saved = local.get(KEY_TIER, null);
+  // Ancien format (chaîne 'lite' sans échéance) ou échéance passée : profil normal.
+  const lite = saved && typeof saved === 'object' && saved.tier === 'lite' && Number(saved.until) > now;
+  if (saved && !lite) local.remove(KEY_TIER);
+  return { crashes, tier: lite ? 'lite' : 'default' };
+}
+
+/**
+ * Pose le drapeau de démarrage juste avant la création du renderer et des shaders.
+ * Le drapeau est retiré par confirmBoot(), ou quand la page est cachée ou fermée
+ * (ce n'est pas un plantage du démarrage).
+ */
+export function armBootGuard() {
   local.set(KEY_BOOT, true);
   session.set(KEY_BOOT, true);
   if (typeof window !== 'undefined') {
     window.addEventListener('pagehide', clearBootFlag, { once: true });
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') clearBootFlag();
+    });
   }
-  const tier = local.get(KEY_TIER, 'default') === 'lite' ? 'lite' : 'default';
-  return { crashes, tier };
 }
 
 /** Démarrage réussi (premières images affichées) : retire le drapeau, remet le compteur à 0. */

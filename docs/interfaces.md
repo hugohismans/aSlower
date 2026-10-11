@@ -232,7 +232,9 @@ isChunkVisible(chunk, camera {x, y, z}, visibilityFar) // coupe à la distance d
   perte et restauration du contexte, préchauffage des programmes.
 - `quality.js` : DPR (défaut min(devicePixelRatio, 2), plafond de pixels), paramètre d'URL
   `?dpr=`, garde-fou de démarrage (clés `aslower:v1:gl-boot`, `gl-crash`, `gl-tier` via
-  `storage.js`).
+  `storage.js`) : `createQuality()` lit l'état à l'ouverture ; `armBootGuard()` pose le
+  drapeau juste avant la création du renderer (pas sur l'écran titre) ; `confirmBoot()` le
+  retire après 30 images. Le profil « lite » d'après plantage expire au bout de 3 jours.
 - `camera.js` : caméra première personne, œil à EYE_HEIGHT, hFOV 90° en paysage.
 - `dopplerLut.js` : `createDopplerLutTexture()` → DataTexture HalfFloat RGBA, LinearFilter,
   sans mipmaps, à partir de `buildDopplerLutData()`.
