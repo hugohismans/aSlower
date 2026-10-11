@@ -41,7 +41,8 @@ dans le joueur (`createPlayer({physics})`), la scène (`lengthUnit`), et tout le
   - `src/main.js`, `src/loop.js` : tout.
   - `localStorage` et `sessionStorage` ne sont utilisés que dans `src/storage.js`.
   - Les fichiers « purs » (`physics/**`, `render/subdivide.js`, `render/lod.js`,
-    `render/culling.js`, `render/layout.js`, `render/adaptiveDpr.js`, `hud/format.js`,
+    `render/culling.js`, `render/layout.js`, `render/adaptiveDpr.js`, `render/streetPlan.js`,
+    `hud/format.js`,
     `hud/levelFormat.js`,
     `input/tiltMath.js`, `game/conditions.js`, `game/bubbles.js`, `game/validate.js`,
     `game/level.js`, `game/rules.js`, `game/score.js`, `game/states.js`, `game/bot.js`,
@@ -245,7 +246,9 @@ setStreetMap(texture, bounds)      // branche la carte des rues sur la passe d'e
 ```js
 createSurfaceMaterial()            // façades, sol maillé éventuel (attributs color + aSpec)
 createEmitterMaterial()            // lampadaires corps noir (attribut aEmit)
-createEnvironmentMaterial()        // passe plein écran ciel + sol + brouillard (renderOrder 1)
+createEnvironmentMaterial({vegetation} = {})
+                                   // passe plein écran ciel + sol + brouillard (renderOrder 1) ;
+                                   // vegetation : entrée de palette (ir, uv de la végétation)
 createEnvironmentMesh(material = createEnvironmentMaterial())
                                    // triangle plein écran de cette passe (jamais éliminé)
 createCockpitMaterial()            // avant du véhicule, comobile, sans effet relativiste ni
@@ -330,11 +333,30 @@ isChunkVisible(chunk, camera {x, y, z}, visibilityFar) // coupe à la distance d
 - `camera.js` : caméra première personne, œil à EYE_HEIGHT, hFOV 90° en paysage.
 - `dopplerLut.js` : `createDopplerLutTexture()` → DataTexture HalfFloat RGBA, LinearFilter,
   sans mipmaps, à partir de `buildDopplerLutData()`.
-- `streetMap.js` : `createStreetMap(streets, bounds, {buildings = [], sunDir = SUN_DIRECTION} = {})`
-  → CanvasTexture (plan et ombres portées des bâtiments).
+- `streetMap.js` : `createStreetMap(streets, bounds, {buildings = [], sunDir = SUN_DIRECTION,
+  detail = 'full', vegetation = [], greens = [], lawnColor} = {})` → CanvasTexture sRGB (au plus
+  2 px/m) : trottoirs dallés, bordures, caniveaux, chaussées, places dallées (chaussée ≥ 40 m),
+  passages piétons, lignes d'arrêt, ligne axiale, pelouses, pieds d'arbres, ombres portées.
+  `detail` : 'full', 'lite' (sans motifs de dalles), 'off' (carte d'avant, `?solDetail=0`).
+  **Végétation (facultative, pour le décor)** : `vegetation: [{x, y, r}]` = pieds d'arbres
+  (disques de terre de rayon r m, végétation v = 0,3) ; `greens: [polygone]` = pelouses (v = 1),
+  polygone = sommets `{x, y}` ou `[x, y]` du repère du jeu, sens quelconque ; `lawnColor` :
+  sRGB des pelouses (palette « vegetation »). scene.js les lit dans `city.greens` et
+  `city.vegetation` s'ils existent (buildCity), sinon rien.
+  **Canal végétation** : alpha = 1 − v/2 (v ∈ [0, 1], fraction de végétation du texel ; alpha ≥ 0,5
+  pour la précision malgré le stockage prémultiplié du canevas ; `premultiplyAlpha = false`).
+  La passe d'environnement en tire ir, uv = Y·mix(uGroundIrUv, uVegetationIrUv, v), où Y est la
+  luminance lue sur la carte et uVegetationIrUv = (ir, uv)/Y de la palette « vegetation »
+  (`createEnvironmentMaterial({vegetation})`). En vision classique, seules les couleurs comptent.
+- `streetPlan.js` (pur) : géométrie de la carte. `planStreets(streets)` → `{plazas, junctions,
+  crosswalks, stopLines, centerLines}` ; `findJunctions(streets)` (parties de l'axe d'une rue
+  dans la chaussée d'une autre, non parallèle ou place) ; `isPlaza(street)` ;
+  `crosswalkBarOffsets(roadWidth)` ; `normalizeGreens`, `normalizeTreePits` ;
+  `groundDetailFor(search, tier)` → 'off' | 'lite' | 'full' ; `irUvPerLuminance(entry)`.
 - `cockpit.js` : `createCockpit()` → Object3D attaché à la caméra (renderOrder −1).
 - `scene.js` : assemble tout pour une scène de `src/data/scenes/` ;
-  `createWorld(renderer, sceneJson, palette, {tier = 'default', lodSteps, physics} = {})` →
+  `createWorld(renderer, sceneJson, palette, {tier = 'default', lodSteps, physics, level,
+  groundDetail} = {})` (groundDetail : détail de la carte des rues, défaut celui du profil) →
   `{update(snapshot, k, dtReal), render(camera), stats(), dispose()}`, plus
   `scene`, `start`, `bounds`, `streets`, `buildings` (emprises au sol {x, y, width, depth, …},
   pour `game/bubbles.facadeAhead`), `visibilityFar`, `warmup(camera)` (préchauffage, variantes

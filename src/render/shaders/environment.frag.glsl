@@ -6,7 +6,11 @@
 // 1. direction apparente n' (référentiel du joueur), puis aberration INVERSE exacte vers la
 //    direction monde n : D = 1/(γ(1 − β·n')), n = (n' + (γ²/(γ+1)(β·n') − γ)β)·D ;
 // 2. intersection analytique avec le sol (Three : y = 0, œil à uEyeHeight), SANS branchement
-//    avant la lecture de texture, puis carte des rues (repère du jeu, uStreetBounds) ;
+//    avant la lecture de texture, puis carte des rues (repère du jeu, uStreetBounds) : rgb =
+//    réflectances visibles, alpha = 1 − v/2 où v est la fraction de végétation du texel
+//    (render/streetMap.js) ; ir et uv = luminance × rapport du sol minéral (uGroundIrUv) ou
+//    de la végétation (uVegetationIrUv, « red edge » : ir fort pour un visible faible),
+//    mélangés selon v ;
 // 3. ciel en dégradé (horizon : ligne de LUT uSkyRow ; zénith : ciel dégagé à spectre continu,
 //    ligne de LUT uSkyClearRow), disque solaire, brume à l'horizon ; brouillard du sol en
 //    distance monde, mélangé avant le Doppler ;
@@ -21,7 +25,8 @@ uniform highp vec4 uStreetBounds; // (xmin, ymin, xmax, ymax) du jeu couverts pa
 uniform highp vec3 uSunDir;       // direction du soleil (monde, repère Three, unitaire)
 uniform float uSkyRow;            // ligne de LUT de la lumière du ciel (corps noir)
 uniform float uSkyClearRow;       // ligne de LUT du ciel dégagé (spectre continu)
-uniform vec2 uGroundIrUv;         // réflectances ir, uv du sol, en fraction de sa luminance
+uniform vec2 uGroundIrUv;         // réflectances ir, uv du sol minéral, en fraction de sa luminance
+uniform vec2 uVegetationIrUv;     // réflectances ir, uv de la végétation, en fraction de sa luminance
 
 varying highp vec3 vRay;
 
@@ -64,10 +69,12 @@ void main() {
   highp vec2 hitXZ = cameraPosition.xz + n.xz * dist;
   highp vec2 hitGame = vec2(hitXZ.x, -hitXZ.y); // repère du jeu : y = −Z
   highp vec2 uv = (hitGame - uStreetBounds.xy) / (uStreetBounds.zw - uStreetBounds.xy);
-  vec3 ground = texture(uStreetMap, uv).rgb;
+  vec4 groundTexel = texture(uStreetMap, uv);
+  vec3 ground = groundTexel.rgb;
+  float vegetation = clamp(2.0 - 2.0 * groundTexel.a, 0.0, 1.0);
   float fog = relFogFactor(dist);
   vec3 groundRgb = mix(ground, uFogSpec, fog);
-  vec2 groundIrUv = mix(uGroundIrUv * dot(ground, REL_LUMA), uFogIrUv, fog);
+  vec2 groundIrUv = mix(mix(uGroundIrUv, uVegetationIrUv, vegetation) * dot(ground, REL_LUMA), uFogIrUv, fog);
 
   // --- Ciel : brume près de l'horizon, puis ciel dégagé en dégradé (blanc → bleu du ciel dégagé).
   float isGround = step(0.0, down);

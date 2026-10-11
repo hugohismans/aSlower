@@ -51,6 +51,7 @@ import { createAdaptiveDpr, DPR_FLOOR, DPR_FLOOR_LITE } from './render/adaptiveD
 import { armBootGuard, confirmBoot, createQuality, profilePixelRatio } from './render/quality.js';
 import { createRenderer, observeViewport, resizeRenderer, viewportSize, watchContextLoss } from './render/renderer.js';
 import { createWorld } from './render/scene.js';
+import { groundDetailFor } from './render/streetPlan.js';
 import { createControls } from './input/controls.js';
 import { createWakeLock, enterFullscreen } from './input/device.js';
 import { CALIBRATION_MS, createTilt } from './input/tilt.js';
@@ -1284,6 +1285,7 @@ async function createSession(renderer, { sceneJson = null, levelDef = null }, c)
   const level = levelDef ? createLevel(levelDef, physics, palette) : null;
   const world = createWorld(renderer, level ? level.sceneJson : sceneJson, palette, {
     tier: quality.tier,
+    groundDetail: groundDetailFor(window.location.search, quality.tier),
     physics,
     level: level ? levelView(level) : null,
   });
