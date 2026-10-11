@@ -1,40 +1,48 @@
 /**
- * Point d'entrée du jeu : écran titre → « Jouer » (geste utilisateur) → monde, caméra,
- * commandes, HUD et boucle d'images.
+ * Point d'entrée du jeu : menu principal → niveaux (sélection, briefing, décompte, partie,
+ * bilan ou échec) ou conduite libre (l'avenue de test) ; monde, caméra, commandes, HUD et
+ * boucle d'images.
  *
  * Paramètres d'URL (docs/interfaces.md) :
- * - ?scene=avenue-test (par défaut) | quartier-test : scène de src/data/scenes/ ;
+ * - ?scene=avenue-test (par défaut) | quartier-test : scène de la conduite libre ;
  * - ?diag : panneau de diagnostic #diag (touche E ou case « Passe ciel/sol » : couper la
  *   passe d'environnement pour mesurer son coût) ;
- * - ?bench : parcours de mesure automatique, sans entrée (voir createBench), avec #diag ;
- *   résultat affiché dans #diag et exposé dans window.__benchResult ;
+ * - ?bench : parcours de mesure automatique en conduite libre, sans entrée (voir createBench),
+ *   avec #diag ; résultat affiché dans #diag et exposé dans window.__benchResult ;
  * - ?sansciel (avec ?diag ou ?bench) : passe ciel/sol coupée dès la première image ;
  * - ?dpr= : rapport de pixels imposé (render/quality.js ; coupe le DPR adaptatif) ;
  * - ?c=n : vitesse de la lumière (entier de 10 à 100 m/s), prioritaire sur le réglage mémorisé
  *   (game/settings.js) et jamais mémorisée ;
- * - ?debug : panneau de l'inclinaison (hud/tiltDebug.js : α, β, γ, angle, neutre, volant).
+ * - ?debug : panneau de l'inclinaison (hud/tiltDebug.js : α, β, γ, angle, neutre, volant) ;
+ * - ?autopilote[=reference|naif] : en niveau, le pilote de référence (game/bot.js) conduit à
+ *   la place du joueur, sur l'itinéraire `parcours` du niveau (défaut : reference), à pas fixes
+ *   de 1/60 s ; pour les tests automatisés et les démonstrations. Sans effet sans ce paramètre.
  *
- * Vitesse de la lumière : réglage du joueur (écran titre, ou « Changer c » dans le menu pause,
- * qui redémarre la partie). Toute la partie lit ses constantes dans physicsFor(c) : joueur,
- * scène (longueurs en L = c²/a), butée, ?bench ; le HUD et le rendu lisent snapshot.c.
+ * Machine à états des niveaux (game/states.js) : chargement → menu → selection → briefing →
+ * decompte → enCours ⇄ pause / reprise → bilan | echec. Les écrans sont rendus par
+ * hud/screens.js ; les horloges ne tournent qu'en « enCours » (décompte de 3 s au départ,
+ * d'1 s après une pause ou une reprise ; calibrage du volant d'inclinaison pendant le décompte).
+ * La conduite libre garde le fonctionnement du jalon 2 (butée douce, pas de collision).
+ *
+ * Vitesse de la lumière : réglage du joueur (menu, ou « Changer c » dans le menu pause, qui
+ * redémarre la partie). Toute la partie lit ses constantes dans physicsFor(c) : joueur, scène
+ * (longueurs en L = c²/a), niveau, butée, ?bench ; le HUD et le rendu lisent snapshot.c. La
+ * progression (game/progress.js) est gardée par niveau et par c.
  *
  * Direction tactile (jalon 2) : inclinaison du GSM (input/tilt.js) ou glisser, réglage
- * « Direction » de l'écran titre et du menu pause, mémorisé (aslower:v1:commandes) ; par
- * défaut l'inclinaison sur écran tactile. La permission du capteur est demandée EN PREMIER
- * dans le clic « Jouer » (geste exigé par iOS), puis le plein écran (Android), puis le
- * chargement. Repli automatique en glisser, annoncé (aria-live) ; calibrage quand le capteur
- * répond en jeu ; « Recentrer le volant » au menu pause.
+ * « Direction » du menu et du menu pause, mémorisé (aslower:v1:commandes) ; par défaut
+ * l'inclinaison sur écran tactile. La permission du capteur est demandée EN PREMIER dans le
+ * geste qui lance la partie (« C'est parti », « Conduite libre » : exigé par iOS), puis le
+ * plein écran (Android), puis le chargement. Repli automatique en glisser, annoncé (aria-live).
  *
- * Une image (plan §2) : commandes → butée douce → player.step (dτ ≤ 0,1 s) → vision
- * classique (k) → bulles (game/bubbles.js, conditions à 5 Hz) → world.update (observateur,
- * coupe, LOD) → caméra → world.render → HUD (12 Hz) → #diag → DPR adaptatif
- * (render/adaptiveDpr.js, appliqué à l'image suivante, avant le rendu).
+ * Une image de niveau : commandes (ou pilote) → level.advance (player.step, collisions,
+ * règles, reprises ; dτ ≤ 0,1 s) → événements (états, messages, bulles) → vision classique (k)
+ * → bulles globales et du niveau → world.update + updateLevel (zones, clients et portes VUS à
+ * t_e, couleur des lampes par la chaîne de la règle) → caméra → rendu → HUD et HUD de niveau
+ * (12 Hz) → #diag → DPR adaptatif. Conduite libre : commandes → butée douce → player.step → …
  *
  * Pauses (horloges gelées, horloge des bulles comprise, écran plus maintenu allumé) : Échap
- * ou P, onglet caché, panneau « Tourne ton GSM » (portrait sur écran tactile : paysage
- * strictement imposé), perte du contexte WebGL (recompilation et préchauffage à la
- * restauration ; « Recharger » si elle tarde). Menu pause : Reprendre, Recentrer le volant,
- * Direction, Changer c, Revoir les bulles, Recommencer, Crédits.
+ * ou P, onglet caché, panneau « Tourne ton GSM », perte du contexte WebGL.
  */
 import { PHI_MAX_DEFAULT, physicsFor } from './physics/constants.js';
 import { createPlayer, snapshot, step } from './physics/player.js';
@@ -53,17 +61,46 @@ import { createDiag, diagModeFromUrl, readGlInfo } from './hud/diag.js';
 import { createDirectionControl } from './hud/direction.js';
 import { createHud } from './hud/hud.js';
 import { formatLightSpeed } from './hud/format.js';
+import { createLevelHud } from './hud/levelHud.js';
+import {
+  activeAids,
+  batteryFraction,
+  batteryLevel,
+  brakingDistance,
+  failureText,
+  formatBattery,
+  formatClockShort,
+  formatDistance,
+  formatStars,
+  hintFor,
+  hueSpeedWindow,
+  resultFigures,
+  spectrometerReading,
+  starLines,
+  stopIndicator,
+  stopTiming,
+} from './hud/levelFormat.js';
 import { createLightSpeedControl } from './hud/lightSpeed.js';
+import { createScreens } from './hud/screens.js';
 import { createTiltDebug, tiltDebugFromUrl } from './hud/tiltDebug.js';
-import { createBubbleEngine, createBubbleVariables, facadeAhead } from './game/bubbles.js';
+import { BUBBLES_SCHEMA, createBubbleEngine, createBubbleVariables, facadeAhead } from './game/bubbles.js';
+import { BOT_DT, createBotDriver } from './game/bot.js';
+import { advance, createLevel, createLevelPlayer } from './game/level.js';
+import { canSkip, isUnlocked, levelStats, loadProgress, recordResult, recordSkip, saveProgress, totalStars } from './game/progress.js';
+import { activeStops, perceivedLamp, seenClientPresent, seenDoorOpen } from './game/rules.js';
+import { computeScore } from './game/score.js';
 import {
   LIGHT_SPEED_PRESETS,
   initialLightSpeed,
   loadControlMode,
+  loadOptions,
   parseLightSpeed,
   saveControlMode,
+  saveOptions,
   saveSettings,
 } from './game/settings.js';
+import { createStateMachine } from './game/states.js';
+import { LEVEL_FILES, LEVEL_IDS, levelJson } from './levels/index.js';
 import { createLoop } from './loop.js';
 import { local } from './storage.js';
 import bubblesJson from './data/bubbles.json';
@@ -362,6 +399,26 @@ function createBench(sceneId, player, limits) {
 }
 
 /* ------------------------------------------------------------------------- */
+/* Niveaux : constantes                                                       */
+/* ------------------------------------------------------------------------- */
+
+/** Décomptes (s) : au départ d'une partie, puis après une pause ou une reprise. */
+const COUNTDOWN_START_S = 3;
+const COUNTDOWN_RESUME_S = 1;
+/** Durée d'affichage de « Partez ! » (s) et du message de reprise (s). */
+const GO_TEXT_S = 0.6;
+const REPRISE_MESSAGE_S = 1.6;
+/** Messages courts du jeu (livraison, porte…) : durée d'affichage (ms). */
+const TOAST_EVENT_MS = 2200;
+/** Un choc plus court que ceci (s d'étourdissement) n'est pas annoncé. */
+const STUN_TOAST_MIN_S = 0.3;
+/** Spectromètre : lampes vues dans ±60° devant, à moins de 3 × la fin de la portée de la porte. */
+const SPECTRO_HALF_ANGLE = Math.PI / 3;
+const SPECTRO_RANGE = 3;
+/** Bulle « dépassé » : arrêt derrière, à moins de cette distance (m). */
+const BEHIND_MAX_M = 60;
+
+/* ------------------------------------------------------------------------- */
 /* Page                                                                       */
 /* ------------------------------------------------------------------------- */
 
@@ -372,6 +429,7 @@ const dom = {
   hud: $('hud'),
   title: $('title'),
   play: /** @type {HTMLButtonElement} */ ($('play')),
+  freeDrive: /** @type {HTMLButtonElement} */ ($('free-drive')),
   openCredits: $('open-credits'),
   credits: /** @type {HTMLDialogElement} */ ($('credits')),
   diag: $('diag'),
@@ -385,6 +443,8 @@ const dom = {
   helpTilt: $('help-tilt'),
   helpDrag: $('help-drag'),
   helpIos: $('help-ios'),
+  screen: $('screen'),
+  countdown: $('countdown'),
 };
 
 // Safari iOS ignore user-scalable=no : pas de pincement, sur toute la page (titre, pause, Crédits).
@@ -398,6 +458,8 @@ if (requestedScene && !(requestedScene in SCENES)) {
 }
 const diagMode = diagModeFromUrl(window.location.search);
 const benchMode = diagMode === 'bench';
+/** ?autopilote[=reference|naif] : itinéraire du pilote de référence en niveau, ou null. */
+const autopilotRoute = params.has('autopilote') ? params.get('autopilote') || 'reference' : null;
 
 /** Écran tactile : direction par inclinaison par défaut, réglage Direction, plein écran. */
 const touchDevice = window.matchMedia('(any-pointer: coarse)').matches;
@@ -405,7 +467,7 @@ const touchDevice = window.matchMedia('(any-pointer: coarse)').matches;
 // Vitesse de la lumière de la prochaine partie : ?c= (prioritaire), sinon le réglage mémorisé.
 const startLight = initialLightSpeed(window.location.search);
 if (startLight.message) console.warn(startLight.message);
-/** Réglage de c choisi sur l'écran titre (ou au menu pause) pour la prochaine partie. */
+/** Réglage de c choisi au menu (ou au menu pause) pour la prochaine partie. */
 let chosenC = startLight.c;
 
 /** Mémorise le réglage (pas une valeur venue de ?c= tant que le joueur n'y touche pas). */
@@ -418,11 +480,15 @@ function chooseLightSpeed(c) {
 const quality = createQuality();
 
 /**
- * État de la page : 'title' → 'loading' → 'playing' ⇄ 'paused' ; 'lost' (contexte WebGL
- * perdu) ; 'done' (fin de ?bench) ; 'error'.
+ * État de la boucle : 'title' (menus et écrans, rien à dessiner) → 'loading' → 'countdown'
+ * (vue dessinée, horloges arrêtées) → 'playing' ⇄ 'paused' ; 'frozen' (bilan, échec, message
+ * de reprise : dernière image gardée) ; 'lost' (contexte WebGL perdu) ; 'done' (fin de ?bench) ;
+ * 'error'.
  */
 let mode = 'title';
-/** Jeu en cours (créé au clic sur « Jouer »). */
+/** Partie en cours : 'libre' (conduite libre) ou 'niveau' ; null au menu. */
+let flow = null;
+/** Renderer et partie (créés au premier lancement ; la partie est refaite à chaque niveau). */
 let game = null;
 /** Intervalle moyen entre images (s), pour les i/s du HUD en ?diag. */
 let averageDt = NaN;
@@ -430,6 +496,13 @@ let averageDt = NaN;
 /** Réglages Direction de l'écran titre et du menu pause (ce dernier, recréé à chaque ouverture). */
 let titleDirection = null;
 let pauseDirection = null;
+
+/** Progression mémorisée (aslower:v1:progression), par niveau et par c. */
+let progress = loadProgress();
+/** Options (aslower:v1:options) : spectromètre. */
+let options = loadOptions();
+/** Niveau choisi (id) pour le briefing et la partie. */
+let selectedLevelId = null;
 
 /* --- Annonces, inclinaison, commandes ------------------------------------------ */
 
@@ -468,7 +541,7 @@ function onTiltFallback(reason) {
   tiltFallback = reason;
   const text = TILT_FALLBACK_TEXTS[reason] ?? TILT_FALLBACK_TEXTS.indisponible;
   announcer.announce(text);
-  if (mode === 'playing') showToast(text, TOAST_FALLBACK_MS, { announce: false });
+  if (mode === 'playing' || mode === 'countdown') showToast(text, TOAST_FALLBACK_MS, { announce: false });
   refreshDirection();
 }
 
@@ -484,9 +557,12 @@ tilt.subscribe((state) => {
   refreshDirection();
 });
 
-/** Calibrage (≈ 0,5 s) quand l'inclinaison répond, en jeu : la position tenue devient « tout droit ». */
+/**
+ * Calibrage (≈ 0,5 s) quand l'inclinaison répond, en jeu ou pendant le décompte : la position
+ * tenue devient « tout droit ».
+ */
 function maybeCalibrate() {
-  if (!calibrationPending || mode !== 'playing' || controls.getMode() !== 'tilt' || tilt.state !== 'actif') return;
+  if (!calibrationPending || (mode !== 'playing' && mode !== 'countdown') || controls.getMode() !== 'tilt' || tilt.state !== 'actif') return;
   calibrationPending = false;
   showToast(CALIBRATION_TEXT, CALIBRATION_TOAST_MS);
   tilt.calibrate(CALIBRATION_MS);
@@ -502,13 +578,13 @@ function chooseDirection(next) {
     tilt.stop(); // plus d'écoute du capteur
   }
   if (mode === 'title') announceTitleFailure = next === 'tilt';
-  if (game && (mode === 'playing' || mode === 'paused')) controls.setMode(next);
+  if (game?.session && (mode === 'playing' || mode === 'paused')) controls.setMode(next);
   refreshDirection();
 }
 
 /** Mode affiché par les réglages Direction : celui en usage, ou le repli. */
 function shownDirection() {
-  if (game && mode !== 'title') return controls.getMode();
+  if (game?.session && mode !== 'title') return controls.getMode();
   if (!touchDevice) return 'drag';
   return preferredMode === 'tilt' && tiltFallback ? 'drag' : preferredMode;
 }
@@ -534,20 +610,39 @@ function canRecenter() {
   return controls.getMode() === 'tilt' && tilt.state === 'actif';
 }
 
-/* --- HUD, bulles, Crédits, #diag -------------------------------------------- */
+/* --- HUD, bulles, écrans, Crédits, #diag ------------------------------------------ */
 
 const hud = createHud(dom.hud, { phiMax: PHI_MAX_DEFAULT });
+const levelHud = createLevelHud(dom.hud);
+levelHud.hide();
+const screens = createScreens(dom.screen, dom.countdown);
 
 /** Horloge réelle de jeu (ms) : avance seulement en jeu, s'arrête en pause (durées des bulles). */
 let playClockMs = 0;
-const bubbles = createBubbleEngine({ definitions: bubblesJson, store: local, now: () => playClockMs });
 // Après createHud (qui remplit #hud) : la bulle se place sous les horloges.
 const bubbleView = createBubbleView(dom.hud, { announcer, onDismiss: () => bubbles.dismiss() });
-bubbles.onShow((b) => (b ? bubbleView.show(b) : bubbleView.hide()));
+/**
+ * Moteur de bulles : bulles globales (src/data/bubbles.json) et, en niveau, celles du niveau
+ * (ids distincts, vérifiés par le validateur). Refait à chaque partie (vues gardées).
+ * @param {any} [levelDef] JSON du niveau
+ */
+function makeBubbleEngine(levelDef = null) {
+  const bulles = [...bubblesJson.bulles, ...(levelDef?.bulles ?? [])];
+  return createBubbleEngine({ definitions: { schema: BUBBLES_SCHEMA, bulles }, store: local, now: () => playClockMs });
+}
+let bubbles = makeBubbleEngine();
+let unsubscribeBubbles = bubbles.onShow((b) => (b ? bubbleView.show(b) : bubbleView.hide()));
+/** Change le moteur de bulles (nouvelle partie : bulles du niveau). */
+function useBubbleEngine(levelDef) {
+  unsubscribeBubbles();
+  bubbleView.hide();
+  bubbles = makeBubbleEngine(levelDef);
+  unsubscribeBubbles = bubbles.onShow((b) => (b ? bubbleView.show(b) : bubbleView.hide()));
+}
 const bubbleVars = createBubbleVariables();
 
-// Messages courts du jeu (calibrage, repli) : même allure qu'une bulle, hors du moteur de bulles.
-// Sans annonceur : showToast annonce lui-même, sauf si l'appelant l'a déjà fait.
+// Messages courts du jeu (calibrage, repli, livraisons) : même allure qu'une bulle, hors du
+// moteur de bulles. Sans annonceur : showToast annonce lui-même, sauf si l'appelant l'a fait.
 const toast = createBubbleView(dom.hud, { onDismiss: () => hideToast() });
 toast.element.classList.add('bubble-toast');
 let toastTimer = 0;
@@ -572,7 +667,7 @@ if (tiltDebug) {
   tiltDebug.show();
   // Panneau ?debug : mis à jour à chaque image, écran titre et pause compris.
   const debugTick = () => {
-    tiltDebug.update({ ...tilt.debugInfo(), mode: game ? controls.getMode() : `${preferredMode}, titre` });
+    tiltDebug.update({ ...tilt.debugInfo(), mode: game?.session ? controls.getMode() : `${preferredMode}, titre` });
     requestAnimationFrame(debugTick);
   };
   requestAnimationFrame(debugTick);
@@ -597,6 +692,20 @@ const standalone =
   /** @type {any} */ (navigator).standalone === true || window.matchMedia('(display-mode: standalone), (display-mode: fullscreen)').matches;
 dom.helpIos.hidden = !(ios && !standalone);
 refreshDirection();
+
+/** Option « Spectromètre » (sélection des niveaux et pause) : bouton bascule (aria-pressed). */
+function spectroLabel() {
+  return `Spectromètre : ${options.spectrometre ? 'oui' : 'non'}`;
+}
+/** Bascule l'option (sélection des niveaux, menu pause) et met à jour ses boutons. */
+function toggleSpectro() {
+  options = { ...options, spectrometre: !options.spectrometre };
+  saveOptions(options);
+  for (const b of document.querySelectorAll('[data-option="spectrometre"]')) {
+    b.textContent = spectroLabel();
+    b.setAttribute('aria-pressed', String(options.spectrometre));
+  }
+}
 
 /** Portrait sur écran tactile : même requête que le panneau #rotate de base.css. */
 const portrait = window.matchMedia('(orientation: portrait) and (pointer: coarse)');
@@ -636,12 +745,13 @@ function showNotice({ title, text, actions = [], content = null, variant = '' })
   else dom.noticeContent.replaceChildren();
   if (variant !== 'pause') pauseDirection = null;
   dom.noticeActions.replaceChildren(
-    ...actions.map(({ label, primary = false, onClick, id, hidden = false }) => {
+    ...actions.map(({ label, primary = false, onClick, id, hidden = false, pressed }) => {
       const button = document.createElement('button');
       button.type = 'button';
       button.className = primary ? 'btn btn-primary' : 'btn';
       button.textContent = label;
       if (id) button.dataset.action = id;
+      if (pressed !== undefined) button.setAttribute('aria-pressed', String(pressed));
       button.hidden = hidden;
       button.addEventListener('click', onClick);
       return button;
@@ -662,10 +772,220 @@ function nextPaint() {
   return new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0)));
 }
 
+/** Panneau « Le jeu s'est arrêté » après une erreur de préparation. */
+function showFatal(text) {
+  mode = 'error';
+  showNotice({
+    title: "Le jeu s'est arrêté",
+    text,
+    actions: [{ label: 'Recharger', primary: true, onClick: () => window.location.reload() }],
+  });
+}
+
+/* --- Machine à états des niveaux ---------------------------------------------- */
+
+const sm = createStateMachine({ onChange: onStateChange });
+
+/**
+ * Effets d'un changement d'état (game/states.js) : écrans, HUD, décompte, boucle.
+ * @param {string} to
+ * @param {string} from
+ * @param {string} event
+ */
+function onStateChange(to, from, event) {
+  if (to !== 'pause') hideNotice();
+  // « Partez ! » reste affiché un instant au début de la partie (frame le retire).
+  if (to !== 'decompte' && to !== 'enCours') screens.hideCountdown();
+  switch (to) {
+    case 'menu':
+      leaveGameView();
+      screens.hide();
+      dom.title.hidden = false;
+      dom.play.focus({ preventScroll: true });
+      break;
+    case 'selection':
+      leaveGameView();
+      dom.title.hidden = true;
+      showSelection();
+      break;
+    case 'briefing':
+      leaveGameView();
+      dom.title.hidden = true;
+      showBriefing();
+      break;
+    case 'decompte':
+      screens.hide();
+      startCountdown(from === 'pause' && event === 'reprendre' ? COUNTDOWN_RESUME_S : from === 'reprise' ? COUNTDOWN_RESUME_S : COUNTDOWN_START_S);
+      break;
+    case 'enCours':
+      if (!(game?.countdown?.go > 0)) screens.hideCountdown();
+      enterPlaying();
+      break;
+    case 'pause':
+      mode = 'paused';
+      controls.setEnabled(false);
+      wakeLock.release();
+      screens.hideCountdown();
+      showPauseNotice();
+      break;
+    case 'reprise':
+      mode = 'frozen';
+      controls.setEnabled(false);
+      screens.showCountdown(game.repriseText ?? 'Reprise', { small: true });
+      game.repriseTimer = REPRISE_MESSAGE_S;
+      break;
+    case 'bilan':
+      mode = 'frozen';
+      controls.setEnabled(false);
+      wakeLock.release();
+      showResult();
+      break;
+    case 'echec':
+      mode = 'frozen';
+      controls.setEnabled(false);
+      wakeLock.release();
+      showFailure();
+      break;
+    default:
+      break;
+  }
+  refreshDirection();
+}
+
+/** Hors de la vue de jeu (menus, sélection, briefing) : HUD masqué, commandes coupées. */
+function leaveGameView() {
+  if (mode !== 'loading') mode = 'title';
+  controls.setEnabled(false);
+  wakeLock.release();
+  hud.hide();
+  levelHud.hide();
+  hideToast();
+  bubbleView.hide();
+}
+
+/** Niveau suivant (id) dans l'ordre des numéros, ou null. */
+function nextLevelId(id) {
+  const i = LEVEL_IDS.indexOf(id);
+  return i >= 0 && i + 1 < LEVEL_IDS.length ? LEVEL_IDS[i + 1] : null;
+}
+
+/** Sélection des niveaux : étoiles à ce c (et meilleures tous c), verrous. */
+function showSelection() {
+  const levels = LEVEL_FILES.map(({ id, json }) => {
+    const stats = levelStats(progress, id, chosenC);
+    const locked = !isUnlocked(progress, LEVEL_IDS, id);
+    const here = stats.etoilesC ?? 0;
+    let note = '';
+    if (locked) note = 'Termine le niveau précédent pour le débloquer.';
+    else if (stats.passe && !stats.reussi) note = 'Passé (sans étoile).';
+    else if (stats.etoiles > here) note = `Meilleur : ${formatStars(stats.etoiles)} à un autre c.`;
+    return {
+      id,
+      numero: json.numero,
+      titre: json.titre,
+      notion: json.notion,
+      stars: formatStars(here),
+      starsLabel: `${here} étoile${here > 1 ? 's' : ''} sur 3 à c = ${chosenC} m/s.`,
+      locked,
+      note,
+    };
+  });
+  const total = totalStars(progress, LEVEL_IDS);
+  screens.showSelection({
+    levels,
+    cText: formatLightSpeed(chosenC),
+    total: `${total} étoile${total > 1 ? 's' : ''} sur ${3 * LEVEL_IDS.length}`,
+    onChoose: (id) => {
+      selectedLevelId = id;
+      sm.send('choisir');
+    },
+    onBack: () => sm.send('retour'),
+    option: { label: spectroLabel(), pressed: options.spectrometre, onToggle: toggleSpectro },
+  });
+}
+
+/** Clients du briefing, avec les heures de la ville qui comptent. */
+function briefingClients(json) {
+  return json.colis.map((p) => {
+    const when = [];
+    if (p.retrait?.pasAvant !== undefined) when.push(`prêt à ${formatClockShort(p.retrait.pasAvant)}`);
+    if (p.livraison.pasAvant !== undefined) when.push(`absent avant ${formatClockShort(p.livraison.pasAvant)}`);
+    if (p.delai !== undefined) when.push(`avant ${formatClockShort(p.delai)}`);
+    return { client: p.client, nom: p.nom ?? 'colis', when: when.join(', ') };
+  });
+}
+
+/** Échecs mémorisés sur un niveau (tous c). */
+const failuresOf = (id) => progress.niveaux[id]?.echecs ?? 0;
+
+/** Briefing du niveau choisi ; « C'est parti » est le geste qui lance la partie. */
+function showBriefing() {
+  const json = levelJson(selectedLevelId);
+  if (!json) {
+    sm.send('retour');
+    return;
+  }
+  const hint = hintFor(json.indices, failuresOf(json.id));
+  const view = screens.showBriefing({
+    numero: json.numero,
+    titre: json.titre,
+    notion: json.notion,
+    lines: json.briefing,
+    clients: briefingClients(json),
+    battery: `${json.batterie.tauMax} s`,
+    cText: formatLightSpeed(chosenC),
+    hint: hint ? hint.texte : '',
+    onGo: () => onGoClick(view),
+    onBack: () => sm.send('retour'),
+  });
+}
+
+/**
+ * « C'est parti ! » (geste) : permission d'inclinaison EN PREMIER (iOS), plein écran, puis
+ * chargement du niveau, puis décompte.
+ * @param {{setBusy(text: string | null): void}} view
+ */
+function onGoClick(view) {
+  if (mode === 'loading' || sm.state !== 'briefing') return;
+  if (wantsTilt()) requestTilt();
+  if (touchDevice) enterFullscreen();
+  view.setBusy('Préparation…');
+  startLevel(selectedLevelId, chosenC).then((ok) => {
+    view.setBusy(null);
+    if (ok && sm.state === 'briefing') sm.send('partir');
+  });
+}
+
+/* --- Décompte ----------------------------------------------------------------- */
+
+/**
+ * Décompte de `seconds` s (vue dessinée, horloges arrêtées) ; calibrage du volant
+ * d'inclinaison pendant ce temps (au départ d'une partie).
+ * @param {number} seconds
+ */
+function startCountdown(seconds) {
+  mode = 'countdown';
+  controls.setEnabled(false);
+  hud.show();
+  if (flow === 'niveau') levelHud.show();
+  dom.title.hidden = true;
+  game.countdown = { remaining: seconds, go: 0 };
+  screens.showCountdown(String(Math.ceil(seconds)));
+  if (seconds >= COUNTDOWN_START_S && controls.getMode() === 'tilt') calibrationPending = true;
+  maybeCalibrate();
+  if (!loop.running) loop.start();
+}
+
 /* --- Pause ---------------------------------------------------------------- */
 
-function pause() {
-  if (mode !== 'playing' || benchMode) return;
+/** Pause demandée (Échap, onglet caché, portrait) : niveau → machine à états ; libre → menu. */
+function pause(reason = 'pause') {
+  if (benchMode) return;
+  if (flow === 'niveau') {
+    if (sm.can(reason)) sm.send(reason);
+    return;
+  }
+  if (mode !== 'playing') return;
   mode = 'paused';
   controls.setEnabled(false);
   wakeLock.release();
@@ -674,8 +994,9 @@ function pause() {
 
 /**
  * Menu pause : Reprendre ; Recentrer le volant (inclinaison active) ; Direction (écran
- * tactile) ; Changer c ; Revoir les bulles ; Recommencer ; Crédits. Tout au clavier (Tab,
- * Entrée, Échap ou P pour reprendre) et au toucher (cibles ≥ 48 px).
+ * tactile) ; Spectromètre ; Changer c ; Revoir les bulles ; Recommencer ; Quitter le niveau
+ * (niveau) ou Menu principal (conduite libre) ; Crédits. Tout au clavier (Tab, Entrée, Échap
+ * ou P pour reprendre) et au toucher (cibles ≥ 48 px).
  * @param {string} [status] message affiché (et lu) sous les réglages
  */
 function showPauseNotice(status = '') {
@@ -693,22 +1014,36 @@ function showPauseNotice(status = '') {
   statusLine.textContent = status;
   content.append(statusLine);
   const keys = touchDevice ? '' : ' Échap ou P pour reprendre.';
+  const inLevel = flow === 'niveau';
+  const where = inLevel ? `${game.level.titre} · ` : '';
   showNotice({
     title: 'Pause',
-    text: `Les deux horloges sont arrêtées (${formatLightSpeed(game.physics.c)}).${keys}`,
+    text: `${where}Les deux horloges sont arrêtées (${formatLightSpeed(game.physics.c)}).${keys}`,
     content,
     variant: 'pause',
     actions: [
       { label: 'Reprendre', primary: true, onClick: onResumeClick },
       { label: 'Recentrer le volant', id: 'recentrer', hidden: !canRecenter(), onClick: recenterWheel },
+      { label: spectroLabel(), id: 'spectrometre', pressed: options.spectrometre, onClick: toggleSpectroInPause },
       { label: 'Changer c', id: 'changer-c', onClick: showLightSpeedNotice },
       { label: 'Revoir les bulles', id: 'revoir-bulles', onClick: replayBubbles },
-      { label: 'Recommencer', id: 'recommencer', onClick: () => restartGame(game.physics.c, 'Recommencer') },
+      { label: 'Recommencer', id: 'recommencer', onClick: () => (inLevel ? restartLevelFromPause(game.physics.c) : restartGame(game.physics.c, 'Recommencer')) },
+      inLevel
+        ? { label: 'Quitter le niveau', id: 'quitter', onClick: () => sm.send('quitter') }
+        : { label: 'Menu principal', id: 'menu', onClick: leaveFreeDrive },
       { label: 'Crédits', id: 'credits', onClick: () => credits.open() },
     ],
   });
+  const spectro = dom.noticeActions.querySelector('[data-action="spectrometre"]');
+  spectro?.setAttribute('data-option', 'spectrometre');
   pauseDirection = direction;
   refreshDirection();
+}
+
+/** Bascule du spectromètre depuis le menu pause. */
+function toggleSpectroInPause() {
+  toggleSpectro();
+  setPauseStatus(options.spectrometre ? 'Spectromètre : la teinte des lampes s’affiche en mots.' : 'Spectromètre coupé.');
 }
 
 /** Message du menu pause (région role="status" : lu par les lecteurs d'écran). */
@@ -737,7 +1072,7 @@ function showLightSpeedNotice() {
   if (mode !== 'paused') return;
   const holder = document.createElement('div');
   let proposed = game.physics.c;
-  const restartLabel = (c) => `Redémarrer avec c = ${c} m/s`;
+  const restartLabel = (c) => `Redémarrer avec c = ${c} m/s`;
   const control = createLightSpeedControl(holder, {
     value: proposed,
     presets: LIGHT_SPEED_PRESETS,
@@ -750,7 +1085,7 @@ function showLightSpeedNotice() {
   });
   showNotice({
     title: 'Changer c',
-    text: 'La partie recommence au départ avec la nouvelle vitesse de la lumière.',
+    text: flow === 'niveau' ? 'Le niveau recommence au départ avec la nouvelle vitesse de la lumière.' : 'La partie recommence au départ avec la nouvelle vitesse de la lumière.',
     content: control.element,
     actions: [
       {
@@ -759,7 +1094,8 @@ function showLightSpeedNotice() {
         onClick: () => {
           chooseLightSpeed(proposed);
           titleLightSpeed.setValue(proposed);
-          restartGame(proposed, 'Changer c');
+          if (flow === 'niveau') restartLevelFromPause(proposed);
+          else restartGame(proposed, 'Changer c');
         },
       },
       { label: 'Annuler', onClick: () => showPauseNotice() },
@@ -775,6 +1111,10 @@ function onResumeClick() {
 
 function resume() {
   if (mode !== 'paused' || portrait.matches) return;
+  if (flow === 'niveau') {
+    sm.send('reprendre'); // → décompte d'une seconde
+    return;
+  }
   hideNotice();
   enterPlaying();
 }
@@ -789,10 +1129,10 @@ function enterPlaying() {
 }
 
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'hidden') pause();
+  if (document.visibilityState === 'hidden') pause('cache');
 });
 portrait.addEventListener('change', (event) => {
-  if (event.matches) pause();
+  if (event.matches) pause('cache');
 });
 
 /** Fenêtre en portrait sur un écran en paysage : « Agrandis la fenêtre » au lieu de « Tourne ton GSM ». */
@@ -807,22 +1147,42 @@ window.screen.orientation?.addEventListener('change', updateWindowShape);
 /* --- Création du jeu ------------------------------------------------------- */
 
 /**
+ * Vue statique d'un niveau pour le rendu (render/levelObjects.js) : zones, portes, emprises.
+ * @param {import('./game/level.js').LevelState} level
+ */
+function levelView(level) {
+  const stops = [];
+  for (const p of level.colis) {
+    if (p.retrait) stops.push({ key: `${p.id}:retrait`, kind: 'retrait', x: p.retrait.x, y: p.retrait.y, rayon: p.retrait.rayon });
+    stops.push({ key: `${p.id}:livraison`, kind: 'livraison', x: p.livraison.x, y: p.livraison.y, rayon: p.livraison.rayon });
+  }
+  const doors = level.portes.map((d) => ({ id: d.id, x: d.x, y: d.y, capDegres: d.capDegres, largeur: d.largeur, hauteur: d.hauteur, lampZ: d.lampe.z }));
+  return { stops, doors, buildings: level.scene.buildings };
+}
+
+/**
  * Partie pour la vitesse de la lumière c : constantes physiques, monde (scène développée pour
- * L = c²/a), caméra, joueur, butée, ?bench ; préchauffage des programmes.
+ * L = c²/a), caméra, joueur ; en niveau, l'état de partie (game/level.js) et ses objets ; en
+ * conduite libre, la butée et ?bench ; préchauffage des programmes.
  * @param {import('three').WebGLRenderer} renderer
- * @param {any} sceneJson
+ * @param {{sceneJson?: any, levelDef?: any}} what scène de conduite libre, ou niveau (JSON)
  * @param {number} c
  */
-async function createSession(renderer, sceneJson, c) {
+async function createSession(renderer, { sceneJson = null, levelDef = null }, c) {
   const physics = physicsFor(c);
-  const world = createWorld(renderer, sceneJson, palette, { tier: quality.tier, physics });
+  const level = levelDef ? createLevel(levelDef, physics, palette) : null;
+  const world = createWorld(renderer, level ? level.sceneJson : sceneJson, palette, {
+    tier: quality.tier,
+    physics,
+    level: level ? levelView(level) : null,
+  });
   const { width, height } = viewportSize();
   const camera = createCamera({ aspect: width / height, visibility: world.visibilityFar });
   resizeRenderer(renderer, quality, camera);
 
-  const limits = drivableLimits(world.streets, world.bounds, SOFT_STOP_MARGIN);
-  const player = createPlayer({ x: world.start.x, y: world.start.y, heading: world.start.heading, physics });
-  const bench = benchMode ? createBench(sceneId, player, limits) : null;
+  const limits = level ? null : drivableLimits(world.streets, world.bounds, SOFT_STOP_MARGIN);
+  const player = level ? createLevelPlayer(level) : createPlayer({ x: world.start.x, y: world.start.y, heading: world.start.heading, physics });
+  const bench = !level && benchMode ? createBench(sceneId, player, limits) : null;
 
   // Première image : îlots visibles maillés (sans budget), puis compilation de tous les
   // programmes (variantes « vision classique » comprises) et deux rendus.
@@ -835,9 +1195,41 @@ async function createSession(renderer, sceneJson, c) {
       }
     : snapshot(player);
   world.update(first, 1, 0);
+  if (level) world.updateLevel(levelRenderState(level, first, 1), first, 0);
   updateCamera(camera, first);
   await world.warmup(camera);
-  return { physics, world, camera, player, limits, bench, lastSnapshot: first, facade: false, facadeTimer: Infinity };
+  return {
+    physics,
+    world,
+    camera,
+    player,
+    limits,
+    bench,
+    level,
+    levelDef,
+    driver: level ? makeDriver(level, physics) : null,
+    lastSnapshot: first,
+    facade: false,
+    facadeTimer: Infinity,
+    odometer: 0,
+    aids: level ? activeAids(levelDef.indices, failuresOf(levelDef.id)) : new Set(),
+    speedZones: new Map(),
+    countdown: null,
+    repriseTimer: 0,
+    repriseText: null,
+    finished: false,
+  };
+}
+
+/** Pilote de ?autopilote pour ce niveau (game/bot.js), ou null. */
+function makeDriver(level, physics) {
+  if (!autopilotRoute) return null;
+  const route = level.level.parcours?.[autopilotRoute];
+  if (!route) {
+    console.warn(`?autopilote : pas d'itinéraire « ${autopilotRoute} » dans ${level.id}.`);
+    return null;
+  }
+  return createBotDriver(route, physics);
 }
 
 /** Informations de la partie pour #diag. */
@@ -845,12 +1237,16 @@ function sessionInfo(g) {
   return {
     'vitesse de la lumière': `${formatLightSpeed(g.physics.c)} (a = ${String(g.physics.a).replace('.', ',')} m/s², L = ${g.physics.lengthUnit} m)`,
     visibilite: `${g.world.visibilityFar} m`,
+    ...(g.level ? { niveau: g.level.id } : {}),
   };
 }
 
-/** Renderer, première partie et écouteurs (perte de contexte, redimensionnement, #diag). */
-async function createGame() {
-  const sceneJson = (await SCENES[sceneId]()).default;
+/**
+ * Renderer (une fois) et ses écouteurs : perte de contexte, redimensionnement, #diag.
+ * @returns {Promise<any>} objet de jeu {renderer, …, session}
+ */
+async function ensureGame() {
+  if (game) return game;
   const renderer = createRenderer(dom.canvas, quality);
   if (adaptiveAllowed) {
     const { width, height } = viewportSize();
@@ -859,19 +1255,17 @@ async function createGame() {
       min: quality.tier === 'lite' ? DPR_FLOOR_LITE : DPR_FLOOR,
     });
   }
-  const session = await createSession(renderer, sceneJson, chosenC);
-
-  const g = { renderer, sceneJson, ...session, k: 1, frames: 0, environment: true, pendingDpr: null };
+  const g = { renderer, session: false, k: 1, frames: 0, environment: !params.has('sansciel'), pendingDpr: null, key: null };
+  game = g;
 
   if (diag) {
     const gl = renderer.getContext();
-    diag.setInfo({ ...readGlInfo(gl), ...displayInfo(g), profile: quality.tier, scene: sceneId, ...sessionInfo(g) });
+    diag.setInfo({ ...readGlInfo(gl), profile: quality.tier, scene: sceneId });
     // ?sansciel : passe ciel/sol coupée dès la première image (mesure de son coût par différence).
     const setEnvironment = (on) => {
       g.environment = on;
-      g.world.setEnvironmentEnabled(on);
+      if (g.session) g.world.setEnvironmentEnabled(on);
     };
-    setEnvironment(!params.has('sansciel'));
     diag.addToggle('Passe ciel/sol (E)', g.environment, setEnvironment);
     window.addEventListener('keydown', (event) => {
       if (event.code !== 'KeyE' || event.repeat || event.ctrlKey || event.metaKey || event.altKey) return;
@@ -884,7 +1278,7 @@ async function createGame() {
     // Après une erreur (mode 'error'), le panneau « Le jeu s'est arrêté » reste affiché.
     onLost: () => {
       if (mode === 'error') return;
-      if (mode === 'playing' || mode === 'paused') {
+      if (mode === 'playing' || mode === 'paused' || mode === 'countdown') {
         mode = 'lost';
         controls.setEnabled(false);
         wakeLock.release();
@@ -897,14 +1291,18 @@ async function createGame() {
     onRestored: async () => {
       if (mode === 'error') return;
       showNotice({ title: 'Affichage interrompu', text: "Préparation de l'affichage…" });
-      await g.world.warmup(g.camera); // three a tout réinitialisé : recompilation, données renvoyées
+      if (g.session) await g.world.warmup(g.camera); // three a tout réinitialisé
       if (mode !== 'lost') {
         hideNotice();
         return;
       }
       mode = 'playing';
       if (benchMode) hideNotice();
-      else pause(); // le joueur reprend quand il est prêt
+      else if (flow === 'niveau') {
+        hideNotice();
+        if (sm.can('cache')) sm.send('cache');
+        else mode = 'frozen';
+      } else pause(); // le joueur reprend quand il est prêt
     },
     onRestoreTimeout: () => {
       if (mode === 'error') return;
@@ -923,20 +1321,115 @@ async function createGame() {
       quality.adaptiveDpr = adaptive.dpr;
       g.pendingDpr = null;
     }
+    if (!g.session) return;
     resizeRenderer(renderer, quality, g.camera);
     if (diag) diag.setInfo(displayInfo(g));
-    // En pause, le redimensionnement a effacé le canevas : on redessine l'image figée.
-    if (mode === 'paused' || mode === 'done') g.world.render(g.camera);
+    // Image figée (pause, bilan…) : le redimensionnement a effacé le canevas, on la redessine.
+    if (mode === 'paused' || mode === 'done' || mode === 'frozen') g.world.render(g.camera);
   });
 
   return g;
 }
 
 /**
- * Menu pause → « Recommencer », ou « Changer c » → « Redémarrer » : nouvelle partie au
- * départ, avec la vitesse de la lumière c (le renderer, les commandes et le HUD sont gardés ;
- * le monde est refait, car la scène dépend de L = c²/a). Les bulles déjà vues le restent ;
- * celle affichée et la file d'attente sont oubliées.
+ * Remplace la partie du jeu (le renderer est gardé ; l'ancien monde est libéré).
+ * @param {{sceneJson?: any, levelDef?: any}} what
+ * @param {number} c
+ */
+async function replaceSession(what, c) {
+  const g = await ensureGame();
+  if (g.session) {
+    g.world.dispose();
+    g.session = false;
+  }
+  Object.assign(g, await createSession(g.renderer, what, c), { k: 1, session: true, key: what.levelDef ? `${what.levelDef.id}@${c}` : `libre:${sceneId}@${c}` });
+  g.world.setEnvironmentEnabled(g.environment);
+  if (diag) diag.setInfo({ ...displayInfo(g), ...sessionInfo(g) });
+  return g;
+}
+
+/** Remet le niveau en cours au départ (même monde : même c). */
+function resetLevelState() {
+  const g = game;
+  const level = createLevel(g.levelDef, g.physics, palette);
+  const player = createLevelPlayer(level);
+  const first = snapshot(player);
+  Object.assign(g, {
+    level,
+    player,
+    driver: makeDriver(level, g.physics),
+    lastSnapshot: first,
+    odometer: 0,
+    facade: false,
+    facadeTimer: Infinity,
+    aids: activeAids(g.levelDef.indices, failuresOf(g.levelDef.id)),
+    speedZones: new Map(),
+    finished: false,
+    k: 1,
+  });
+  g.world.update(first, 1, 0);
+  g.world.updateLevel(levelRenderState(level, first, 1), first, 0);
+  updateCamera(g.camera, first);
+  hud.setSpeedZone(null);
+  resetPartyMessages();
+}
+
+/** Nouvelle partie : bulles (file vidée, vues gardées), messages, horloge des bulles. */
+function resetPartyMessages() {
+  bubbles.clearPending();
+  bubbleVars.reset();
+  hideToast();
+}
+
+/**
+ * Prépare un niveau pour c (renderer créé au besoin ; monde refait si le niveau ou c change).
+ * @param {string} id
+ * @param {number} c
+ * @returns {Promise<boolean>} vrai si la partie est prête
+ */
+async function startLevel(id, c) {
+  const json = levelJson(id);
+  if (!json) return false;
+  const previous = mode;
+  mode = 'loading';
+  await nextPaint();
+  try {
+    if (!game) armBootGuard(); // le démarrage « risqué » commence ici (contexte WebGL, shaders)
+    if (game?.session && game.key === `${id}@${c}`) resetLevelState();
+    else await replaceSession({ levelDef: json }, c);
+  } catch (error) {
+    console.error(error);
+    mode = previous === 'loading' ? 'title' : previous;
+    showFatal('Impossible de préparer le niveau (WebGL2 indisponible ?). Recharge la page pour reprendre.');
+    return false;
+  }
+  flow = 'niveau';
+  useBubbleEngine(json);
+  resetPartyMessages();
+  controls.setMode(wantsTilt() ? 'tilt' : 'drag');
+  hud.update(game.lastSnapshot, { k: 1 });
+  hud.setSpeedZone(null);
+  mode = 'title'; // le décompte (machine à états) prend la suite
+  return true;
+}
+
+/** Recommencer le niveau (bilan, échec, pause), éventuellement avec un autre c. */
+async function restartLevel(c) {
+  if (!game?.levelDef) return false;
+  return startLevel(game.levelDef.id, c);
+}
+
+/** Menu pause → « Recommencer » ou « Changer c » en niveau : nouvelle partie puis décompte. */
+async function restartLevelFromPause(c) {
+  if (mode !== 'paused') return;
+  showNotice({ title: 'Recommencer', text: `Préparation du niveau pour ${formatLightSpeed(c)}…` });
+  const ok = await restartLevel(c);
+  if (ok) sm.send('recommencer');
+}
+
+/**
+ * Menu pause → « Recommencer », ou « Changer c » → « Redémarrer » (conduite libre) : nouvelle
+ * partie au départ, avec la vitesse de la lumière c. Les bulles déjà vues le restent.
  * @param {number} c
  * @param {string} [title] titre du panneau d'attente
  */
@@ -945,26 +1438,16 @@ async function restartGame(c, title = 'Changer c') {
   mode = 'loading';
   showNotice({ title, text: `Préparation de la ville pour ${formatLightSpeed(c)}…` });
   await nextPaint();
-  const g = game;
   try {
-    g.world.dispose();
-    Object.assign(g, await createSession(g.renderer, g.sceneJson, c), { k: 1 });
-    g.world.setEnvironmentEnabled(g.environment);
+    const sceneJson = (await SCENES[sceneId]()).default;
+    await replaceSession({ sceneJson }, c);
   } catch (error) {
     console.error(error);
-    mode = 'error';
-    showNotice({
-      title: "Le jeu s'est arrêté",
-      text: 'Impossible de préparer la nouvelle partie. Recharge la page pour reprendre.',
-      actions: [{ label: 'Recharger', primary: true, onClick: () => window.location.reload() }],
-    });
+    showFatal('Impossible de préparer la nouvelle partie. Recharge la page pour reprendre.');
     return;
   }
-  bubbles.clearPending();
-  bubbleVars.reset();
-  hideToast();
-  if (diag) diag.setInfo(sessionInfo(g));
-  hud.update(g.lastSnapshot, { k: 1 });
+  resetPartyMessages();
+  hud.update(game.lastSnapshot, { k: 1 });
   hideNotice();
   enterPlaying();
   if (portrait.matches) pause();
@@ -983,43 +1466,50 @@ function displayInfo(g) {
   return { dpr: `${g.renderer.getPixelRatio().toFixed(2)} (${canvas.width}×${canvas.height} px)${range}` };
 }
 
+/* --- Conduite libre ------------------------------------------------------------ */
+
 /**
- * Clic sur « Jouer » (geste utilisateur). Dans cet ordre : permission du capteur
+ * Clic sur « Conduite libre » (geste utilisateur). Dans cet ordre : permission du capteur
  * d'inclinaison (EN PREMIER, synchrone : iOS vérifie le geste à l'appel), plein écran (écran
  * tactile, si l'API existe), puis le chargement (dont l'await ferait perdre le geste).
  */
-function onPlayClick() {
-  if (mode !== 'title') return;
+function onFreeDriveClick() {
+  if (mode !== 'title' || sm.state !== 'menu') return;
   if (wantsTilt()) requestTilt();
   if (touchDevice) enterFullscreen();
-  startGame();
+  startFreeDrive();
 }
 
-/** Chargement puis départ (après « Jouer », ou démarrage automatique de ?bench). */
-async function startGame() {
+/** Chargement puis départ de la conduite libre (ou démarrage automatique de ?bench). */
+async function startFreeDrive() {
   if (mode !== 'title') return;
   mode = 'loading';
   hideNotice();
-  dom.play.disabled = true;
-  dom.play.textContent = 'Chargement…';
-  dom.play.blur(); // sinon Espace (frein) pourrait « recliquer » le bouton
+  const label = dom.freeDrive.textContent;
+  dom.freeDrive.disabled = true;
+  dom.freeDrive.textContent = 'Chargement…';
+  dom.freeDrive.blur(); // sinon Espace (frein) pourrait « recliquer » le bouton
   await nextPaint();
   try {
-    armBootGuard(); // le démarrage « risqué » commence ici (contexte WebGL, shaders)
-    game = await createGame();
+    if (!game) armBootGuard(); // le démarrage « risqué » commence ici (contexte WebGL, shaders)
+    const sceneJson = (await SCENES[sceneId]()).default;
+    await replaceSession({ sceneJson }, chosenC);
   } catch (error) {
     console.error(error);
-    mode = 'error';
     dom.title.hidden = true;
-    showNotice({
-      title: 'Impossible de lancer le jeu',
-      text: 'Ce navigateur ne permet pas le rendu 3D nécessaire (WebGL2). Essaie un navigateur récent, ou recharge la page.',
-      actions: [{ label: 'Recharger', primary: true, onClick: () => window.location.reload() }],
-    });
+    showFatal('Ce navigateur ne permet pas le rendu 3D nécessaire (WebGL2). Essaie un navigateur récent, ou recharge la page.');
     return;
+  } finally {
+    dom.freeDrive.disabled = false;
+    dom.freeDrive.textContent = label;
   }
+  flow = 'libre';
+  useBubbleEngine(null);
+  resetPartyMessages();
   dom.title.hidden = true;
   hud.show();
+  levelHud.hide();
+  hud.setSpeedZone(null);
   if (benchMode) {
     mode = 'playing';
     wakeLock.acquire(); // mesure sur GSM : l'écran ne doit pas s'éteindre
@@ -1030,23 +1520,119 @@ async function startGame() {
     if (portrait.matches) pause();
   }
   refreshDirection();
-  loop.start();
+  if (!loop.running) loop.start();
 }
 
-dom.play.addEventListener('click', onPlayClick);
+/** Conduite libre → « Menu principal » (menu pause). */
+function leaveFreeDrive() {
+  flow = null;
+  hideNotice();
+  leaveGameView();
+  dom.title.hidden = false;
+  dom.play.focus({ preventScroll: true });
+}
 
-// ?diag, ?bench et ?debug : lecture seule de l'état, pour les mesures et les tests automatisés.
-if (diag || tiltDebug) {
+dom.freeDrive.addEventListener('click', onFreeDriveClick);
+dom.play.addEventListener('click', () => {
+  if (mode === 'title' && sm.state === 'menu') sm.send('jouer');
+});
+
+/* --- Fin de partie : bilan, échec ---------------------------------------------- */
+
+/** Partie finie (réussite ou batterie vide) : score, progression, état. */
+function finishLevel() {
+  const g = game;
+  if (g.finished) return;
+  g.finished = true;
+  const score = computeScore(g.level);
+  const { progress: next, records } = recordResult(progress, g.level.id, g.physics.c, score);
+  progress = next;
+  saveProgress(progress);
+  g.result = { score, records };
+  sm.send(score.reussite ? 'reussite' : 'echec');
+}
+
+/** Écran de bilan (réussite). */
+function showResult() {
+  const g = game;
+  const { score, records } = g.result;
+  const f = resultFigures({ tauFin: score.econome.tauFin, tFin: score.ponctuel.tFin, tauMax: g.level.tauMax, distance: g.odometer, c: g.physics.c });
+  const recordTexts = [];
+  if (records.premiereReussite) recordTexts.push('Première réussite !');
+  else if (records.etoiles) recordTexts.push("Record d'étoiles à ce c !");
+  if (records.batterie) recordTexts.push('Record de batterie');
+  if (records.tVille) recordTexts.push("Record à l'horloge de la ville");
+  const nextId = nextLevelId(g.level.id);
+  screens.showResult({
+    titre: `Niveau ${g.level.numero} · ${g.level.titre} · ${formatLightSpeed(g.physics.c)}`,
+    stars: formatStars(score.etoiles),
+    starsCount: score.etoiles,
+    lines: starLines(score),
+    figures: [`${f.montre} · ${f.ville} · ${f.ecart}`, f.batterie, f.contrefactuel],
+    records: recordTexts,
+    hasNext: Boolean(nextId),
+    onReplay: () => replayFrom('rejouer'),
+    onNext: () => {
+      selectedLevelId = nextId;
+      sm.send('suivant', { niveauSuivant: Boolean(nextId) });
+    },
+    onQuit: () => sm.send('quitter'),
+  });
+  announcer.announce(`Livré ! ${score.etoiles} étoile${score.etoiles > 1 ? 's' : ''} sur 3.`);
+}
+
+/** Écran d'échec : raison, indice gradué, Recommencer ; « Passer » après assez d'échecs. */
+function showFailure() {
+  const g = game;
+  const { score } = g.result;
+  const echecs = failuresOf(g.level.id);
+  const hint = hintFor(g.levelDef.indices, echecs);
+  const nextId = nextLevelId(g.level.id);
+  const skip = canSkip(progress, g.level.id) && Boolean(nextId) && sm.can('passer', { echecs, niveauSuivant: Boolean(nextId) });
+  screens.showFailure({
+    titre: `Niveau ${g.level.numero} · ${g.level.titre}`,
+    reason: failureText(score),
+    hint: hint ? hint.texte : '',
+    canSkip: skip,
+    onRetry: () => replayFrom('recommencer'),
+    onSkip: () => {
+      progress = recordSkip(progress, g.level.id);
+      saveProgress(progress);
+      selectedLevelId = nextId;
+      sm.send('passer', { echecs, niveauSuivant: Boolean(nextId) });
+    },
+    onQuit: () => sm.send('quitter'),
+  });
+  announcer.announce(failureText(score));
+}
+
+/** Bilan « Rejouer » ou échec « Recommencer » : même niveau, même c, décompte. */
+async function replayFrom(event) {
+  if (!game?.levelDef || mode === 'loading') return;
+  const ok = await restartLevel(chosenC);
+  if (ok) sm.send(event);
+}
+
+/* --- ?diag, ?bench, ?debug, ?autopilote : état en lecture seule ------------------- */
+
+if (diag || tiltDebug || autopilotRoute) {
   /** @type {any} */ (window).__coursier = {
     get mode() {
       return mode;
     },
-    get k() {
-      return game ? game.k : null;
+    /** État de la machine des niveaux (game/states.js) et partie en cours. */
+    get etat() {
+      return sm.state;
     },
-    /** Vitesse de la lumière de la partie en cours (ou du réglage, avant « Jouer »). */
+    get flow() {
+      return flow;
+    },
+    get k() {
+      return game?.session ? game.k : null;
+    },
+    /** Vitesse de la lumière de la partie en cours (ou du réglage, avant de jouer). */
     get c() {
-      return game ? game.physics.c : chosenC;
+      return game?.session ? game.physics.c : chosenC;
     },
     /** Direction tactile en usage ('tilt' | 'drag') et état du capteur d'inclinaison. */
     get controlMode() {
@@ -1067,8 +1653,26 @@ if (diag || tiltDebug) {
     get dpr() {
       return game ? game.renderer.getPixelRatio() : null;
     },
-    snapshot: () => (game ? { ...game.lastSnapshot } : null),
-    stats: () => (game ? game.world.stats() : null),
+    snapshot: () => (game?.session ? { ...game.lastSnapshot } : null),
+    stats: () => (game?.session ? game.world.stats() : null),
+    /** Partie de niveau : statut, horloges, colis, portes (teinte vue), chocs, reprises. */
+    niveau: () => {
+      const l = game?.session ? game.level : null;
+      if (!l) return null;
+      return {
+        id: l.id,
+        status: l.status,
+        tau: l.tau,
+        t: l.t,
+        colis: l.colis.map((p) => ({ id: p.id, etat: p.etat, enRetard: p.enRetard })),
+        portes: l.portes.map((d) => ({ id: d.id, ouverte: d.ouverte, teinte: d.vue?.hue ?? null, inRange: d.inRange })),
+        chocs: l.chocs,
+        reprises: l.reprisesFaites,
+        odometer: game.odometer,
+      };
+    },
+    /** Progression mémorisée. */
+    progression: () => JSON.parse(JSON.stringify(progress)),
   };
 }
 
@@ -1083,16 +1687,60 @@ function nextK(k, classicHeld, dtReal) {
 }
 
 /**
+ * Instantané « effectif » de la vision : β_eff = k·β (vision classique : k = 0, aucun
+ * décalage). À k = 1, c'est l'instantané lui-même (la couleur des lampes est alors exactement
+ * celle que juge la règle).
+ */
+function effectiveSnapshot(snap, k) {
+  if (k >= 1) return snap;
+  const beta = k * snap.beta;
+  const gamma = 1 / Math.sqrt(1 - beta * beta);
+  const scale = snap.speed > 0 ? (gamma * beta * snap.c) / Math.hypot(snap.ux, snap.uy) : 0;
+  return { ...snap, beta, gamma, rapidity: Math.atanh(beta), ux: snap.ux * scale, uy: snap.uy * scale, vx: snap.vx * k, vy: snap.vy * k, speed: snap.speed * k };
+}
+
+/**
+ * État VU des objets du niveau (render/levelObjects.js) : arrêts actifs, clients vus présents
+ * (t_e), portes vues ouvertes (t_e), couleur perçue des lampes (même chaîne que la règle).
+ * @param {import('./game/level.js').LevelState} level
+ * @param {any} snap
+ * @param {number} k
+ */
+function levelRenderState(level, snap, k) {
+  const stops = {};
+  for (const p of level.colis) {
+    if (p.retrait) stops[`${p.id}:retrait`] = { active: p.etat === 'aRetirer', present: seenClientPresent(p.retrait, snap) };
+    stops[`${p.id}:livraison`] = { active: p.etat === 'aBord', present: seenClientPresent(p.livraison, snap) };
+  }
+  const eff = effectiveSnapshot(snap, k);
+  const doors = {};
+  for (const d of level.portes) doors[d.id] = { open: seenDoorOpen(d, snap), lampRgb: perceivedLamp(d.lampe, eff).rgb };
+  return { stops, doors };
+}
+
+/** Porte fermée la plus proche du joueur (ou null), avec sa distance horizontale. */
+function nearestClosedDoor(level, snap) {
+  let best = null;
+  for (const d of level.portes) {
+    if (d.ouverte) continue;
+    const dist = Math.hypot(d.x - snap.x, d.y - snap.y);
+    if (!best || dist < best.dist) best = { door: d, dist };
+  }
+  return best;
+}
+
+/**
  * Bulles pédagogiques : variables de l'image (commande appliquée, butée, façade dans l'axe à
- * 5 Hz…), puis le moteur (conditions évaluées à 5 Hz).
+ * 5 Hz, variables du niveau…), puis le moteur (conditions évaluées à 5 Hz).
  * @param {any} snap
  * @param {{thrust?: number, brake?: number, steer?: number}} cmd commande appliquée
  * @param {ReturnType<typeof controls.read>} input commande du joueur
  * @param {number} dt temps propre simulé (s)
  * @param {number} dtReal
+ * @param {{distanceDevant: number, butee: boolean, niveau: any}} extra
  */
-function updateBubbles(snap, cmd, input, dt, dtReal) {
-  const { player, limits, world } = game;
+function updateBubbles(snap, cmd, input, dt, dtReal, { distanceDevant, butee, niveau }) {
+  const { world } = game;
   game.facadeTimer += dtReal;
   if (game.facadeTimer >= FACADE_PERIOD_S) {
     game.facadeTimer = 0;
@@ -1105,12 +1753,177 @@ function updateBubbles(snap, cmd, input, dt, dtReal) {
       k: game.k,
       a: game.physics.a,
       modeVolant: input.lastSource === 'clavier' ? 'clavier' : controls.getMode(),
-      distanceDevant: exitDistance(player.x, player.y, player.hx, player.hy, limits),
+      distanceDevant,
       facadeDevant: game.facade,
-      butee: cmd !== input,
+      butee,
+      niveau,
     }),
     dt,
   );
+}
+
+/**
+ * Une image de conduite libre : butée douce, pas exact, ?bench.
+ * @returns {{snap: any, cmd: any}}
+ */
+function stepFree(input, dt, dtReal) {
+  const { player, bench } = game;
+  if (bench) return { snap: bench.advance(), cmd: null };
+  const cmd = softStopCommand(player, input, game.limits);
+  step(player, cmd, dt);
+  keepInside(player, game.limits);
+  const snap = snapshot(player);
+  playClockMs += dtReal * 1000;
+  return { snap, cmd };
+}
+
+/**
+ * Une image de niveau : pilote (?autopilote, pas fixes de BOT_DT) ou commandes, puis
+ * level.advance (collisions, règles, reprises) ; événements de partie.
+ * @returns {{snap: any, cmd: any, events: any[]}}
+ */
+function stepLevel(input, dt, dtReal) {
+  const g = game;
+  const { level, player } = g;
+  const events = [];
+  let snap = g.lastSnapshot;
+  let cmd = { thrust: input.thrust, brake: input.brake, steer: input.steer };
+  const before = { x: player.x, y: player.y };
+  let teleported = false;
+  if (g.driver) {
+    let remaining = dt;
+    while (remaining > 1e-9 && level.status === 'enCours') {
+      const h = Math.min(BOT_DT, remaining);
+      cmd = g.driver.command(snap);
+      const out = advance(level, player, cmd, h);
+      snap = out.snapshot;
+      events.push(...out.events);
+      remaining -= h;
+    }
+  } else {
+    const out = advance(level, player, cmd, dt);
+    snap = out.snapshot;
+    events.push(...out.events);
+  }
+  teleported = events.some((e) => e.type === 'reprise');
+  if (!teleported) g.odometer += Math.hypot(player.x - before.x, player.y - before.y);
+  playClockMs += dtReal * 1000;
+  return { snap, cmd, events };
+}
+
+/** Messages et transitions des événements de partie. Renvoie les événements des bulles. */
+function handleLevelEvents(events) {
+  const bubbleEvents = [];
+  let finished = false;
+  for (const e of events) {
+    switch (e.type) {
+      case 'livraison':
+        bubbleEvents.push('livraison');
+        showToast(e.enRetard ? `Livré : ${e.client}, en retard.` : `Livré : ${e.client} ✓`, TOAST_EVENT_MS);
+        break;
+      case 'retrait':
+        bubbleEvents.push('retrait');
+        showToast(`Colis retiré chez ${e.client}.`, TOAST_EVENT_MS);
+        break;
+      case 'attente':
+        bubbleEvents.push('attente');
+        break;
+      case 'porte':
+        if (e.ouverte) {
+          bubbleEvents.push('porteOuverte');
+          showToast('La porte s’ouvre !', TOAST_EVENT_MS);
+        }
+        break;
+      case 'choc':
+        bubbleEvents.push('choc');
+        if (e.stun >= STUN_TOAST_MIN_S) showToast(`Choc ! +${e.stun.toFixed(1).replace('.', ',')} s aux deux horloges.`, TOAST_EVENT_MS);
+        break;
+      case 'reprise':
+        bubbleEvents.push('reprise');
+        game.repriseText = `Porte fermée : choc ! Tu repars de la ligne d'élan (+${String(e.cout).replace('.', ',')} s).`;
+        break;
+      case 'reussite':
+      case 'echec':
+        finished = true;
+        break;
+      default:
+        break;
+    }
+  }
+  return { bubbleEvents, finished, reprise: events.some((e) => e.type === 'reprise') };
+}
+
+/**
+ * Données du HUD de niveau et des bulles du niveau pour l'image.
+ * @param {any} snap
+ * @param {string[]} bubbleEvents
+ */
+function levelInfo(snap, bubbleEvents) {
+  const g = game;
+  const { level } = g;
+  const stops = activeStops(level);
+  const nextStop = stops[0] ?? null;
+  const frac = batteryFraction(snap.tau, level.tauMax);
+  const done = level.colis.filter((p) => p.etat === 'livre').length;
+  const info = {
+    battery: { text: formatBattery(snap.tau, level.tauMax), fraction: frac, level: batteryLevel(frac) },
+    colis: { done, total: level.colis.length },
+    next: null,
+    brake: '',
+    spectro: null,
+  };
+  const niveau = {
+    batterie: frac,
+    colisLivres: done,
+    evenements: bubbleEvents,
+    attendClient: level.colis.some((p) => (p.etat === 'aBord' && p.livraison.waiting) || (p.etat === 'aRetirer' && p.retrait?.waiting)),
+  };
+  let distanceDevant = Infinity;
+  if (nextStop) {
+    const ind = stopIndicator(snap, nextStop, { k: g.k });
+    info.next = {
+      client: nextStop.client,
+      verb: nextStop.kind === 'retrait' ? 'Retirer' : 'Livrer',
+      distance: formatDistance(ind.distance),
+      angle: ind.angle,
+      behind: ind.behind,
+      inZone: ind.inZone,
+      timing: stopTiming(nextStop, snap.t),
+    };
+    if (g.aids.has('repereFreinage')) {
+      info.brake = `Freinage : ${formatDistance(brakingDistance(snap, g.physics.a))} · client : ${formatDistance(ind.distance)}`;
+    }
+    Object.assign(niveau, {
+      distanceArret: ind.distance,
+      dansZone: ind.inZone,
+      arretDerriere: ind.behind && !ind.inZone && ind.distance <= BEHIND_MAX_M,
+      margeDelai: nextStop.delai !== null ? nextStop.delai - snap.t : Infinity,
+    });
+    // Bulle « frein » des niveaux : le prochain arrêt, s'il est devant.
+    if (Math.abs(ind.worldAngle) < Math.PI / 6) distanceDevant = ind.distance;
+  }
+  const near = nearestClosedDoor(level, snap);
+  let zone = null;
+  if (near && near.dist <= SPECTRO_RANGE * near.door.portee[1]) {
+    const d = near.door;
+    const view = d.vue ?? perceivedLamp(d.lampe, snap);
+    if (near.dist <= 2 * d.portee[1]) {
+      niveau.porteProche = true;
+      niveau.teintePorte = view.hue;
+      niveau.teinteVoulue = view.hue === d.teinte;
+    }
+    const ahead = Math.abs(stopIndicator(snap, d, { k: 1 }).worldAngle) < SPECTRO_HALF_ANGLE;
+    if ((options.spectrometre || g.aids.has('spectrometre')) && ahead) info.spectro = spectrometerReading(view, d.lampe, d.teinte);
+    if (g.aids.has('zoneVitesse')) {
+      if (!g.speedZones.has(d.id)) {
+        const mid = (d.portee[0] + d.portee[1]) / 2;
+        g.speedZones.set(d.id, hueSpeedWindow(d.lampe, d.teinte, { distance: mid }));
+      }
+      zone = g.speedZones.get(d.id);
+    }
+  }
+  hud.setSpeedZone(zone);
+  return { info, niveau, distanceDevant };
 }
 
 /**
@@ -1120,11 +1933,24 @@ function updateBubbles(snap, cmd, input, dt, dtReal) {
 function frame(dtReal, dt) {
   const input = controls.read();
   if (input.pause && !benchMode) {
-    if (mode === 'playing') pause();
+    if (mode === 'playing' || mode === 'countdown') pause();
     else if (mode === 'paused') resume();
   }
-  if (mode !== 'playing' || !game) return;
-  const { world, camera, player, bench, renderer } = game;
+  if (!game?.session) return;
+  if (mode === 'frozen') {
+    // Message de reprise : la vue reste figée, puis décompte d'une seconde.
+    if (sm.state === 'reprise') {
+      game.repriseTimer -= dtReal;
+      if (game.repriseTimer <= 0) sm.send('fini');
+    }
+    return;
+  }
+  if (mode !== 'playing' && mode !== 'countdown') return;
+  const { world, camera, bench, renderer } = game;
+  if (mode === 'playing' && game.countdown?.go > 0) {
+    game.countdown.go -= dtReal;
+    if (game.countdown.go <= 0) screens.hideCountdown();
+  }
 
   // DPR adaptatif décidé à l'image précédente : appliqué avant le rendu (pas d'image effacée).
   if (game.pendingDpr !== null) {
@@ -1134,22 +1960,40 @@ function frame(dtReal, dt) {
     if (diag) diag.setInfo(displayInfo(game));
   }
 
-  // Simulation.
+  // Simulation (rien pendant le décompte : horloges arrêtées).
   const t0 = performance.now();
-  let snap;
+  let snap = game.lastSnapshot;
   let cmd = null;
-  if (bench) {
-    snap = bench.advance();
+  let levelStep = null;
+  if (mode === 'countdown') {
+    tickCountdown(dtReal);
+  } else if (flow === 'niveau') {
+    levelStep = stepLevel(input, dt, dtReal);
+    snap = levelStep.snap;
+    cmd = levelStep.cmd;
   } else {
-    cmd = softStopCommand(player, input, game.limits);
-    step(player, cmd, dt);
-    keepInside(player, game.limits);
-    snap = snapshot(player);
-    playClockMs += dtReal * 1000;
+    ({ snap, cmd } = stepFree(input, dt, dtReal));
   }
-  game.k = nextK(game.k, !bench && input.classic, dtReal);
-  if (cmd) updateBubbles(snap, cmd, input, dt, dtReal);
+  game.k = nextK(game.k, !bench && input.classic && mode === 'playing', dtReal);
+
+  // Événements de partie, HUD de niveau, bulles.
+  let handled = null;
+  if (flow === 'niveau') {
+    handled = levelStep ? handleLevelEvents(levelStep.events) : { bubbleEvents: [], finished: false, reprise: false };
+    const { info, niveau, distanceDevant } = levelInfo(snap, handled.bubbleEvents);
+    levelHud.update(info);
+    if (cmd) updateBubbles(snap, cmd, input, dt, dtReal, { distanceDevant, butee: false, niveau });
+  } else if (cmd) {
+    const { player, limits } = game;
+    updateBubbles(snap, cmd, input, dt, dtReal, {
+      distanceDevant: exitDistance(player.x, player.y, player.hx, player.hy, limits),
+      butee: cmd !== input,
+      niveau: null,
+    });
+  }
+
   world.update(snap, game.k, dtReal);
+  if (flow === 'niveau') world.updateLevel(levelRenderState(game.level, snap, game.k), snap, dtReal);
   updateCamera(camera, snap);
   const t1 = performance.now();
 
@@ -1176,6 +2020,27 @@ function frame(dtReal, dt) {
   if (bench) {
     bench.record({ dtMs: dtReal * 1000, renderMs: t2 - t1, updateMs: t1 - t0, stats, environment: game.environment });
     if (bench.done) finishBench();
+  }
+
+  // Transitions de fin d'image (après le rendu : l'image du choc ou de la livraison reste).
+  if (handled?.finished) finishLevel();
+  else if (handled?.reprise && sm.can('reprise')) sm.send('reprise');
+}
+
+/** Décompte : « 3 », « 2 », « 1 », puis « Partez ! » et départ. */
+function tickCountdown(dtReal) {
+  const cd = game.countdown;
+  if (!cd) return;
+  if (cd.remaining > 0) {
+    cd.remaining -= dtReal;
+    if (cd.remaining > 0) {
+      screens.showCountdown(String(Math.ceil(cd.remaining - 1e-9)));
+      return;
+    }
+    screens.showCountdown('Partez !');
+    cd.go = GO_TEXT_S;
+    if (sm.state === 'decompte') sm.send('fini'); // les horloges partent tout de suite
+    else if (flow === 'libre') enterPlaying();
   }
 }
 
@@ -1214,12 +2079,13 @@ function finishBench() {
 
 /* --- Démarrage ------------------------------------------------------------- */
 
+sm.send('pret'); // chargement → menu
 if (benchMode) {
-  startGame();
+  startFreeDrive();
 } else if (quality.unstable) {
   showNotice({
     title: 'WebGL instable',
     text: "Le jeu s'est interrompu deux fois au démarrage. Il repart en mode allégé (moins de pixels, sans anticrénelage).",
-    actions: [{ label: 'Réessayer', primary: true, onClick: onPlayClick }],
+    actions: [{ label: 'Continuer', primary: true, onClick: hideNotice }],
   });
 }

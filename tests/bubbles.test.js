@@ -534,6 +534,45 @@ describe('createBubbleVariables', () => {
   });
 });
 
+describe('createBubbleVariables : variables des niveaux (jalon 3)', () => {
+  const snap = (over = {}) => ({ beta: 0, gamma: 1, speed: 0, c: 30, tau: 10, t: 12, ...over });
+
+  it('valeurs neutres en conduite libre', () => {
+    const v = createBubbleVariables().compute({ snapshot: snap() });
+    expect(v).toMatchObject({
+      enNiveau: false,
+      distanceArret: Infinity,
+      margeArret: Infinity,
+      arretDerriere: false,
+      dansZone: false,
+      attendClient: false,
+      porteProche: false,
+      teintePorte: 'aucune',
+      teinteVoulue: false,
+      batterie: 1,
+      margeDelai: Infinity,
+      colisLivres: 0,
+    });
+  });
+
+  it('variables et événements de la partie (main.js les calcule)', () => {
+    const b = 0.5;
+    const g = 1 / Math.sqrt(1 - b * b);
+    const v = createBubbleVariables().compute({
+      snapshot: snap({ beta: b, gamma: g, speed: 15 }),
+      niveau: { distanceArret: 60, porteProche: true, teintePorte: 'vert', teinteVoulue: true, batterie: 0.4, margeDelai: 12, colisLivres: 1, evenements: ['livraison', 'porteOuverte'] },
+    });
+    expect(v.enNiveau).toBe(true);
+    expect(v.margeArret).toBeCloseTo(60 / (300 * (g - 1)), 9);
+    expect(v).toMatchObject({ porteProche: true, teintePorte: 'vert', teinteVoulue: true, batterie: 0.4, margeDelai: 12, colisLivres: 1 });
+    expect(v.evenements).toEqual(['livraison', 'porteOuverte']);
+    // Les bulles des niveaux citent ces variables et événements (validées par le schéma).
+    for (const name of ['margeArret', 'arretDerriere', 'attendClient', 'porteProche', 'teintePorte', 'teinteVoulue', 'batterie', 'margeDelai', 'colisLivres']) {
+      expect(VARIABLES).toHaveProperty(name);
+    }
+  });
+});
+
 describe('facadeAhead', () => {
   const wall = { x: 0, y: 200, width: 40, depth: 10 }; // façade au nord, à 195 m
 

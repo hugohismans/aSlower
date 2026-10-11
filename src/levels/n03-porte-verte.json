@@ -1,0 +1,529 @@
+{
+  "schema": "coursier-niveau/1",
+  "id": "n03-porte-verte",
+  "numero": 3,
+  "titre": "La Porte Verte",
+  "notion": "effet Doppler : la couleur dépend de ta vitesse",
+  "briefing": [
+    "Rue des Lanternes, les portes ne s'ouvrent que si leur lampe te paraît verte.",
+    "La première lampe est rouge : en roulant vers elle, sa lumière bleuit. Trouve la bonne vitesse.",
+    "La seconde semble éteinte : elle brille en infrarouge. Trop vite, la lampe devient bleue, puis noire !"
+  ],
+  "note": "Rue nord-sud (x = 0) bordee de facades, limites x = ±40 m : chaque porte (80 m de large) barre toute la carte. Porte 1 a 0,4 L, lampe a raie 640 nm vue verte pour beta ≈ 0,13-0,22 dans l'axe ; porte 2 a 1 L, raie 900 nm (infrarouge, eteinte au repos) vue verte pour beta ≈ 0,44-0,51. Trop vite : bleu, violet, puis noir, et choc : reprise sur la ligne d'elan (+3 s).",
+  "parametres": {
+    "porte1": {
+      "fois": 0.4,
+      "min": 40
+    },
+    "lorentz": {
+      "fois": 0.5,
+      "min": 60
+    },
+    "porte2": {
+      "fois": 1,
+      "min": 120
+    },
+    "fitzgerald": {
+      "fois": 1.25,
+      "min": 150
+    },
+    "nord": {
+      "fois": 1,
+      "de": "fitzgerald",
+      "plus": 60
+    }
+  },
+  "scene": {
+    "titre": "Rue des Lanternes",
+    "graine": 303,
+    "limites": {
+      "min": [
+        -40,
+        -30
+      ],
+      "max": [
+        40,
+        {
+          "fois": 1,
+          "de": "nord"
+        }
+      ]
+    },
+    "rues": [
+      {
+        "id": "lanternes",
+        "nom": "Rue des Lanternes",
+        "de": [
+          0,
+          -30
+        ],
+        "a": [
+          0,
+          {
+            "fois": 1,
+            "de": "nord"
+          }
+        ],
+        "largeur": 18
+      },
+      {
+        "id": "traverses",
+        "nom": "Traverses",
+        "de": [
+          -40,
+          68
+        ],
+        "a": [
+          40,
+          68
+        ],
+        "largeur": 18,
+        "repeter": {
+          "nombre": {
+            "fois": 0.0125,
+            "de": "nord",
+            "arrondiInf": 1
+          },
+          "pas": [
+            0,
+            80
+          ]
+        }
+      }
+    ],
+    "rangees": [
+      {
+        "id": "ouest",
+        "coin": [
+          -68,
+          0
+        ],
+        "ilot": [
+          56,
+          56
+        ],
+        "nombre": {
+          "fois": 0.0125,
+          "de": "nord",
+          "plus": 0.3,
+          "arrondiInf": 1
+        },
+        "pas": [
+          0,
+          80
+        ],
+        "facades": [
+          "est"
+        ],
+        "largeurs": [
+          12,
+          22
+        ],
+        "profondeurs": [
+          14,
+          20
+        ],
+        "hauteurs": [
+          8,
+          20
+        ],
+        "couleurs": [
+          "rouge",
+          "orange",
+          "jaune",
+          "vert",
+          "cyan",
+          "bleu",
+          "violet"
+        ],
+        "ordreCouleurs": "suite"
+      },
+      {
+        "id": "est",
+        "coin": [
+          12,
+          0
+        ],
+        "ilot": [
+          56,
+          56
+        ],
+        "nombre": {
+          "fois": 0.0125,
+          "de": "nord",
+          "plus": 0.3,
+          "arrondiInf": 1
+        },
+        "pas": [
+          0,
+          80
+        ],
+        "facades": [
+          "ouest"
+        ],
+        "largeurs": [
+          12,
+          22
+        ],
+        "profondeurs": [
+          14,
+          20
+        ],
+        "hauteurs": [
+          8,
+          20
+        ],
+        "couleurs": [
+          "violet",
+          "bleu",
+          "cyan",
+          "vert",
+          "jaune",
+          "orange",
+          "rouge"
+        ],
+        "ordreCouleurs": "suite"
+      }
+    ],
+    "batiments": [],
+    "lampadaires": [
+      {
+        "rue": "lanternes",
+        "pas": 40,
+        "depart": 20
+      }
+    ]
+  },
+  "depart": {
+    "pos": [
+      0,
+      0
+    ],
+    "capDegres": 90
+  },
+  "batterie": {
+    "tauMax": 120
+  },
+  "phiMax": 3,
+  "colis": [
+    {
+      "id": "boussole",
+      "client": "Mme Lorentz",
+      "nom": "Boussole",
+      "livraison": {
+        "lieu": [
+          0,
+          {
+            "fois": 1,
+            "de": "lorentz"
+          }
+        ],
+        "rayon": 8
+      },
+      "delai": 60,
+      "obligatoire": true
+    },
+    {
+      "id": "prisme",
+      "client": "M. FitzGerald",
+      "nom": "Prisme",
+      "livraison": {
+        "lieu": [
+          0,
+          {
+            "fois": 1,
+            "de": "fitzgerald"
+          }
+        ],
+        "rayon": 8
+      },
+      "delai": 150,
+      "obligatoire": true
+    }
+  ],
+  "portes": [
+    {
+      "id": "porte-rouge",
+      "nom": "Porte à lampe rouge",
+      "pos": [
+        0,
+        {
+          "fois": 1,
+          "de": "porte1"
+        }
+      ],
+      "capDegres": 90,
+      "largeur": 80,
+      "hauteur": 6,
+      "lampe": {
+        "raie": 640,
+        "hauteur": 7
+      },
+      "teinte": "vert",
+      "portee": [
+        12,
+        {
+          "fois": 0.15,
+          "min": 30
+        }
+      ],
+      "maintien": 0.4,
+      "reprise": "elan-1"
+    },
+    {
+      "id": "porte-infrarouge",
+      "nom": "Porte à lampe infrarouge",
+      "pos": [
+        0,
+        {
+          "fois": 1,
+          "de": "porte2"
+        }
+      ],
+      "capDegres": 90,
+      "largeur": 80,
+      "hauteur": 6,
+      "lampe": {
+        "raie": 900,
+        "hauteur": 7
+      },
+      "teinte": "vert",
+      "portee": [
+        12,
+        {
+          "fois": 0.2,
+          "min": 30
+        }
+      ],
+      "maintien": 0.4,
+      "reprise": "elan-2"
+    }
+  ],
+  "reprises": [
+    {
+      "id": "elan-1",
+      "pos": [
+        0,
+        {
+          "fois": 0.2,
+          "min": 15
+        }
+      ],
+      "capDegres": 90,
+      "cout": 3
+    },
+    {
+      "id": "elan-2",
+      "pos": [
+        0,
+        {
+          "fois": 0.52,
+          "min": 62
+        }
+      ],
+      "capDegres": 90,
+      "cout": 3
+    }
+  ],
+  "etoiles": {
+    "batterieMin": 0.45,
+    "tVilleMax": 70
+  },
+  "bulles": [
+    {
+      "id": "n03-porte",
+      "texte": "Cette porte s'ouvre si sa lampe te paraît verte. Regarde-la changer en roulant.",
+      "priorite": 3,
+      "note": "Premiere porte en vue (moins de deux portees).",
+      "quand": {
+        "tous": [
+          {
+            "var": "porteProche"
+          },
+          {
+            "var": "teintePorte",
+            "op": "!=",
+            "val": "noir"
+          }
+        ]
+      }
+    },
+    {
+      "id": "n03-relache",
+      "texte": "Vert ! Relâche : tu gardes cette vitesse, la porte va s'ouvrir.",
+      "priorite": 4,
+      "quand": {
+        "tous": [
+          {
+            "var": "porteProche"
+          },
+          {
+            "var": "teinteVoulue"
+          },
+          {
+            "var": "accelere"
+          }
+        ]
+      }
+    },
+    {
+      "id": "n03-trop-vite",
+      "texte": "Trop vite : la lampe a dépassé le vert. Freine un peu !",
+      "priorite": 4,
+      "quand": {
+        "tous": [
+          {
+            "var": "porteProche"
+          },
+          {
+            "un": [
+              {
+                "var": "teintePorte",
+                "op": "==",
+                "val": "cyan"
+              },
+              {
+                "var": "teintePorte",
+                "op": "==",
+                "val": "bleu"
+              },
+              {
+                "var": "teintePorte",
+                "op": "==",
+                "val": "violet"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "n03-ir",
+      "texte": "Cette lampe semble éteinte ? Elle brille en infrarouge. Fonce vers elle !",
+      "priorite": 3,
+      "quand": {
+        "tous": [
+          {
+            "var": "porteProche"
+          },
+          {
+            "var": "teintePorte",
+            "op": "==",
+            "val": "noir"
+          },
+          {
+            "var": "beta",
+            "op": "<",
+            "val": 0.2
+          }
+        ]
+      }
+    }
+  ],
+  "indices": [
+    {
+      "apresEchecs": 1,
+      "texte": "Regarde la lampe changer : rouge, orange, jaune… vert ! Relâche à ce moment-là."
+    },
+    {
+      "apresEchecs": 2,
+      "texte": "La bande verte sur le compteur montre la vitesse qui ouvre la prochaine porte.",
+      "aide": "zoneVitesse"
+    },
+    {
+      "apresEchecs": 3,
+      "texte": "Lampe rouge : vise un sixième de c. Infrarouge : un peu moins de la moitié de c.",
+      "aide": "spectrometre"
+    }
+  ],
+  "parcours": {
+    "reference": {
+      "note": "Vite jusqu'a la portee de la porte 1, beta 0,17 au passage, arret chez Mme Lorentz, puis beta 0,48 a travers la porte infrarouge et arret chez M. FitzGerald.",
+      "etapes": [
+        {
+          "aller": [
+            0,
+            {
+              "fois": 1,
+              "de": "porte1",
+              "plus": -60,
+              "min": 5
+            }
+          ],
+          "beta": 0.4
+        },
+        {
+          "aller": [
+            0,
+            {
+              "fois": 1,
+              "de": "porte1",
+              "plus": 12
+            }
+          ],
+          "beta": 0.17
+        },
+        {
+          "aller": [
+            0,
+            {
+              "fois": 1,
+              "de": "lorentz"
+            }
+          ],
+          "beta": 0.4,
+          "arret": true
+        },
+        {
+          "aller": [
+            0,
+            {
+              "fois": 1,
+              "de": "porte2",
+              "plus": 12
+            }
+          ],
+          "beta": 0.48
+        },
+        {
+          "aller": [
+            0,
+            {
+              "fois": 1,
+              "de": "fitzgerald"
+            }
+          ],
+          "beta": 0.6,
+          "arret": true
+        }
+      ]
+    },
+    "naif": {
+      "note": "Foncer : a beta 0,6 la lampe rouge parait noire, la porte reste fermee, choc et reprise, encore et encore.",
+      "etapes": [
+        {
+          "aller": [
+            0,
+            {
+              "fois": 1,
+              "de": "lorentz"
+            }
+          ],
+          "beta": 0.6,
+          "arret": true
+        },
+        {
+          "aller": [
+            0,
+            {
+              "fois": 1,
+              "de": "fitzgerald"
+            }
+          ],
+          "beta": 0.6,
+          "arret": true
+        }
+      ]
+    }
+  }
+}

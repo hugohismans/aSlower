@@ -23,6 +23,7 @@ import {
   SRGBColorSpace,
   ShaderMaterial,
   Vector2,
+  Vector3,
   UnsignedByteType,
 } from 'three';
 import { adaptationExposure } from '../physics/spectrum.js';
@@ -92,6 +93,16 @@ export function createSurfaceMaterial() {
  */
 export function createEmitterMaterial() {
   return relMaterial('rel-emitter', SHADERS.emitter, {}, { side: DoubleSide });
+}
+
+/**
+ * Lampe de porte (niveaux) : couleur perçue calculée par le CPU (uniforme `uLampColor`, sRGB
+ * linéaire final : game/rules.perceivedLamp), même aberration que le décor, sans brouillard.
+ * Un matériau par lampe (son uniforme propre) ; les uniformes partagés restent ceux de REL.
+ * @returns {ShaderMaterial}
+ */
+export function createLampMaterial() {
+  return relMaterial('rel-lampe', SHADERS.lamp, { uLampColor: { value: new Vector3(0, 0, 0) } }, { side: DoubleSide });
 }
 
 /**

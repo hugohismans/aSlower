@@ -58,6 +58,7 @@ const TEMPLATE = `
           <div class="gauge-bar">
             <div class="gauge-fill"></div>
             <div class="gauge-cover" data-ref="cover"></div>
+            <div class="gauge-zone" data-ref="zone" hidden></div>
             ${GAUGE_TICKS.map((v) => `<i class="gauge-tick" style="left:${v}%"></i>`).join('')}
           </div>
           <div class="gauge-rail" data-ref="needle"><i class="gauge-needle"></i></div>
@@ -77,6 +78,7 @@ const TEMPLATE = `
  *   vitesse) ; `snapshot.phiMax`, s'il est fourni, l'emporte. La vitesse de la lumière est
  *   lue à chaque image dans `snapshot.c` (celle de la partie).
  * @returns {{update(snapshot: object, extra?: {k?: number, fps?: number}): void,
+ *            setSpeedZone(zone: {min: number, max: number} | null): void,
  *            show(): void, hide(): void}}
  */
 export function createHud(rootElement, { phiMax = PHI_MAX_DEFAULT } = {}) {
@@ -95,7 +97,10 @@ export function createHud(rootElement, { phiMax = PHI_MAX_DEFAULT } = {}) {
     classic: ref('classic'),
     fps: ref('fps'),
     c: ref('c'),
+    zone: ref('zone'),
   };
+  /** Zone de vitesse affichée (aide « zoneVitesse » des niveaux), clé « min-max » ou ''. */
+  let zoneKey = '';
 
   /** Dernier texte écrit par élément : on n'écrit que ce qui change. */
   const lastText = new Map();
@@ -166,6 +171,22 @@ export function createHud(rootElement, { phiMax = PHI_MAX_DEFAULT } = {}) {
         el.fps.hidden = !showFps;
       }
       if (showFps) writeText('fps', `${Math.round(fps)}\u202fi/s`);
+    },
+
+    /**
+     * Bande de vitesse sur la jauge (aide « zoneVitesse » des niveaux : la vitesse qui donne
+     * la teinte demandée par la prochaine porte), en fractions de c ; null l'efface.
+     * @param {{min: number, max: number} | null} zone
+     */
+    setSpeedZone(zone) {
+      const key = zone ? `${zone.min.toFixed(4)}-${zone.max.toFixed(4)}` : '';
+      if (key === zoneKey) return;
+      zoneKey = key;
+      el.zone.hidden = !zone;
+      if (zone) {
+        el.zone.style.left = `${(zone.min * 100).toFixed(2)}%`;
+        el.zone.style.width = `${(Math.max(0.004, zone.max - zone.min) * 100).toFixed(2)}%`;
+      }
     },
 
     show() {

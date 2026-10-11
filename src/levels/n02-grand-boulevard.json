@@ -1,0 +1,896 @@
+{
+  "schema": "coursier-niveau/1",
+  "id": "n02-grand-boulevard",
+  "numero": 2,
+  "titre": "Le Grand Boulevard",
+  "notion": "deux horloges : ta montre et celle de la ville",
+  "briefing": [
+    "Ta batterie, c'est ta montre. Tes clients, eux, comptent avec l'horloge de la ville.",
+    "Hôtel Lorentz, au bout du Grand Boulevard : avant 0:45 à l'horloge de la ville.",
+    "Mme FitzGerald, sur le boulevard, rentre à 1:30. Attendre vide la batterie : roule plutôt !"
+  ],
+  "note": "Grille d'ilots de 56 m (rues tous les 80 m). Grand Boulevard x = 0 vers le nord : Hotel Lorentz a ≈ 1,5 L (delai 45 s), Mme FitzGerald plus bas sur le boulevard a ≈ 0,7 L, absente avant t = 90 s (delai 115 s). Place de l'Horloge au bout (centre a 2,3 L, tour de rayon 0,2 L autour du monument). Arriver tot puis attendre coute 1 s de batterie par seconde de ville ; faire le tour des ruelles a petite vitesse aussi (γ ≈ 1). Un tour et demi de la place a beta 0,85 (γ ≈ 1,9) fait passer la ville a moindre cout (dτ = dt/γ) : c'est le detour de reference. Batterie de 100 s.",
+  "parametres": {
+    "ya": {
+      "fois": 1.5,
+      "arrondiInf": 80,
+      "puisPlus": 40
+    },
+    "yb": {
+      "fois": 0.8,
+      "arrondiInf": 80,
+      "puisPlus": -40
+    },
+    "ybas": {
+      "fois": 1.4,
+      "arrondiInf": 80,
+      "puisPlus": -20
+    },
+    "xmax": {
+      "fois": 0.35,
+      "min": 180
+    },
+    "xmin": {
+      "fois": -0.35,
+      "max": -180
+    },
+    "coin": {
+      "fois": -0.35,
+      "max": -180,
+      "arrondiInf": 80,
+      "puisPlus": 12
+    },
+    "nx": {
+      "fois": 0.00875,
+      "plus": 5.3,
+      "arrondiInf": 1
+    },
+    "ny": {
+      "fois": 0.0125,
+      "de": "ybas",
+      "plus": 1.15,
+      "arrondiInf": 1
+    },
+    "ymax": {
+      "fois": 2.65,
+      "plus": 20
+    }
+  },
+  "scene": {
+    "titre": "Le Grand Boulevard",
+    "graine": 202,
+    "limites": {
+      "min": [
+        {
+          "fois": 1,
+          "de": "xmin"
+        },
+        -100
+      ],
+      "max": [
+        {
+          "fois": 1,
+          "de": "xmax"
+        },
+        {
+          "fois": 1,
+          "de": "ymax"
+        }
+      ]
+    },
+    "rues": [
+      {
+        "id": "boulevard",
+        "nom": "Grand Boulevard",
+        "de": [
+          0,
+          -100
+        ],
+        "a": [
+          0,
+          {
+            "fois": 2.1
+          }
+        ],
+        "largeur": 18
+      },
+      {
+        "id": "place",
+        "nom": "Place de l'Horloge",
+        "de": [
+          {
+            "fois": 1,
+            "de": "xmin"
+          },
+          {
+            "fois": 2.26
+          }
+        ],
+        "a": [
+          {
+            "fois": 1,
+            "de": "xmax"
+          },
+          {
+            "fois": 2.26
+          }
+        ],
+        "largeur": {
+          "fois": 0.58,
+          "plus": 20
+        }
+      },
+      {
+        "id": "ruelles-nord-sud",
+        "nom": "Ruelles",
+        "de": [
+          {
+            "fois": 1,
+            "de": "coin",
+            "plus": -12
+          },
+          -100
+        ],
+        "a": [
+          {
+            "fois": 1,
+            "de": "coin",
+            "plus": -12
+          },
+          {
+            "fois": 1,
+            "de": "ybas"
+          }
+        ],
+        "largeur": 18,
+        "repeter": {
+          "nombre": {
+            "fois": 1,
+            "de": "nx",
+            "plus": 1
+          },
+          "pas": [
+            80,
+            0
+          ]
+        }
+      },
+      {
+        "id": "ruelles-est-ouest",
+        "nom": "Ruelles",
+        "de": [
+          {
+            "fois": 1,
+            "de": "xmin"
+          },
+          -80
+        ],
+        "a": [
+          {
+            "fois": 1,
+            "de": "xmax"
+          },
+          -80
+        ],
+        "largeur": 18,
+        "repeter": {
+          "nombre": {
+            "fois": 1,
+            "de": "ny",
+            "plus": 1
+          },
+          "pas": [
+            0,
+            80
+          ]
+        }
+      }
+    ],
+    "rangees": [
+      {
+        "id": "quartier",
+        "coin": [
+          {
+            "fois": 1,
+            "de": "coin"
+          },
+          -68
+        ],
+        "ilot": [
+          56,
+          56
+        ],
+        "nombre": {
+          "fois": 1,
+          "de": "nx"
+        },
+        "pas": [
+          80,
+          0
+        ],
+        "rangs": {
+          "nombre": {
+            "fois": 1,
+            "de": "ny"
+          },
+          "pas": [
+            0,
+            80
+          ]
+        },
+        "facades": [
+          "sud",
+          "nord",
+          "ouest",
+          "est"
+        ],
+        "largeurs": [
+          16,
+          28
+        ],
+        "profondeurs": [
+          12,
+          18
+        ],
+        "hauteurs": [
+          10,
+          30
+        ],
+        "couleurs": [
+          "rouge",
+          "orange",
+          "jaune",
+          "vert",
+          "cyan",
+          "bleu",
+          "violet",
+          "creme",
+          "gris"
+        ],
+        "ordreCouleurs": "hasard"
+      }
+    ],
+    "batiments": [
+      {
+        "id": "horloge",
+        "nom": "Horloge de la Mairie",
+        "pos": [
+          0,
+          {
+            "fois": 2.3
+          }
+        ],
+        "taille": [
+          {
+            "fois": 0.132
+          },
+          {
+            "fois": 0.132
+          }
+        ],
+        "hauteur": 24,
+        "couleur": "creme"
+      }
+    ],
+    "lampadaires": [
+      {
+        "rue": "boulevard",
+        "pas": 40,
+        "depart": 20
+      }
+    ]
+  },
+  "depart": {
+    "pos": [
+      0,
+      -40
+    ],
+    "capDegres": 90
+  },
+  "batterie": {
+    "tauMax": 100
+  },
+  "phiMax": 3,
+  "colis": [
+    {
+      "id": "contrat",
+      "client": "Hôtel Lorentz",
+      "nom": "Contrat",
+      "livraison": {
+        "lieu": [
+          0,
+          {
+            "fois": 1,
+            "de": "ya"
+          }
+        ],
+        "rayon": 10
+      },
+      "delai": 45,
+      "obligatoire": true
+    },
+    {
+      "id": "pendule",
+      "client": "Mme FitzGerald",
+      "nom": "Pendule",
+      "livraison": {
+        "lieu": [
+          0,
+          {
+            "fois": 1,
+            "de": "yb"
+          }
+        ],
+        "rayon": 8,
+        "pasAvant": 90
+      },
+      "delai": 115,
+      "obligatoire": true
+    }
+  ],
+  "etoiles": {
+    "batterieMin": 0.2,
+    "tVilleMax": 115
+  },
+  "bulles": [
+    {
+      "id": "n02-delai",
+      "texte": "Ton client compte avec l'horloge de la ville, pas avec ta montre !",
+      "priorite": 3,
+      "note": "Moins de 20 s avant le delai du prochain colis, horloges deja decalees.",
+      "quand": {
+        "tous": [
+          {
+            "var": "margeDelai",
+            "op": "<",
+            "val": 20
+          },
+          {
+            "var": "ecart",
+            "op": ">",
+            "val": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "n02-detour",
+      "texte": "Mme FitzGerald rentre à 1:30. Fais le tour de la place, vite : ta montre avancera moins.",
+      "priorite": 3,
+      "note": "Juste apres la livraison a l'hotel (la cliente suivante est encore absente).",
+      "quand": {
+        "tous": [
+          {
+            "evenement": "livraison"
+          },
+          {
+            "var": "t",
+            "op": "<",
+            "val": 75
+          }
+        ]
+      }
+    },
+    {
+      "id": "n02-attente",
+      "texte": "Cliente absente : chaque seconde d'attente coûte une seconde de batterie.",
+      "priorite": 4,
+      "quand": {
+        "var": "attendClient"
+      }
+    },
+    {
+      "id": "n02-batterie",
+      "texte": "Batterie à 20 % : économise ta montre, pas l'horloge de la ville.",
+      "priorite": 4,
+      "quand": {
+        "var": "batterie",
+        "op": "<",
+        "val": 0.2
+      }
+    }
+  ],
+  "indices": [
+    {
+      "apresEchecs": 1,
+      "texte": "Le client compte avec l'horloge de la ville : regarde-la, pas ta montre."
+    },
+    {
+      "apresEchecs": 2,
+      "texte": "Ne lâche pas sur le boulevard : plus tu vas vite, moins ta montre avance par mètre.",
+      "aide": "repereFreinage"
+    },
+    {
+      "apresEchecs": 3,
+      "texte": "Après l'hôtel, fais un tour et demi de la place de l'Horloge, vite, au lieu d'attendre Mme FitzGerald."
+    }
+  ],
+  "parcours": {
+    "reference": {
+      "note": "A fond sur le boulevard jusqu'a l'hotel, puis un tour et demi de la place de l'Horloge a beta 0,85 et retour a fond par le boulevard : arrivee chez Mme FitzGerald vers t = 91-99 s, sans attendre.",
+      "etapes": [
+        {
+          "aller": [
+            0,
+            {
+              "fois": 1,
+              "de": "ya"
+            }
+          ],
+          "beta": 0.9,
+          "arret": true
+        },
+        {
+          "aller": [
+            {
+              "fois": -0.2
+            },
+            {
+              "fois": 2.1
+            }
+          ],
+          "beta": 0.9
+        },
+        {
+          "aller": [
+            {
+              "fois": -0.2
+            },
+            {
+              "fois": 2.3
+            }
+          ],
+          "beta": 0.85
+        },
+        {
+          "aller": [
+            {
+              "fois": -0.19319
+            },
+            {
+              "fois": 2.35176
+            }
+          ],
+          "beta": 0.85
+        },
+        {
+          "aller": [
+            {
+              "fois": -0.17321
+            },
+            {
+              "fois": 2.4
+            }
+          ],
+          "beta": 0.85
+        },
+        {
+          "aller": [
+            {
+              "fois": -0.14142
+            },
+            {
+              "fois": 2.44142
+            }
+          ],
+          "beta": 0.85
+        },
+        {
+          "aller": [
+            {
+              "fois": -0.1
+            },
+            {
+              "fois": 2.47321
+            }
+          ],
+          "beta": 0.85
+        },
+        {
+          "aller": [
+            {
+              "fois": -0.05176
+            },
+            {
+              "fois": 2.49319
+            }
+          ],
+          "beta": 0.85
+        },
+        {
+          "aller": [
+            0,
+            {
+              "fois": 2.5
+            }
+          ],
+          "beta": 0.85
+        },
+        {
+          "aller": [
+            {
+              "fois": 0.05176
+            },
+            {
+              "fois": 2.49319
+            }
+          ],
+          "beta": 0.85
+        },
+        {
+          "aller": [
+            {
+              "fois": 0.1
+            },
+            {
+              "fois": 2.47321
+            }
+          ],
+          "beta": 0.85
+        },
+        {
+          "aller": [
+            {
+              "fois": 0.14142
+            },
+            {
+              "fois": 2.44142
+            }
+          ],
+          "beta": 0.85
+        },
+        {
+          "aller": [
+            {
+              "fois": 0.17321
+            },
+            {
+              "fois": 2.4
+            }
+          ],
+          "beta": 0.85
+        },
+        {
+          "aller": [
+            {
+              "fois": 0.19319
+            },
+            {
+              "fois": 2.35176
+            }
+          ],
+          "beta": 0.85
+        },
+        {
+          "aller": [
+            {
+              "fois": 0.2
+            },
+            {
+              "fois": 2.3
+            }
+          ],
+          "beta": 0.85
+        },
+        {
+          "aller": [
+            {
+              "fois": 0.19319
+            },
+            {
+              "fois": 2.24824
+            }
+          ],
+          "beta": 0.85
+        },
+        {
+          "aller": [
+            {
+              "fois": 0.17321
+            },
+            {
+              "fois": 2.2
+            }
+          ],
+          "beta": 0.85
+        },
+        {
+          "aller": [
+            {
+              "fois": 0.14142
+            },
+            {
+              "fois": 2.15858
+            }
+          ],
+          "beta": 0.85
+        },
+        {
+          "aller": [
+            {
+              "fois": 0.1
+            },
+            {
+              "fois": 2.12679
+            }
+          ],
+          "beta": 0.85
+        },
+        {
+          "aller": [
+            {
+              "fois": 0.05176
+            },
+            {
+              "fois": 2.10681
+            }
+          ],
+          "beta": 0.85
+        },
+        {
+          "aller": [
+            0,
+            {
+              "fois": 2.1
+            }
+          ],
+          "beta": 0.85
+        },
+        {
+          "aller": [
+            {
+              "fois": -0.05176
+            },
+            {
+              "fois": 2.10681
+            }
+          ],
+          "beta": 0.85
+        },
+        {
+          "aller": [
+            {
+              "fois": -0.1
+            },
+            {
+              "fois": 2.12679
+            }
+          ],
+          "beta": 0.85
+        },
+        {
+          "aller": [
+            {
+              "fois": -0.14142
+            },
+            {
+              "fois": 2.15858
+            }
+          ],
+          "beta": 0.85
+        },
+        {
+          "aller": [
+            {
+              "fois": -0.17321
+            },
+            {
+              "fois": 2.2
+            }
+          ],
+          "beta": 0.85
+        },
+        {
+          "aller": [
+            {
+              "fois": -0.19319
+            },
+            {
+              "fois": 2.24824
+            }
+          ],
+          "beta": 0.85
+        },
+        {
+          "aller": [
+            {
+              "fois": -0.2
+            },
+            {
+              "fois": 2.3
+            }
+          ],
+          "beta": 0.85
+        },
+        {
+          "aller": [
+            {
+              "fois": -0.19319
+            },
+            {
+              "fois": 2.35176
+            }
+          ],
+          "beta": 0.85
+        },
+        {
+          "aller": [
+            {
+              "fois": -0.17321
+            },
+            {
+              "fois": 2.4
+            }
+          ],
+          "beta": 0.85
+        },
+        {
+          "aller": [
+            {
+              "fois": -0.14142
+            },
+            {
+              "fois": 2.44142
+            }
+          ],
+          "beta": 0.85
+        },
+        {
+          "aller": [
+            {
+              "fois": -0.1
+            },
+            {
+              "fois": 2.47321
+            }
+          ],
+          "beta": 0.85
+        },
+        {
+          "aller": [
+            {
+              "fois": -0.05176
+            },
+            {
+              "fois": 2.49319
+            }
+          ],
+          "beta": 0.85
+        },
+        {
+          "aller": [
+            0,
+            {
+              "fois": 2.5
+            }
+          ],
+          "beta": 0.85
+        },
+        {
+          "aller": [
+            {
+              "fois": 0.05176
+            },
+            {
+              "fois": 2.49319
+            }
+          ],
+          "beta": 0.85
+        },
+        {
+          "aller": [
+            {
+              "fois": 0.1
+            },
+            {
+              "fois": 2.47321
+            }
+          ],
+          "beta": 0.85
+        },
+        {
+          "aller": [
+            {
+              "fois": 0.14142
+            },
+            {
+              "fois": 2.44142
+            }
+          ],
+          "beta": 0.85
+        },
+        {
+          "aller": [
+            {
+              "fois": 0.17321
+            },
+            {
+              "fois": 2.4
+            }
+          ],
+          "beta": 0.85
+        },
+        {
+          "aller": [
+            {
+              "fois": 0.19319
+            },
+            {
+              "fois": 2.35176
+            }
+          ],
+          "beta": 0.85
+        },
+        {
+          "aller": [
+            {
+              "fois": 0.2
+            },
+            {
+              "fois": 2.3
+            }
+          ],
+          "beta": 0.85
+        },
+        {
+          "aller": [
+            {
+              "fois": 0.2
+            },
+            {
+              "fois": 2.1
+            }
+          ],
+          "beta": 0.9
+        },
+        {
+          "aller": [
+            0,
+            {
+              "fois": 1.4
+            }
+          ],
+          "beta": 0.9
+        },
+        {
+          "aller": [
+            0,
+            {
+              "fois": 1,
+              "de": "yb"
+            }
+          ],
+          "beta": 0.9,
+          "arret": true
+        }
+      ]
+    },
+    "naif": {
+      "note": "Pressé puis patient : a fond jusqu'a l'hotel, demi-tour, a fond chez Mme FitzGerald, puis attente devant sa porte jusqu'a son retour. L'attente vide la batterie.",
+      "etapes": [
+        {
+          "aller": [
+            0,
+            {
+              "fois": 1,
+              "de": "ya"
+            }
+          ],
+          "beta": 0.9,
+          "arret": true
+        },
+        {
+          "aller": [
+            0,
+            {
+              "fois": 1,
+              "de": "yb"
+            }
+          ],
+          "beta": 0.9,
+          "arret": true
+        }
+      ]
+    }
+  }
+}

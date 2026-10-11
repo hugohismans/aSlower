@@ -54,6 +54,9 @@ export function createBotDriver(route, physics, { dt = BOT_DT, turnRadius = BOT_
     phase = { started: false, tau0: 0, stopped: false, stopTau: 0, from: [0, 0] };
   };
   const turnPhi = Math.asinh((turnRadius * TURN_RATE) / c);
+  /** Plafonds de rapidité aux points (anticipation : voir limitPhi), pour l'étape `limitsAt`. */
+  const limits = new Map();
+  let limitsAt = -1;
 
   /** Rapidité voulue en passant le point i (0 si arrêt) ; from : début du tronçon. */
   function waypointPhi(i, cruisePhi, from) {
@@ -67,6 +70,31 @@ export function createBotDriver(route, physics, { dt = BOT_DT, turnRadius = BOT_
     const a1 = Math.atan2(s.aller[1] - prev[1], s.aller[0] - prev[0]);
     const a2 = Math.atan2(n.aller[1] - s.aller[1], n.aller[0] - s.aller[0]);
     return Math.abs(wrap(a2 - a1)) > (20 * Math.PI) / 180 ? Math.min(through, turnPhi) : through;
+  }
+
+  /**
+   * Rapidité permise en passant le point i, en anticipant les points suivants : au plus
+   * waypointPhi(i), et pas plus que ce qui permet, au frein plein, de ralentir jusqu'au plafond
+   * du point suivant (cosh φ_i ≤ cosh φ_{i+1} + a·d/c², d = longueur du tronçon). Sans cela, un
+   * long tronçon rapide suivi d'un virage serré arrive trop vite au virage (un seul point
+   * d'avance ne suffit pas). Calcul récursif vers l'aval ; une étape d'attente impose l'arrêt.
+   */
+  function limitPhi(i, cruisePhi, from) {
+    if (limitsAt !== index) {
+      limits.clear(); // le plafond du point courant dépend du début du tronçon (phase.from)
+      limitsAt = index;
+    }
+    const key = i;
+    if (limits.has(key)) return /** @type {number} */ (limits.get(key));
+    let phi = waypointPhi(i, cruisePhi, from);
+    const n = steps[i + 1];
+    if (phi > 0 && n && n.aller && i + 1 < steps.length) {
+      const d = Math.hypot(n.aller[0] - steps[i].aller[0], n.aller[1] - steps[i].aller[1]);
+      const nextPhi = limitPhi(i + 1, Math.atanh(Math.min(n.beta, 0.995)), steps[i].aller);
+      phi = Math.min(phi, Math.acosh(Math.cosh(nextPhi) + (a * d) / (c * c)));
+    }
+    limits.set(key, phi);
+    return phi;
   }
 
   /** Poussée ou frein dosés pour atteindre la rapidité phiTarget dans l'image. */
@@ -116,8 +144,9 @@ export function createBotDriver(route, physics, { dt = BOT_DT, turnRadius = BOT_
           }
           return { thrust: 0, brake: 0, steer: 0 };
         }
+        const stopHere = s.arret || !steps[index + 1] || !steps[index + 1].aller;
         if (d <= radius) {
-          if (s.arret || !steps[index + 1] || !steps[index + 1].aller) {
+          if (stopHere) {
             phase.stopped = true;
             phase.stopTau = snap.tau;
             continue;
@@ -125,11 +154,27 @@ export function createBotDriver(route, physics, { dt = BOT_DT, turnRadius = BOT_
           next();
           continue;
         }
+        // Point de passage dépassé (à grande vitesse, on peut le frôler à plus de `radius`) :
+        // on est au-delà de la perpendiculaire au tronçon, assez près de lui.
+        if (!stopHere) {
+          const prev = index > 0 && steps[index - 1].aller ? steps[index - 1].aller : phase.from;
+          const sx = tx - prev[0];
+          const sy = ty - prev[1];
+          if (dx * sx + dy * sy < 0 && d < Math.max(4 * radius, 0.25 * Math.hypot(sx, sy))) {
+            next();
+            continue;
+          }
+        }
         const err = wrap(Math.atan2(dy, dx) - snap.heading);
-        const steer = clamp(-2.5 * err, -1, 1);
+        // Volant : proportionnel à l'écart de cap, plus l'anticipation « poursuite pure » (courbure
+        // 2·sin(écart)/d du cercle qui passe par le point, × |u|/TURN_RATE) : sans elle, le
+        // volant est en retard dans les virages larges pris vite (tour de place).
+        const u = Math.hypot(snap.ux ?? 0, snap.uy ?? 0);
+        const pursuit = ((2 * Math.sin(err)) / Math.max(d, 1)) * (u / TURN_RATE);
+        const steer = clamp(-2.5 * err - pursuit, -1, 1);
         if (!moving && Math.abs(err) > 0.12) return { thrust: 0, brake: 0, steer: Math.sign(-err) || 0 };
         const cruisePhi = Math.atanh(Math.min(s.beta, 0.995));
-        const phiW = waypointPhi(index, cruisePhi, phase.from);
+        const phiW = limitPhi(index, cruisePhi, phase.from);
         const allow = Math.acosh(Math.cosh(phiW) + (a * Math.max(d - 0.5 * radius, 0)) / (c * c));
         let phiTarget = Math.min(cruisePhi, allow);
         if (Math.abs(err) > 0.5) phiTarget = Math.min(phiTarget, turnPhi);

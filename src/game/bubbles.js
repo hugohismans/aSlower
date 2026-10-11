@@ -454,6 +454,24 @@ const STEER_THRESHOLD = 0.15;
 const RELEASE_MIN_BETA = 0.01;
 
 /**
+/**
+ * @typedef {object} LevelBubbleInput variables d'une partie de niveau (main.js les calcule à
+ *   partir de l'état de partie, voir hud/levelFormat.js et game/rules.js)
+ * @property {number} [distanceArret] m
+ * @property {boolean} [arretDerriere]
+ * @property {boolean} [dansZone]
+ * @property {boolean} [attendClient]
+ * @property {boolean} [porteProche]
+ * @property {string} [teintePorte]
+ * @property {boolean} [teinteVoulue]
+ * @property {number} [batterie] fraction restante
+ * @property {number} [margeDelai] s
+ * @property {number} [colisLivres]
+ * @property {string[]} [evenements] événements de l'image (livraison, retrait, choc, reprise,
+ *   porteOuverte, attente)
+ */
+
+/**
  * Calcule, à chaque image, les variables et événements des bulles (VARIABLES, EVENTS) à partir
  * de l'état du jeu. Garde ce qui demande une mémoire : τ au départ, dejaParti, dejaTourne,
  * fronts des commandes. Le résultat se passe tel quel à engine.update(vars, dt).
@@ -461,10 +479,13 @@ const RELEASE_MIN_BETA = 0.01;
  *     snapshot: {beta: number, gamma: number, speed: number, c: number, tau: number, t: number},
  *     command?: {thrust?: number, brake?: number, steer?: number, classic?: boolean},
  *     k?: number, a?: number, modeVolant?: 'tilt' | 'drag' | 'clavier',
- *     distanceDevant?: number, facadeDevant?: boolean, regardArriere?: boolean, butee?: boolean
+ *     distanceDevant?: number, facadeDevant?: boolean, regardArriere?: boolean, butee?: boolean,
+ *     niveau?: LevelBubbleInput | null
  *   }): Record<string, any>, reset(): void}}
  *   command : commande appliquée (après la butée douce) ; a : accélération propre maximale
- *   (défaut c/10) ; butee : vrai quand la butée douce freine à la place du joueur.
+ *   (défaut c/10) ; butee : vrai quand la butée douce freine à la place du joueur ;
+ *   niveau : variables de la partie de niveau (jalon 3), absentes en conduite libre (valeurs
+ *   neutres : enNiveau faux, distances infinies, batterie 1, teintePorte « aucune »).
  */
 export function createBubbleVariables() {
   let startTau = null;
@@ -483,6 +504,7 @@ export function createBubbleVariables() {
       facadeDevant = false,
       regardArriere = false,
       butee = false,
+      niveau = null,
     }) {
       if (startTau === null) startTau = s.tau;
       const brake = (command.brake ?? 0) > 0;
@@ -505,6 +527,9 @@ export function createBubbleVariables() {
       const accel = a > 0 ? a : s.c / 10;
       const gb = s.gamma * s.beta;
       const distanceFreinage = ((s.c * s.c) / accel) * ((gb * gb) / (s.gamma + 1));
+      const lv = niveau ?? {};
+      const distanceArret = Number.isFinite(lv.distanceArret) ? /** @type {number} */ (lv.distanceArret) : Infinity;
+      if (Array.isArray(lv.evenements)) for (const name of lv.evenements) evenements.push(name);
 
       return {
         beta: s.beta,
@@ -529,6 +554,18 @@ export function createBubbleVariables() {
         regardArriere,
         facadeDevant,
         modeVolant,
+        enNiveau: niveau !== null,
+        distanceArret,
+        margeArret: distanceFreinage > 0 ? distanceArret / distanceFreinage : Infinity,
+        arretDerriere: Boolean(lv.arretDerriere),
+        dansZone: Boolean(lv.dansZone),
+        attendClient: Boolean(lv.attendClient),
+        porteProche: Boolean(lv.porteProche),
+        teintePorte: typeof lv.teintePorte === 'string' ? lv.teintePorte : 'aucune',
+        teinteVoulue: Boolean(lv.teinteVoulue),
+        batterie: Number.isFinite(lv.batterie) ? lv.batterie : 1,
+        margeDelai: Number.isFinite(lv.margeDelai) ? lv.margeDelai : Infinity,
+        colisLivres: Number.isFinite(lv.colisLivres) ? lv.colisLivres : 0,
         evenements,
       };
     },

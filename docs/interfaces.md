@@ -40,6 +40,7 @@ dans le joueur (`createPlayer({physics})`), la scène (`lengthUnit`), et tout le
   - `localStorage` et `sessionStorage` ne sont utilisés que dans `src/storage.js`.
   - Les fichiers « purs » (`physics/**`, `render/subdivide.js`, `render/lod.js`,
     `render/culling.js`, `render/layout.js`, `render/adaptiveDpr.js`, `hud/format.js`,
+    `hud/levelFormat.js`,
     `input/tiltMath.js`, `game/conditions.js`, `game/bubbles.js`, `game/validate.js`,
     `game/level.js`, `game/rules.js`, `game/score.js`, `game/states.js`, `game/bot.js`,
     `levels/index.js`) n'utilisent ni `window`, ni `document`, ni `three`, et n'importent que
@@ -247,6 +248,10 @@ createEnvironmentMesh(material = createEnvironmentMaterial())
                                    // triangle plein écran de cette passe (jamais éliminé)
 createCockpitMaterial()            // avant du véhicule, comobile, sans effet relativiste ni
                                    // exposition d'adaptation (éclairé par la lumière projetée)
+createLampMaterial()               // lampe de porte (jalon 3) : aberration ; couleur = uniforme
+                                   // uLampColor (Vector3, sRGB linéaire FINAL), calculée par le CPU
+                                   // avec game/rules.perceivedLamp (même chaîne que la règle) ;
+                                   // pas de brouillard ; un matériau par lampe (shaders/lamp.*.glsl)
 createClassicVariant(material)     // même pipeline compilé sans effets (define REL_CLASSIC),
                                    // pour le critère « vision classique » du jalon 1
 ```
@@ -335,7 +340,23 @@ isChunkVisible(chunk, camera {x, y, z}, visibilityFar) // coupe à la distance d
   les variantes `REL_CLASSIC` quand k = 0 ; `stats()` → `{calls, triangles, chunks,
   visibleChunks, lodCounts, generated, generationMs, renderMs}`. `physics` (physicsFor(c)) :
   la scène est développée pour `physics.lengthUnit` ; une nouvelle partie (« Changer c »)
-  appelle `dispose()` puis recrée le monde avec le même renderer.
+  appelle `dispose()` puis recrée le monde avec le même renderer. Option `level` (jalon 3) :
+  vue statique d'un niveau (`LevelView`, ci-dessous) → objets du niveau dans la scène ;
+  `updateLevel(state, eye, dtReal)` les met à jour après `update` ; ils suivent les variantes
+  « vision classique », le préchauffage et `dispose()`.
+- `levelObjects.js` (jalon 3) : `createLevelObjects(view, {surface: {rel, classic}, emitter:
+  {rel, classic}})` → `{group, setClassic(on), update(state, eye, dtReal), ownMaterials,
+  dispose()}`. `view` (`LevelView`) = `{stops: [{key, kind: 'retrait'|'livraison', x, y,
+  rayon}], doors: [{id, x, y, capDegres, largeur, hauteur, lampZ}], buildings}` ; `state`
+  (`LevelRenderState`, calculé par main.js) = `{stops: {clé: {active, present}}, doors: {id:
+  {open, lampRgb}}}` : `present` = client VU présent (`rules.seenClientPresent`, à t_e),
+  `open` = porte VUE ouverte (`rules.seenDoorOpen`), `lampRgb` = `perceivedLamp(lampe,
+  instantané effectif k·β).rgb` (à k = 1, exactement la couleur jugée par la règle). Zone :
+  anneau au sol (rayon de la zone) et balise corps noir à côté du client (6 500 K livraison,
+  2 700 K retrait) ; client : silhouette en boîtes ; porte : deux battants qui coulissent
+  (0,8 s) dans les façades, linteau, potence et lentille de la lampe. Fonctions de géométrie
+  exportées et testées : `ringGeometry`, `beaconGeometry`, `clientGeometry`,
+  `doorLeafGeometry`, `doorFrameGeometry`, `lampGeometry`, `clientSpot`.
 
 ## `src/input/` (DOM)
 
@@ -398,8 +419,35 @@ mi-hauteur à gauche ; ni zone volant ni repère.
 
 ```js
 // hud.js
-createHud(rootElement, {phiMax = PHI_MAX_DEFAULT} = {}) // → {update(snapshot, {k, fps}), show(), hide()}
-                                   // c lu dans snapshot.c (jauge, décimales, libellé « c = 30 m/s »)
+createHud(rootElement, {phiMax = PHI_MAX_DEFAULT} = {}) // → {update(snapshot, {k, fps}),
+                                   //    setSpeedZone({min, max} | null), show(), hide()}
+                                   // c lu dans snapshot.c (jauge, décimales, libellé « c = 30 m/s ») ;
+                                   // setSpeedZone : bande verte sur la jauge (aide « zoneVitesse »)
+// levelHud.js (jalon 3)
+createLevelHud(hudRoot)            // → {update(info), show(), hide(), element} ; info =
+                                   // {battery: {text, fraction, level}, colis: {done, total},
+                                   //  next: {client, verb, distance, angle, behind, inZone, timing}
+                                   //  | null, brake: texte, spectro: {text, ok} | null} ; 12 Hz,
+                                   // flèche et jauge par transform
+// levelFormat.js (pur, jalon 3)
+frNumber(x, decimals) · formatClockShort(s) « 1:30 » · batteryFraction(tau, tauMax)
+batteryLevel(f) 'ok'|'bas'|'critique' · formatBattery(tau, tauMax) « 65 s » · formatDistance(m)
+formatStars(n) « ★★☆ » · brakingDistance(snap, a) · counterfactualBattery(d, c, β = 0,2)
+stopIndicator(snap, stop, {k}) → {distance, angle, worldAngle, inZone, behind} : angle =
+                                   // direction APPARENTE (aberrate avec β_eff = k·β), 0 = devant,
+                                   // > 0 = à droite ; distance dans la ville
+stopTiming(stop, t) → {text, state: 'absent'|'delai'|'retard'|'libre'} (heure de la ville)
+headOnHue(lamp, β, d) · hueSpeedWindow(lamp, teinte, {distance}) → {min, max} | null
+                                   // même chaîne que rules.perceivedLamp (testé)
+spectrometerReading(vue, lampe, teinte) → {text: « vert ✓ 533 nm », ok}
+hintFor(indices, echecs) · activeAids(indices, echecs) → Set · starLines(score) · failureText(score)
+resultFigures({tauFin, tFin, tauMax, distance, c}) → {montre, ville, ecart, batterie, contrefactuel}
+// screens.js (jalon 3) : #screen et #countdown de index.html
+createScreens(root, countdownRoot) // → {showSelection({levels, cText, total, onChoose, onBack,
+                                   //  option}), showBriefing({…, onGo, onBack}) → {setBusy(text)},
+                                   //  showResult({…, onReplay, onNext, onQuit}), showFailure({…,
+                                   //  canSkip, onRetry, onSkip, onQuit}), hide(), showCountdown(text,
+                                   //  {small}), hideCountdown()}
 // lightSpeed.js (DOM)
 createLightSpeedControl(container, {value, presets, parse, onChange})
                                    // réglage « Vitesse de la lumière : [−] n [+] m/s » + préréglages,
@@ -463,6 +511,9 @@ CONTROL_MODES                      // ['tilt', 'drag']
 loadControlMode({touch} = {}, store = local) // direction mémorisée, sinon 'tilt' sur écran tactile
                                    // ((any-pointer: coarse)) et 'drag' ailleurs
 saveControlMode(mode, store = local) // choix du joueur (un repli automatique n'est pas mémorisé)
+OPTIONS_KEY = 'options'            // stockage local : aslower:v1:options → {spectrometre}
+DEFAULT_OPTIONS                    // {spectrometre: false}
+loadOptions(store = local) · saveOptions({spectrometre}, store = local)
 ```
 
 ## `src/game/conditions.js` (pur)
@@ -478,8 +529,13 @@ VARIABLES                          // {nom: {type, valeurs?, entier?, descriptio
                                    // beta, gamma, speed, c, tau, t, ecart, depuisDebut, k,
                                    // vitessePropre, distanceFreinage, distanceDevant, margeFreinage,
                                    // accelere, freine, relache, tourne, dejaParti, dejaTourne,
-                                   // regardArriere, facadeDevant, modeVolant ('tilt'|'drag'|'clavier')
-EVENTS                             // depart, relache, frein, butee, visionClassique, regardArriere
+                                   // regardArriere, facadeDevant, modeVolant ('tilt'|'drag'|'clavier') ;
+                                   // niveaux (J3, neutres en conduite libre) : enNiveau, distanceArret,
+                                   // margeArret, arretDerriere, dansZone, attendClient, porteProche,
+                                   // teintePorte ('aucune' | teintes), teinteVoulue, batterie,
+                                   // margeDelai, colisLivres
+EVENTS                             // depart, relache, frein, butee, visionClassique, regardArriere ;
+                                   // niveaux : livraison, retrait, choc, reprise, porteOuverte, attente
 validateCondition(cond, {path, variables, events, bubbleIds}) // → liste d'erreurs (chemin JSON)
 compileCondition(cond, options)    // → {evaluate(ctx, dt) → bool, reset()} ; lève si invalide
 evaluateCondition(cond, ctx)       // évaluation ponctuelle (sans état)
@@ -502,8 +558,12 @@ createBubbleEngine({definitions, store = mémoire, now = Date.now, key = 'bulles
   //    reset() (« Revoir les bulles » : oublie les vues, stockage compris),
   //    clearPending() (nouvelle partie : ferme et vide la file, garde les vues), list()}
 createBubbleVariables()            // → {compute({snapshot, command, k, a, modeVolant,
-                                   //    distanceDevant, facadeDevant, regardArriere, butee}) → vars,
-                                   //    reset()} (mémoire : τ au départ, dejaParti, fronts)
+                                   //    distanceDevant, facadeDevant, regardArriere, butee, niveau})
+                                   //    → vars, reset()} (mémoire : τ au départ, dejaParti, fronts) ;
+                                   //    niveau (J3, null en conduite libre) : {distanceArret,
+                                   //    arretDerriere, dansZone, attendClient, porteProche,
+                                   //    teintePorte, teinteVoulue, batterie, margeDelai, colisLivres,
+                                   //    evenements}
 facadeAhead(buildings, x, y, hx, hy, {range = 300, halfAngleDeg = 20, rays = 5})
                                    // façade dans l'axe (lancer de rayons, à appeler à 5 Hz)
 validateBubbles(json) · interpolate(template, vars) · chooseText(def, modeVolant)
@@ -636,6 +696,10 @@ totalStars(p, levelIds)
 ```js
 BOT_DT = 1/60 · BOT_TURN_RADIUS = 6 · ARRET_PAUSE = 0,65 s
 createBotDriver(route (résolu), physics, {dt, turnRadius}) // → {command(snapshot) → cmd, done, index}
+  // anticipation : la rapidité permise à chaque point tient compte des points suivants (frein
+  // plein jusqu'au plafond du point d'après, de proche en proche) ; volant proportionnel à
+  // l'écart de cap + poursuite pure (courbure 2·sin(écart)/d × |u|/TURN_RATE) ; un point de
+  // passage frôlé (au-delà de la perpendiculaire au tronçon) compte comme atteint
 runBot(json, {c = 30, palette, route = 'reference' | 'naif' | {etapes}, dt, maxTau, onFrame})
   // vraie physique (level.advance) → {status, score, tau, t, events, frames, level, player, finished}
 ```
@@ -678,10 +742,22 @@ export const session               // idem pour sessionStorage
   sur `visibilitychange` (la boucle s'arrête et l'horloge est réinitialisée à la reprise). Une
   exception de `frame` arrête la boucle et appelle `onError(error)` une fois (main.js affiche
   alors « Le jeu s'est arrêté » avec « Recharger »).
+- Machine à états des niveaux (`game/states.js`) branchée sur les écrans (`hud/screens.js`) :
+  menu → sélection (étoiles par c, verrous, option Spectromètre) → briefing (« C'est parti » :
+  permission d'inclinaison, plein écran, chargement) → décompte (3 s ; 1 s après une pause ou
+  une reprise ; calibrage du volant d'inclinaison) → partie (`level.advance` remplace
+  step/softStop/keepInside ; la conduite libre garde ce dernier fonctionnement) ⇄ pause
+  (Recommencer, Quitter le niveau) / reprise (message, +coût) → bilan (étoiles, chiffres,
+  contrefactuel, records ; Niveau suivant, Rejouer, Niveaux) | échec (raison, indice gradué,
+  Recommencer, « Passer » après 4 échecs). Progression et options enregistrées. Bulles :
+  globales + bulles du niveau dans un même moteur (refait à chaque partie).
 - Paramètres d'URL : `?c=n` (vitesse de la lumière, entier de 10 à 100, prioritaire sur le
   réglage mémorisé), `?scene=avenue-test|quartier-test` (défaut : avenue-test), `?diag`,
   `?bench` (résultat dans `window.__benchResult`, avec `c` et `lengthUnit`), `?sansciel` (avec `?diag` ou `?bench` : passe
   ciel/sol coupée dès le départ), `?dpr=` (coupe le DPR adaptatif), `?debug` (panneau de
-  l'inclinaison). Avec `?diag`, `?bench` ou `?debug`, `window.__coursier` donne l'état en lecture
-  seule (`mode`, `k`, `c`, `controlMode`, `tiltState`, `tiltNeutral`, `bubble`, `dpr`,
-  `snapshot()`, `stats()`) pour les tests automatisés.
+  l'inclinaison), `?autopilote[=reference|naif]` (en niveau, le pilote de référence conduit,
+  à pas fixes de 1/60 s ; sans effet sinon). Avec `?diag`, `?bench`, `?debug` ou
+  `?autopilote`, `window.__coursier` donne l'état en lecture seule (`mode`, `etat` (machine
+  à états), `flow` ('libre' | 'niveau'), `k`, `c`, `controlMode`, `tiltState`, `tiltNeutral`,
+  `bubble`, `dpr`, `snapshot()`, `stats()`, `niveau()` (statut, horloges, colis, portes et
+  teinte vue, chocs, reprises, distance parcourue), `progression()`) pour les tests automatisés.

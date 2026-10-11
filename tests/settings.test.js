@@ -15,7 +15,11 @@ import {
 } from '../src/physics/constants.js';
 import {
   CONTROLS_KEY,
+  DEFAULT_OPTIONS,
   LIGHT_SPEED_PRESETS,
+  OPTIONS_KEY,
+  loadOptions,
+  saveOptions,
   SETTINGS_KEY,
   loadControlMode,
   saveControlMode,
@@ -162,5 +166,19 @@ describe('direction tactile mémorisée (aslower:v1:commandes)', () => {
     map.set('aslower:v1:commandes', 'pas du JSON');
     expect(loadControlMode({ touch: false }, store)).toBe('drag');
     expect(() => saveControlMode(/** @type {any} */ ('gyro'), store)).toThrow(RangeError);
+  });
+});
+
+describe('options (aslower:v1:options → {spectrometre})', () => {
+  it('spectromètre coupé par défaut, mémorisé, valeur abîmée ignorée', () => {
+    const { map, store } = fakeStore();
+    expect(loadOptions(store)).toEqual(DEFAULT_OPTIONS);
+    expect(saveOptions({ spectrometre: true }, store)).toBe(true);
+    expect(JSON.parse(/** @type {string} */ (map.get(`${STORAGE_PREFIX}${OPTIONS_KEY}`)))).toEqual({ spectrometre: true });
+    expect(loadOptions(store)).toEqual({ spectrometre: true });
+    map.set(`${STORAGE_PREFIX}${OPTIONS_KEY}`, '{"spectrometre":"oui"}');
+    expect(loadOptions(store)).toEqual({ spectrometre: false });
+    map.set(`${STORAGE_PREFIX}${OPTIONS_KEY}`, 'pas du JSON');
+    expect(loadOptions(store)).toEqual({ spectrometre: false });
   });
 });

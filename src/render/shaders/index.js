@@ -19,6 +19,8 @@ import environmentVert from './environment.vert.glsl?raw';
 import environmentFrag from './environment.frag.glsl?raw';
 import cockpitVert from './cockpit.vert.glsl?raw';
 import cockpitFrag from './cockpit.frag.glsl?raw';
+import lampVert from './lamp.vert.glsl?raw';
+import lampFrag from './lamp.frag.glsl?raw';
 
 /**
  * Retire les commentaires GLSL en gardant les sauts de ligne (les numéros de ligne des
@@ -45,6 +47,8 @@ export const GLSL_SOURCES = Object.freeze({
   'environment.frag': environmentFrag,
   'cockpit.vert': cockpitVert,
   'cockpit.frag': cockpitFrag,
+  'lamp.vert': lampVert,
+  'lamp.frag': lampFrag,
 });
 
 /** Enregistre les chunks rel_* dans THREE.ShaderChunk (idempotent ; fait à l'import). */
@@ -70,4 +74,5 @@ export const SHADERS = Object.freeze({
   emitter: program(emitterVert, emitterFrag),
   environment: program(environmentVert, environmentFrag),
   cockpit: program(cockpitVert, cockpitFrag),
+  lamp: program(lampVert, lampFrag),
 });

@@ -73,6 +73,52 @@ export const VARIABLES = Object.freeze({
     description: 'commande de direction en usage (choisit la variante du texte)',
     calcul: "'clavier' si la dernière commande vient du clavier, sinon le mode tactile",
   },
+  // Variables des niveaux (jalon 3) : valeurs neutres en conduite libre (sans niveau).
+  enNiveau: { type: 'boolean', description: 'une partie de niveau est en cours (faux en conduite libre)', calcul: 'main.js : game.level !== null' },
+  distanceArret: {
+    type: 'number',
+    description: 'distance horizontale au prochain arrêt (m ; Infinity sans niveau ou tout livré)',
+    calcul: 'levelHud.nextStop(level, snapshot).distance',
+  },
+  margeArret: {
+    type: 'number',
+    description: 'distanceArret ÷ distanceFreinage (Infinity à l’arrêt) : < 1, trop tard pour s’arrêter',
+    calcul: 'distanceArret / distanceFreinage',
+  },
+  arretDerriere: {
+    type: 'boolean',
+    description: 'le prochain arrêt est derrière toi (à plus de 100° du cap), à moins de 60 m, et tu n’y es pas',
+    calcul: 'angle(cap, arrêt) > 100° et distance ∈ ]rayon ; 60 m]',
+  },
+  dansZone: { type: 'boolean', description: 'dans la zone du prochain arrêt', calcul: 'distanceArret ≤ rayon de la zone' },
+  attendClient: {
+    type: 'boolean',
+    description: 'dans une zone, presque à l’arrêt, avant l’heure « pas avant » (client absent)',
+    calcul: 'stop.waiting (game/rules.js)',
+  },
+  porteProche: {
+    type: 'boolean',
+    description: 'une porte fermée à moins de deux fois la fin de sa portée (son capteur)',
+    calcul: 'distance(porte) ≤ 2 × portee[1]',
+  },
+  teintePorte: {
+    type: 'string',
+    valeurs: Object.freeze(['aucune', 'noir', 'blanc', 'gris', 'rouge', 'orange', 'jaune', 'vert', 'cyan', 'bleu', 'violet']),
+    description: 'teinte perçue de la lampe de la porte fermée la plus proche (« aucune » sans porte proche)',
+    calcul: 'perceivedLamp(porte.lampe, snapshot).hue (game/rules.js)',
+  },
+  teinteVoulue: {
+    type: 'boolean',
+    description: 'la lampe de la porte proche a la teinte demandée',
+    calcul: 'teintePorte === porte.teinte',
+  },
+  batterie: { type: 'number', description: 'batterie restante, en fraction (1 sans niveau)', calcul: '(tauMax − τ)/tauMax' },
+  colisLivres: { type: 'number', entier: true, description: 'colis déjà livrés dans la partie (0 sans niveau)', calcul: "level.colis (etat 'livre')" },
+  margeDelai: {
+    type: 'number',
+    description: 'délai du prochain colis moins l’heure de la ville (s ; Infinity sans délai)',
+    calcul: 'stop.delai − snapshot.t',
+  },
 });
 
 /**
@@ -86,6 +132,13 @@ export const EVENTS = Object.freeze({
   butee: 'la butée douce freine à la place du joueur (bord de la zone roulable)',
   visionClassique: 'le bouton vision classique vient d’être enfoncé',
   regardArriere: 'le coup d’œil arrière vient de commencer (J3)',
+  // Événements des niveaux (jalon 3), venus de game/rules.js (level.advance).
+  livraison: 'un colis vient d’être livré',
+  retrait: 'un colis vient d’être retiré',
+  choc: 'choc contre un bâtiment, une porte fermée ou le bord de la carte',
+  reprise: 'reprise après un choc contre une porte (retour au point d’élan)',
+  porteOuverte: 'une porte à lampe vient de s’ouvrir',
+  attente: 'tu viens de t’arrêter dans une zone avant l’heure « pas avant »',
 });
 
 const NODE_KEYS = ['tous', 'un', 'non', 'pendant', 'evenement', 'apres'];

@@ -2,7 +2,7 @@
 
 > Contrat entre modules (signatures, repères, attributs, imports permis) : [`docs/interfaces.md`](interfaces.md). En cas de désaccord sur une signature, c'est le contrat qui fait foi ; ce document donne le pourquoi.
 
-Statut : **jalon 1 terminé** le 2026-10-11, prochain : jalon 2 (plan validé ; décisions de l'auteur du 2026-10-11 intégrées, voir §11, dont la décision 10 : **la vitesse de la lumière est un réglage du joueur**, entier de 10 à 100 m/s, 30 m/s par défaut, a = c/10).
+Statut : **jalon 3 intégré** (niveaux 1 à 3, à valider sur l'iPhone, §9) ; jalon 2 intégré ; jalon 1 terminé le 2026-10-11. Décisions de l'auteur du 2026-10-11 intégrées (voir §11, dont la décision 10 : **la vitesse de la lumière est un réglage du joueur**, entier de 10 à 100 m/s, 30 m/s par défaut, a = c/10).
 
 > **Unités naturelles.** Le moteur garde c/a = **T = 10 s** quel que soit le réglage ; l'unité de longueur vaut **L = c²/a = 10·c m** (300 m au réglage par défaut c = 30 m/s, 1 000 m à c = 100 m/s, valeur du cahier des charges). Les distances de jeu ci-dessous sont données en L (et en mètres à c = 30), les vitesses en fractions de c (β) ; les temps ne dépendent pas de c. Les éléments à l'échelle humaine (îlots de 56 m, rues, hauteurs, lampadaires tous les 40 m, œil à 1,6 m) restent en mètres. Le dépôt `hugohismans/aSlower` est public ; GitHub Pages y est publié en mode « GitHub Actions ». Les prototypes jetables du bac à sable (§0) ont servi de base au code du jalon 1. Publication sur <https://hugohismans.github.io/aSlower/> (la casse de l'URL compte).
 
@@ -348,9 +348,9 @@ Les distances sont en L = c²/a = 10·c m et les vitesses en β (fractions de c)
 
 | N° | Titre proposé | Notion | Mécanique (chiffres vérifiés, à recalibrer par le bot) |
 |---|---|---|---|
-| 1 | Premier jour | inertie, frein, Doppler | Deux livraisons (0,3·L = 90 m, puis virage et 0,42·L = 126 m). Relâcher garde la vitesse ; il faut 0,048·L (14,5 m) pour s'arrêter à β = 0,3 (9 m/s). Batterie large (150 s). |
-| 2 | Le Grand Boulevard | deux horloges | Délais en heure de la ville (60 s puis 100 s ; un retard coûte l'étoile « Ponctuel »), batterie de 90 s. Boulevard de 2·L (600 m ; τ 26 s, écart 8 s) contre un raccourci sinueux, plus coûteux sur les deux horloges. Une fenêtre « pas avant » légère introduit le coût de l'attente. |
-| 3 | La Porte Verte | Doppler | Lampe rouge (raie fixée à 640 nm, comme dans le test J1) à voir verte : **β ≈ 0,13 à 0,22, soit ≈ 3,9 à 6,7 m/s** dans l'axe. Lampe infrarouge à 900 nm, « éteinte », vue verte vers **β = 0,44–0,52 (13,2–15,6 m/s)**. Trop vite, la lampe bleuit puis noircit (UV), et c'est le choc. |
+| 1 | Premier jour | inertie, frein, Doppler | **Livré (J3)** : deux livraisons dans une grille d'îlots (boulangerie à 0,3·L, puis virage à droite au premier carrefour après 0,3·L + 40 m et Mme Ampère à 0,42·L ; 130 + 70 + 126 m à c = 30). Relâcher garde la vitesse ; il faut 0,048·L (14,5 m) pour s'arrêter à β = 0,3 (9 m/s). Batterie large (150 s), pas de délai. |
+| 2 | Le Grand Boulevard | deux horloges | **Livré (J3)** : l'Hôtel Lorentz à ≈ 1,6·L sur le boulevard (480 m), délai 45 s à l'horloge de la ville (à β ≤ 0,3, retard : l'étoile « Ponctuel » est perdue) ; Mme FitzGerald plus bas sur le boulevard (≈ 0,7·L), absente avant t = 90 s (délai 115 s) ; batterie de 100 s. Le chemin direct arrive ≈ 40 s trop tôt : attendre (ou flâner dans les ruelles à γ ≈ 1) coûte 1 s de batterie par seconde de ville ; un tour et demi de la place de l'Horloge (rayon 0,2·L) à β = 0,85 (γ ≈ 1,9) fait passer la ville à moindre coût : 65 s de batterie contre 82 s (dτ = dt/γ). |
+| 3 | La Porte Verte | Doppler | **Livré (J3)** : lampe rouge (raie fixée à 640 nm, comme dans le test J1) à voir verte : **β ≈ 0,13 à 0,22, soit ≈ 4,0 à 6,8 m/s** dans l'axe (porte à 0,4·L) ; lampe infrarouge à 900 nm, « éteinte », vue verte vers **β = 0,44–0,52 (13,3–15,5 m/s)** (porte à 1·L). Trop vite, la lampe bleuit puis noircit (UV), et c'est le choc : reprise sur la ligne d'élan (+3 s). Batterie de 120 s ; délais 60 s et 150 s. |
 | 4 | Le Pont Rømer | retard de la lumière | Pont-levis dont l'horaire est en heure de la ville (panneau). **Le niveau démarre lancé** à β ≈ 0,76 (22,8 m/s), profil de référence inscrit dans le JSON. Décision au **point de non-retour** : à β = 0,76, il faut 0,543·L (163 m) pour s'arrêter, et l'image du pont a alors 5,4 s de retard (pour tout c). Le pont est signalé par de grands feux : le tablier ne fait que ≈ 30 px à 163 m (≈ 9 px à 543 m, à c = 100). Le pont peut paraître baissé alors qu'il est déjà levé. Débloque le contour fantôme. |
 | 5 | La Pellicule | horizon de Rindler | Flash à t = 20 s, 0,4·L (120 m) derrière le studio. **Condition de victoire** : atteindre l'abri (0,8·L = 240 m, hors de la ligne de vue du flash) avant le front, soit partir vers le nord avant t ≈ 17 s (≈ 18 s si l'on part à β = 0,1, 3 m/s). Avec l'approche prévue (0,3·L = 90 m puis un virage), on ne part vers le nord qu'à t ≈ 12 s, à environ β = 0,1. **Bonus « au-delà de l'horizon »** si l'on part avant t = 14,0 s depuis l'arrêt (L = 300 m d'avance), ou 14,95 s à β = 0,1 (0,905·L = 272 m d'avance) : fenêtre réelle d'environ 3 s. La lumière ne te rattrape alors jamais tant que tu accélères. Compte à rebours du flash affiché. |
 | 6 | Le Pommier de Langevin | paradoxe des jumeaux | Pommes mûres à t = 200 s, batterie de 120 s : attendre est impossible. Anneau (Ø L = 300 m), φ_max fixé pour γ ≤ 4. Faire passer 200 s de ville coûte 72 à 83 s de batterie sur l'anneau, et environ **101 à 111 s** avec l'accès, les 0,5·L (150 m) jusqu'au pommier et la livraison (marge de 9 à 19 s, à recalibrer par le bot). Le pommier, au centre de l'anneau, est vu avec D = γ : il vieillit **visiblement** ×γ (étapes : fleurs, fruits verts, mûrs, tombés). C'est un **pommier géant**, sans quoi il ne ferait que 2 à 3 px à 500 m (c = 100) : ≈ 45 m à c = 100 ; à c = 30, vu de 150 m, ≈ 15 m suffisent (taille ∝ L, à recalibrer). Le bilan « Luc a vieilli de … s, toi de … s » est produit par le bot. |
@@ -471,10 +471,11 @@ aSlower/
 │   │   ├── culling.js             # J1 : distance ; J3 : cône apparent (PUR)
 │   │   ├── streetMap.js           # carte Canvas2D (plan, ombres)
 │   │   ├── cockpit.js             # avant du véhicule
+│   │   ├── levelObjects.js        # J3 : zones, balises, clients, portes, lampes (couleur de la règle)
 │   │   ├── movers.js  ghosts.js  living.js                  # J4
 │   │   └── shaders/
 │   │       ├── rel_vertex.glsl  rel_doppler.glsl  rel_fog.glsl
-│   │       ├── surface.*.glsl  emitter.*.glsl  cockpit.*.glsl  environment.vert.glsl
+│   │       ├── surface.*.glsl  emitter.*.glsl  cockpit.*.glsl  lamp.*.glsl (J3)  environment.vert.glsl
 │   │       └── environment.frag.glsl                        # ciel + sol + brouillard
 │   ├── input/
 │   │   ├── controls.js            # → { thrust, brake, steer, classic, pause }
@@ -484,7 +485,7 @@ aSlower/
 │   │   ├── hud.js  hud.css  format.js (PUR)  credits.js  diag.js   # J1 (diag : #diag, ?bench)
 │   │   ├── lightSpeed.js          # J1 : réglage « Vitesse de la lumière » (titre, pause)
 │   │   ├── bubbles.js  announcer.js                                # J2 (affichage)
-│   │   └── spectrometer.js                                         # J3
+│   │   └── levelHud.js  levelFormat.js (PUR)  screens.js          # J3 : HUD de niveau, spectromètre, écrans
 │   ├── game/
 │   │   ├── settings.js            # J1 : réglage de c (saisie, ?c=, stockage aslower:v1:reglages)
 │   │   ├── conditions.js  bubbles.js   # J2 : déclencheurs (sans eval), moteur « une seule fois »
@@ -498,7 +499,7 @@ aSlower/
     │        render-math  layout  lod  culling  format  storage  purity  licence  check-dist  loop  settings
     ├── J2 : tiltMath  conditions
     ├── J3 : collisions  rules  levels (+ fixtures/levels-valid/n99-exemple.json, fixtures/levels-invalid/)
-    │        score  states  progress  culling (cône apparent)
+    │        score  states  progress  levelFormat  levelObjects  culling (cône apparent)
     └── J4 : living
 ```
 
@@ -613,7 +614,8 @@ Reste à faire ou à mesurer :
 
 ### J3 : moteur de niveaux et niveaux 1 à 3
 
-**Statut (2026-10-11) : partie 1 livrée (moteur pur et testé)** — schéma `coursier-niveau/1` et validateur
+**Statut (2026-10-11) : partie 2 intégrée, à valider sur l'iPhone 14 Pro Max** (voir plus bas) ;
+**partie 1 livrée (moteur pur et testé)** — schéma `coursier-niveau/1` et validateur
 (`game/validate.js`, fixtures invalides), collisions (`physics/collisions.js`), marche arrière (`player.js`),
 partie et règles (`game/level.js`, `game/rules.js` : livraisons, « pas avant », retards, portes à lampe par la
 teinte perçue, reprises, batterie), étoiles (`game/score.js`), machine à états (`game/states.js`), progression
@@ -622,6 +624,48 @@ par c (`game/progress.js`), bot et calibrage (`game/bot.js`, `scripts/calibrate.
 niveaux 1 à 3, rendu des portes, lampes et zones, écrans (sélection, briefing, décompte, bilan, échec),
 branchement dans main.js, spectromètre, culling par cône apparent.
 
+**Partie 2 (niveaux 1 à 3, rendu, écrans)** :
+- **Niveaux** `src/levels/n01-premier-jour.json`, `n02-grand-boulevard.json`, `n03-porte-verte.json`
+  (distances en L, scènes paramétriques à l'échelle humaine, briefing, bulles propres, indices
+  gradués avec aides, parcours de référence et naïf). Valides à c = 10, 30 et 100 ; référence
+  ★★★ sans aucun choc, naïf < 3 pour les trois c (`tests/levels.test.js`). Seuils fixés par
+  `npm run calibrate` (batterieMin ≈ (τmax − 1,15·τ_ref)/τmax, tVilleMax ≈ 1,12·t_ref, sur le
+  c le plus défavorable). Chiffres du pilote à c = 30 (τ / t / batterie restante) :
+
+  | Niveau | τmax | délais (t ville) | étoiles (batterieMin / tVilleMax) | référence | naïf |
+  |---|---|---|---|---|---|
+  | N1 | 150 s | — | 0,65 / 55 s | 33,0 / 35,2 s / 78 % ★★★ | β 0,1 : 109 / 110 s / 27 % ★ |
+  | N2 | 100 s | 45 s ; pas avant 90 s, délai 115 s | 0,20 / 115 s | 65,0 / 93,1 s / 34 % ★★★ | direct puis attente : 82 / 90 s / 17 % ★★ |
+  | N3 | 120 s | 60 s ; 150 s | 0,45 / 70 s | 44,1 / 46,4 s / 63 % ★★★ | fonce à β 0,6 : 12 chocs, batterie vide |
+
+  À c = 10 (les îlots de 80 m pèsent plus en L : niveaux plus longs) : 42 / 47, 68 / 99 et
+  56 / 59 s ; à c = 100 : 31 / 32, 64 / 91 et 39 / 41 s. Pilote (`game/bot.js`) amélioré pour
+  ces niveaux : anticipation du freinage sur plusieurs points, volant « poursuite pure » (tour
+  de place à β = 0,85), point frôlé compté comme atteint.
+- **Rendu** (`render/levelObjects.js`, `shaders/lamp.*.glsl`, même pipeline : aberration, Doppler,
+  retard) : zones (anneau au sol et balise corps noir), clients (silhouettes, présence VUE à t_e),
+  portes (battants coulissants, état VU à t_e), lampes à raie dont la couleur est calculée sur le
+  CPU par la même chaîne que la règle (`perceivedLamp`) et passée en uniforme : la couleur
+  affichée et la règle coïncident (testé).
+- **Écrans et HUD** (`hud/screens.js`, `hud/levelHud.js`, `hud/levelFormat.js` pur et testé) :
+  menu (Jouer, Conduite libre, c, Direction), sélection (étoiles par c, verrous, option
+  Spectromètre), briefing, décompte 3-2-1 (calibrage de l'inclinaison), HUD de niveau (batterie
+  = τ restant, colis, prochain délai ou « pas avant » à l'heure de la ville, flèche vers la
+  direction APPARENTE du prochain arrêt et distance), bilan (étoiles expliquées, τ/t, ligne
+  « à 0,2 c, … ≈ … s de batterie », records), échec (raison, indice gradué, « Passer » après
+  4 échecs), pause (Recommencer, Quitter le niveau), spectromètre (« vert ✓ 533 nm »).
+  Progression sauvegardée par c. `?autopilote` pour les tests (sans effet sinon).
+- **Vérifié** (Playwright, Chromium SwiftShader, 932 × 430 tactile, c = 30) : parcours menu →
+  sélection → briefing → décompte → N1 jusqu'au bilan ★★★ (mêmes horloges que le pilote en
+  Node), progression après rechargement, N3 (lampe rouge à l'arrêt, verte à la bonne vitesse,
+  porte qui s'ouvre, infrarouge vu vert, bilan), N3 « foncer » (lampe noire, choc, reprise,
+  batterie vide, indice), zéro erreur console.
+- **Reste à faire ou à mesurer** : sur l'iPhone, lisibilité du HUD de niveau et des écrans
+  (encoche, soleil), calibrage pendant le décompte, taille apparente des lampes et des balises,
+  performance avec les objets de niveau ; culling par cône apparent (toujours la coupe à la
+  distance de visibilité).
+
+**Partie 1 (moteur)** :
 - schéma et validateur, machine à états (menu → briefing → décompte → jeu → bilan) ;
 - livraisons, batterie, délais (étoile « Ponctuel », jamais un échec), collisions, marche arrière, `emissionTimeStatic` ;
 - étoiles, bot et calibrage ;

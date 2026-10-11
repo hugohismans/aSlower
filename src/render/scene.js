@@ -22,6 +22,7 @@ import { EYE_HEIGHT } from '../physics/constants.js';
 import { setCameraVisibility } from './camera.js';
 import { DEFAULT_LOD_STEPS, buildCity } from './cityMesher.js';
 import { createCockpit } from './cockpit.js';
+import { createLevelObjects } from './levelObjects.js';
 import { chunkDistance } from './culling.js';
 import { apparentNearestDistance, chooseLod, shouldReleaseLod0 } from './lod.js';
 import {
@@ -71,12 +72,14 @@ function headingGap(snapshot) {
  * @param {import('three').WebGLRenderer} renderer
  * @param {any} sceneJson scène de src/data/scenes/ (schéma « coursier-scene/1 »)
  * @param {Record<string, {srgb: string, ir?: number, uv?: number}>} palette src/data/palette.json
- * @param {{tier?: 'default' | 'lite', lodSteps?: number[], physics?: {lengthUnit: number}}} [options]
+ * @param {{tier?: 'default' | 'lite', lodSteps?: number[], physics?: {lengthUnit: number},
+ *          level?: import('./levelObjects.js').LevelView | null}} [options]
  *   profil de qualité (choisit la visibilité « lite » ou « defaut » de la scène) ; pas des LOD
  *   (m) ; constantes physiques de la partie (physicsFor(c)) : la scène est développée pour
- *   leur unité de longueur L (défaut : réglage par défaut)
+ *   leur unité de longueur L (défaut : réglage par défaut) ; level : vue statique d'un niveau
+ *   (zones, clients, portes, lampes : render/levelObjects.js), mise à jour par updateLevel
  */
-export function createWorld(renderer, sceneJson, palette, { tier = 'default', lodSteps, physics } = {}) {
+export function createWorld(renderer, sceneJson, palette, { tier = 'default', lodSteps, physics, level = null } = {}) {
   const city = buildCity(sceneJson, palette, {
     ...(lodSteps ? { lodSteps } : {}),
     ...(physics ? { lengthUnit: physics.lengthUnit } : {}),
@@ -124,6 +127,15 @@ export function createWorld(renderer, sceneJson, palette, { tier = 'default', lo
   }
 
   const cockpit = createCockpit();
+
+  /** Éléments du niveau (zones, clients, portes, lampes), dans le même pipeline. */
+  const levelObjects = level
+    ? createLevelObjects(level, {
+        surface: { rel: relMaterials.surface, classic: classicMaterials.surface },
+        emitter: { rel: relMaterials.emitter, classic: classicMaterials.emitter },
+      })
+    : null;
+  if (levelObjects) scene.add(levelObjects.group);
 
   /**
    * État de chaque îlot : mesh (créé à sa première apparition), LOD affiché, LOD déjà
@@ -173,6 +185,7 @@ export function createWorld(renderer, sceneJson, palette, { tier = 'default', lo
     environmentMesh.material = materials.environment;
     if (emitterMesh) emitterMesh.material = materials.emitter;
     for (const entry of entries) if (entry.mesh) entry.mesh.material = materials.surface;
+    levelObjects?.setClassic(on);
   }
 
   /** Rattache une caméra à la scène (une fois) : cockpit, plan lointain. */
@@ -262,6 +275,16 @@ export function createWorld(renderer, sceneJson, palette, { tier = 'default', lo
     },
 
     /**
+     * État vu des éléments du niveau (sans effet hors niveau) : à appeler après update().
+     * @param {import('./levelObjects.js').LevelRenderState} state
+     * @param {{x: number, y: number}} eye position du joueur (repère du jeu)
+     * @param {number} [dtReal] durée réelle de l'image (s)
+     */
+    updateLevel(state, eye, dtReal = 0) {
+      levelObjects?.update(state, { x: eye.x, y: eye.y, z: EYE_HEIGHT }, dtReal);
+    },
+
+    /**
      * Dessine l'image (un seul renderer.render).
      * @param {import('three').PerspectiveCamera} camera placée par camera.updateCamera
      */
@@ -292,6 +315,7 @@ export function createWorld(renderer, sceneJson, palette, { tier = 'default', lo
     warmup(camera) {
       attachCamera(camera);
       const inactive = Object.values(classic ? relMaterials : classicMaterials);
+      if (levelObjects) inactive.push(...levelObjects.ownMaterials); // lampes : deux variantes
       return warmup(renderer, scene, camera, inactive);
     },
 
@@ -315,6 +339,7 @@ export function createWorld(renderer, sceneJson, palette, { tier = 'default', lo
         for (const level of entry.built) entry.chunk.lod(level).dispose();
       }
       city.emitters?.dispose();
+      levelObjects?.dispose();
       environmentMesh.geometry.dispose();
       cockpit.geometry.dispose();
       /** @type {import('three').Material} */ (cockpit.material).dispose();

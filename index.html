@@ -60,6 +60,7 @@
         <div id="direction" class="touch-only"></div>
         <div class="title-actions">
           <button type="button" id="play" class="btn btn-primary">Jouer</button>
+          <button type="button" id="free-drive" class="btn">Conduite libre</button>
           <button type="button" id="open-credits" class="btn">Crédits</button>
         </div>
         <p class="title-help title-help-touch">
@@ -74,6 +75,14 @@
         </p>
       </div>
     </section>
+
+    <!-- Écrans des niveaux (sélection, briefing, bilan, échec) : rempli par src/hud/screens.js -->
+    <section id="screen" class="title-screen" hidden aria-live="polite">
+      <div class="title-card screen-card"></div>
+    </section>
+
+    <!-- Décompte 3-2-1 et messages courts (reprise), par-dessus la vue -->
+    <div id="countdown" class="countdown" hidden role="status" aria-live="assertive"></div>
 
     <!-- Pause, affichage interrompu (perte du contexte WebGL), erreurs : rempli par src/main.js -->
     <section id="notice" class="title-screen" hidden aria-labelledby="notice-title">

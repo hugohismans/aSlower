@@ -514,7 +514,7 @@ describe('sources GLSL : le miroir correspond aux shaders', () => {
   });
 
   it('chaque fragment finit par la sortie sRGB de three ; brouillard avant Doppler', () => {
-    for (const name of ['surface.frag', 'emitter.frag', 'environment.frag', 'cockpit.frag']) {
+    for (const name of ['surface.frag', 'emitter.frag', 'environment.frag', 'cockpit.frag', 'lamp.frag']) {
       expect(src[name]).toMatch(/#include <colorspace_fragment>\s*}\s*$/);
     }
     const surface = src['surface.frag'];

@@ -47,10 +47,28 @@ inclinaison du GSM, bulles d'aide « une seule fois », menu pause complet, plei
 maintenu allumé, application installable (écran d'accueil), DPR adaptatif, annonces pour
 lecteurs d'écran.
 
-Pas encore de colis, de délais ni de batterie limitée : ils arrivent avec les niveaux.
+**Jalon 3 intégré** (moteur de niveaux et niveaux 1 à 3, à valider sur le GSM) : menu
+principal (« Jouer », « Conduite libre », réglage de c, Direction), sélection des niveaux avec
+étoiles et verrous, briefing, décompte 3-2-1, batterie (= ta montre), colis, délais et
+« pas avant » à l'horloge de la ville, flèche du prochain arrêt, collisions et marche arrière,
+portes à lampe colorée, bilan en étoiles chiffré, échec avec indices gradués, progression
+sauvegardée (par niveau et par valeur de c), spectromètre.
+
+Les niveaux (distances en L = c²/a = 10·c m : le même niveau pour tout c, chiffres ci-dessous
+à c = 30 m/s) :
+
+| N° | Niveau | Notion | En bref |
+|---|---|---|---|
+| 1 | Premier jour | inertie, frein, Doppler | Deux livraisons : la Boulangerie Planck tout droit, puis Mme Ampère après un virage à droite. Batterie de 150 s, pas de délai. Relâcher garde la vitesse, freiner prend de la place. |
+| 2 | Le Grand Boulevard | deux horloges | L'Hôtel Lorentz au bout du boulevard avant 0:45 (horloge de la ville), puis Mme FitzGerald, absente avant 1:30. Batterie de 100 s : attendre coûte 1 s de batterie par seconde de ville ; un tour et demi de la place de l'Horloge, vite, en coûte bien moins (dτ = dt/γ). |
+| 3 | La Porte Verte | effet Doppler | Deux portes qui ne s'ouvrent que si leur lampe paraît verte : une lampe rouge (640 nm), verte vers 4 à 6,7 m/s, et une lampe infrarouge (900 nm) « éteinte », verte vers 13,3 à 15,4 m/s. Trop vite : bleu, puis noir, et c'est le choc (reprise sur la ligne d'élan, +3 s). |
+
+Étoiles : ★ Livré (tous les colis, même en retard) ; ★ Économe (batterie restante au-dessus du
+seuil) ; ★ Ponctuel (tout livré à temps, à l'horloge de la ville). Seul la batterie vide fait
+échouer ; après quatre échecs, on peut passer un niveau.
+
 Feuille de route complète dans [`docs/conception.md`](docs/conception.md) (§ 9) :
-niveaux 1 à 3 (J3), lumière retardée et objets mobiles (J4), horizon de Rindler et paradoxe
-des jumeaux (J5).
+lumière retardée et objets mobiles (J4), horizon de Rindler et paradoxe des jumeaux (J5).
 
 ## Commandes
 
@@ -76,7 +94,8 @@ choix est mémorisé. Par défaut, l'inclinaison.
   départ, un court message « Tiens ton GSM comme un volant… » : la position tenue devient
   « tout droit » (calibrage d'une demi-seconde) ; le menu pause propose « Recentrer le volant ».
   Sur iPhone, Safari demande l'autorisation d'accéder au mouvement au moment où tu touches
-  « Jouer ». Si tu refuses, ou sans capteur, le jeu passe tout seul en mode glisser et le dit
+  « C'est parti ! » (briefing d'un niveau) ou « Conduite libre ». En niveau, le calibrage se
+  fait pendant le décompte 3-2-1. Si tu refuses, ou sans capteur, le jeu passe tout seul en mode glisser et le dit
   (iOS ne repose la question qu'après un rechargement de la page) ; « Réessayer
   l'inclinaison » est alors proposé dans le réglage Direction. Le **frein** est en bas à gauche.
 - **Glisser** : glisse le pouce dans la moitié gauche pour tourner (le volant naît là où tu
@@ -85,15 +104,22 @@ choix est mémorisé. Par défaut, l'inclinaison.
 - Dans les deux modes : **maintiens la moitié droite** pour accélérer (le frein l'emporte) ;
   **bouton 👁** à mi-hauteur à gauche : vision classique, tant que tu le maintiens.
 
-**Plein écran** : sur Android, le jeu passe en plein écran quand tu touches « Jouer ». Sur
+**Plein écran** : sur Android, le jeu passe en plein écran quand tu touches « C'est parti ! »
+ou « Conduite libre ». Sur
 iPhone, Safari ne le permet pas aux pages : ajoute le jeu à l'écran d'accueil (Partager, puis
 « Sur l'écran d'accueil ») pour l'ouvrir en plein écran, comme une application. Pendant la
 partie, l'écran reste allumé (sauf en pause).
 
-**Menu pause** (Échap ou P au clavier, ou quand tu quittes l'onglet) : Reprendre, Recentrer le
-volant (inclinaison), Direction, Changer c (nouvelle partie), Revoir les bulles (les bulles
-d'aide, montrées une seule fois, reviendront), Recommencer, Crédits. Les deux horloges
-s'arrêtent.
+**Menu pause** (Échap ou P au clavier, ou quand tu quittes l'onglet) : Reprendre (après un
+décompte d'une seconde en niveau), Recentrer le volant (inclinaison), Direction, Spectromètre,
+Changer c (nouvelle partie), Revoir les bulles (les bulles d'aide, montrées une seule fois,
+reviendront), Recommencer, Quitter le niveau (ou Menu principal en conduite libre), Crédits.
+Les deux horloges s'arrêtent.
+
+**Spectromètre** (option de la sélection des niveaux et du menu pause, utile aussi aux
+joueurs daltoniens) : écrit en mots la teinte de la lampe de porte que tu vois, avec la
+longueur d'onde reçue, par exemple « vert ✓ 533 nm » ou « noir ✗ 900 nm (infrarouge) ».
+C'est la même chaîne de calcul que la règle de la porte et que l'image.
 
 **Bulles d'aide** : en jouant, de courtes bulles expliquent ce que tu vois (horloges, effet
 Doppler, vision classique, inertie…), une à la fois et une seule fois ; touche une bulle pour
@@ -139,6 +165,7 @@ Paramètres d'URL (combinables, par exemple `?scene=quartier-test&bench&c=30&dpr
 | `?dpr=1.5` | impose le rapport de pixels (de 0,25 à 4) ; sinon min(devicePixelRatio, 2), plafonné à 2,2 millions de pixels, puis ajusté en jeu par le DPR adaptatif (baisse de 0,25 quand le jeu rame, jusqu'à 1 ; remontée quand il est fluide depuis 10 s). `?dpr=` et `?bench` coupent le DPR adaptatif |
 | `?debug` | panneau de l'inclinaison (angles α, β, γ du capteur, angle de l'écran, angle de volant, neutre calibré, volant), pour vérifier les signes sur un vrai GSM |
 | `?qualite=normale` | oublie un plantage mémorisé et quitte le profil « lite » (DPR 0,75, sans anticrénelage) |
+| `?autopilote` ou `?autopilote=naif` | en niveau, le pilote de référence (`src/game/bot.js`) conduit à ta place sur l'itinéraire `parcours.reference` (ou `parcours.naif`) du niveau, à pas fixes de 1/60 s : démonstration et tests automatisés (Playwright). Sans effet sans ce paramètre ; avec lui (comme avec `?diag` ou `?debug`), `window.__coursier` donne l'état en lecture seule (`etat`, `niveau()`, `progression()`…) |
 
 **Publication** : chaque push sur `main` lance le workflow
 [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) : `npm ci`, `npm test`,
@@ -170,8 +197,12 @@ src/
                         LUT Doppler, maillage de la ville, LOD, culling, shaders GLSL
   input/                clavier, tactile, inclinaison → {thrust, brake, steer, classic, pause} ;
                         plein écran et écran allumé
-  game/                 réglages (c, direction), conditions et bulles d'aide (purs)
-  hud/                  horloges, jauge, bulles, annonces, réglages, diagnostic (?diag, ?debug), Crédits
+  game/                 réglages (c, direction, options), conditions et bulles d'aide, niveaux
+                        (validateur, partie, règles, étoiles, états, pilote de référence : purs),
+                        progression
+  levels/               niveaux du jeu (n01-premier-jour.json…), schéma « coursier-niveau/1 »
+  hud/                  horloges, jauge, HUD de niveau, écrans (sélection, briefing, bilan, échec),
+                        bulles, annonces, réglages, diagnostic (?diag, ?debug), Crédits
   data/                 palette, bulles d'aide et scènes de test (JSON)
   styles/               feuilles de style
 tests/                  tests Vitest (Node, sans navigateur)

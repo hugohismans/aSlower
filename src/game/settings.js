@@ -113,3 +113,34 @@ export function saveControlMode(mode, store = local) {
   if (!CONTROL_MODES.includes(mode)) throw new RangeError(`Direction inconnue : ${mode}`);
   return store.set(CONTROLS_KEY, { mode });
 }
+
+/* ------------------------------------------------------------------------- */
+/* Options (jalon 3) : spectromètre                                           */
+/* ------------------------------------------------------------------------- */
+
+/** Clé de stockage des options (sans le préfixe) : aslower:v1:options → {spectrometre}. */
+export const OPTIONS_KEY = 'options';
+
+/** Options par défaut : spectromètre coupé (le niveau 3 le propose en indice). */
+export const DEFAULT_OPTIONS = Object.freeze({ spectrometre: false });
+
+/**
+ * Options du joueur (valeur abîmée ou absente : options par défaut).
+ * - spectrometre : affiche, en mots, la teinte perçue de la lampe visée (« vert ✓ 530 nm ») ;
+ *   pour tous, et surtout pour les joueurs daltoniens.
+ * @param {{get(key: string, fallback?: any): any}} [store]
+ * @returns {{spectrometre: boolean}}
+ */
+export function loadOptions(store = local) {
+  const saved = store.get(OPTIONS_KEY, null);
+  return { spectrometre: Boolean(saved && typeof saved === 'object' && saved.spectrometre === true) };
+}
+
+/**
+ * @param {{spectrometre: boolean}} options
+ * @param {{set(key: string, value: any): boolean}} [store]
+ * @returns {boolean} vrai si l'écriture est durable
+ */
+export function saveOptions(options, store = local) {
+  return store.set(OPTIONS_KEY, { spectrometre: Boolean(options?.spectrometre) });
+}

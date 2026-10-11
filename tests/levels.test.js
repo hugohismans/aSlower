@@ -133,6 +133,7 @@ describe('pilote de référence : faisabilité et étoiles', () => {
         const ref = runBot(json, { c, palette, route: 'reference' });
         expect(ref.status, ref.score.messages.join(' ')).toBe('reussite');
         expect(ref.score.etoiles, ref.score.messages.join(' ')).toBe(3);
+        expect(ref.level.chocs, 'le parcours de référence ne touche rien').toBe(0);
         if (json.parcours.naif) {
           const naive = runBot(json, { c, palette, route: 'naif' });
           expect(naive.score.etoiles).toBeLessThan(3);

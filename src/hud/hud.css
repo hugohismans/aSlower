@@ -309,3 +309,152 @@
   min-height: 32px;
   font-size: 14px;
 }
+
+/* --- Niveau : batterie, colis, prochain arrêt, spectromètre (src/hud/levelHud.js) --- */
+
+.hud-level {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
+  width: clamp(112px, 15vw, 150px);
+}
+
+.hud-level-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.hud-level-value {
+  font-size: 20px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Jauge de batterie : se vide avec ta montre (transform: scaleX). Couleur + texte. */
+.battery {
+  height: 12px;
+  overflow: hidden;
+  border-radius: 4px;
+  background: #1b2230;
+  contain: strict;
+}
+
+.battery-fill {
+  width: 100%;
+  height: 100%;
+  background: #7bd88f;
+  transform-origin: 0 50%;
+  will-change: transform;
+}
+
+.battery-fill[data-level='bas'] {
+  background: #ffb74d;
+}
+
+.battery-fill[data-level='critique'] {
+  background: #ef5350;
+}
+
+.hud-level[data-level='critique'] .hud-level-value {
+  color: #ff8a80;
+}
+
+.hud-level-colis {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* Bande de vitesse (aide « zoneVitesse ») sur la jauge : au-dessus du cache. */
+.gauge-zone {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-left: 2px solid #b9f6ca;
+  border-right: 2px solid #b9f6ca;
+  background: rgb(76 175 80 / 0.55);
+}
+
+/* Prochain arrêt : en bas, à gauche du centre (hors des freins tactiles). */
+.hud-next {
+  position: absolute;
+  right: calc(50% + 8px);
+  bottom: var(--sa-bottom);
+  max-width: min(46vw, 380px);
+  padding: 6px 12px 7px;
+  text-align: left;
+}
+
+.hud-next-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Flèche : direction apparente de l'arrêt (0° = droit devant, sens horaire). */
+.hud-arrow {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: rgb(255 255 255 / 0.12);
+}
+
+.hud-arrow i {
+  display: block;
+  width: 0;
+  height: 0;
+  border-right: 8px solid transparent;
+  border-bottom: 16px solid var(--accent);
+  border-left: 8px solid transparent;
+  will-change: transform;
+}
+
+.hud-next[data-zone='oui'] .hud-arrow i {
+  width: 12px;
+  height: 12px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.hud-next-main {
+  font-size: 17px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.hud-next-line {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.hud-next-line[data-state='retard'] {
+  color: #ff8a80;
+}
+
+.hud-next-line[data-state='absent'] {
+  color: #ffd180;
+}
+
+.hud-spectro {
+  color: var(--text);
+}
+
+.hud-spectro[data-ok='oui']::before {
+  content: '● ';
+  color: #69f0ae;
+}

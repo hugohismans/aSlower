@@ -1,0 +1,454 @@
+{
+  "schema": "coursier-niveau/1",
+  "id": "n01-premier-jour",
+  "numero": 1,
+  "titre": "Premier jour",
+  "notion": "inertie, frein, Doppler",
+  "briefing": [
+    "Premier jour chez Photon Express ! Livre le pain à la Boulangerie Planck, tout droit.",
+    "Puis tourne à droite dans la rue des Teinturiers : Mme Ampère attend ses lunettes.",
+    "Ici rien ne freine : relâcher garde ta vitesse. Pour livrer, arrête-toi dans le cercle."
+  ],
+  "note": "Tutoriel. Grille d'ilots de 56 m (rues tous les 80 m). Rue Fizeau (x = 0) vers le nord : boulangerie a 0,3 L, virage a droite au premier carrefour apres 0,3 L + 40 m, Mme Ampere a 0,42 L a l'est. Batterie large (150 s), pas de delai : seul compte t fin pour l'etoile Ponctuel. Seuils fixes par npm run calibrate.",
+  "parametres": {
+    "yb": {
+      "fois": 0.3,
+      "min": 40
+    },
+    "yv": {
+      "fois": 0.3,
+      "plus": 40,
+      "arrondiSup": 80
+    },
+    "xa": {
+      "fois": 0.42,
+      "min": 60
+    },
+    "nx": {
+      "fois": 0.0125,
+      "de": "xa",
+      "plus": 3.35,
+      "arrondiInf": 1
+    },
+    "ny": {
+      "fois": 0.0125,
+      "de": "yv",
+      "plus": 2.5,
+      "arrondiInf": 1
+    },
+    "xmax": {
+      "fois": 1,
+      "de": "xa",
+      "plus": 60
+    },
+    "ymax": {
+      "fois": 1,
+      "de": "yv",
+      "plus": 80
+    }
+  },
+  "scene": {
+    "titre": "Quartier de la Gare",
+    "graine": 101,
+    "limites": {
+      "min": [
+        -180,
+        -100
+      ],
+      "max": [
+        {
+          "fois": 1,
+          "de": "xmax"
+        },
+        {
+          "fois": 1,
+          "de": "ymax"
+        }
+      ]
+    },
+    "rues": [
+      {
+        "id": "fizeau",
+        "nom": "Rue Fizeau",
+        "de": [
+          0,
+          -100
+        ],
+        "a": [
+          0,
+          {
+            "fois": 1,
+            "de": "ymax"
+          }
+        ],
+        "largeur": 18
+      },
+      {
+        "id": "teinturiers",
+        "nom": "Rue des Teinturiers",
+        "de": [
+          -180,
+          {
+            "fois": 1,
+            "de": "yv"
+          }
+        ],
+        "a": [
+          {
+            "fois": 1,
+            "de": "xmax"
+          },
+          {
+            "fois": 1,
+            "de": "yv"
+          }
+        ],
+        "largeur": 18
+      },
+      {
+        "id": "nord-sud",
+        "nom": "Rues nord-sud",
+        "de": [
+          -160,
+          -100
+        ],
+        "a": [
+          -160,
+          {
+            "fois": 1,
+            "de": "ymax"
+          }
+        ],
+        "largeur": 18,
+        "repeter": {
+          "nombre": {
+            "fois": 1,
+            "de": "nx",
+            "plus": 1
+          },
+          "pas": [
+            80,
+            0
+          ]
+        }
+      },
+      {
+        "id": "est-ouest",
+        "nom": "Rues est-ouest",
+        "de": [
+          -180,
+          -80
+        ],
+        "a": [
+          {
+            "fois": 1,
+            "de": "xmax"
+          },
+          -80
+        ],
+        "largeur": 18,
+        "repeter": {
+          "nombre": {
+            "fois": 1,
+            "de": "ny",
+            "plus": 1
+          },
+          "pas": [
+            0,
+            80
+          ]
+        }
+      }
+    ],
+    "rangees": [
+      {
+        "id": "quartier",
+        "coin": [
+          -148,
+          -68
+        ],
+        "ilot": [
+          56,
+          56
+        ],
+        "nombre": {
+          "fois": 1,
+          "de": "nx"
+        },
+        "pas": [
+          80,
+          0
+        ],
+        "rangs": {
+          "nombre": {
+            "fois": 1,
+            "de": "ny"
+          },
+          "pas": [
+            0,
+            80
+          ]
+        },
+        "facades": [
+          "sud",
+          "nord",
+          "ouest",
+          "est"
+        ],
+        "largeurs": [
+          16,
+          26
+        ],
+        "profondeurs": [
+          12,
+          18
+        ],
+        "hauteurs": [
+          8,
+          24
+        ],
+        "couleurs": [
+          "rouge",
+          "orange",
+          "jaune",
+          "vert",
+          "cyan",
+          "bleu",
+          "violet"
+        ],
+        "ordreCouleurs": "suite"
+      }
+    ],
+    "batiments": [],
+    "lampadaires": [
+      {
+        "rue": "fizeau",
+        "pas": 40,
+        "depart": 20
+      },
+      {
+        "rue": "teinturiers",
+        "pas": 40,
+        "depart": 200
+      }
+    ]
+  },
+  "depart": {
+    "pos": [
+      0,
+      -40
+    ],
+    "capDegres": 90
+  },
+  "batterie": {
+    "tauMax": 150
+  },
+  "phiMax": 3,
+  "colis": [
+    {
+      "id": "pain",
+      "client": "Boulangerie Planck",
+      "nom": "Pain",
+      "livraison": {
+        "lieu": [
+          0,
+          {
+            "fois": 1,
+            "de": "yb"
+          }
+        ],
+        "rayon": 8
+      },
+      "obligatoire": true
+    },
+    {
+      "id": "lunettes",
+      "client": "Mme Ampère",
+      "nom": "Lunettes",
+      "livraison": {
+        "lieu": [
+          {
+            "fois": 1,
+            "de": "xa"
+          },
+          {
+            "fois": 1,
+            "de": "yv"
+          }
+        ],
+        "rayon": 8
+      },
+      "obligatoire": true
+    }
+  ],
+  "etoiles": {
+    "batterieMin": 0.65,
+    "tVilleMax": 55
+  },
+  "bulles": [
+    {
+      "id": "n01-livrer",
+      "texte": "Arrête-toi dans le cercle lumineux pour livrer : presque à l'arrêt, une demi-seconde.",
+      "priorite": 2,
+      "note": "Le prochain arret approche (moins de 3 distances de freinage) en roulant.",
+      "quand": {
+        "tous": [
+          {
+            "var": "beta",
+            "op": ">",
+            "val": 0.03
+          },
+          {
+            "var": "margeArret",
+            "op": "<",
+            "val": 3
+          }
+        ]
+      }
+    },
+    {
+      "id": "n01-marche-arriere",
+      "texte": "Dépassé ? À l'arrêt, maintiens Frein : tu recules doucement.",
+      "texteDesktop": "Dépassé ? À l'arrêt, maintiens Espace (ou ↓) : tu recules doucement.",
+      "priorite": 3,
+      "note": "Le prochain arret est derriere toi, tout pres.",
+      "quand": {
+        "pendant": {
+          "cond": {
+            "var": "arretDerriere"
+          },
+          "s": 1
+        }
+      }
+    },
+    {
+      "id": "n01-teinturiers",
+      "texte": "En roulant, chaque façade prend la couleur de sa voisine : regarde l'arc-en-ciel glisser.",
+      "note": "Apres la premiere livraison, beta > 0,15 pendant 1 s, facade dans l'axe, vision relativiste.",
+      "quand": {
+        "tous": [
+          {
+            "var": "colisLivres",
+            "op": ">=",
+            "val": 1
+          },
+          {
+            "pendant": {
+              "cond": {
+                "var": "beta",
+                "op": ">",
+                "val": 0.15
+              },
+              "s": 1
+            }
+          },
+          {
+            "var": "facadeDevant"
+          },
+          {
+            "var": "k",
+            "op": ">",
+            "val": 0.99
+          }
+        ]
+      }
+    }
+  ],
+  "indices": [
+    {
+      "apresEchecs": 1,
+      "texte": "Relâche tôt : tu gardes ta vitesse jusqu'au client. Freine avant le cercle."
+    },
+    {
+      "apresEchecs": 2,
+      "texte": "Regarde la distance de freinage sous la flèche : freine quand elle rejoint celle du client.",
+      "aide": "repereFreinage"
+    },
+    {
+      "apresEchecs": 3,
+      "texte": "Accélère sur la moitié du trajet, freine sur l'autre moitié. Pas besoin d'aller vite."
+    }
+  ],
+  "parcours": {
+    "reference": {
+      "note": "Coursier raisonnable : croisiere a beta 0,5, arret a chaque client, virage au carrefour.",
+      "etapes": [
+        {
+          "aller": [
+            0,
+            {
+              "fois": 1,
+              "de": "yb"
+            }
+          ],
+          "beta": 0.5,
+          "arret": true
+        },
+        {
+          "aller": [
+            0,
+            {
+              "fois": 1,
+              "de": "yv"
+            }
+          ],
+          "beta": 0.5
+        },
+        {
+          "aller": [
+            {
+              "fois": 1,
+              "de": "xa"
+            },
+            {
+              "fois": 1,
+              "de": "yv"
+            }
+          ],
+          "beta": 0.5,
+          "arret": true
+        }
+      ]
+    },
+    "naif": {
+      "note": "Prudent : tout a beta 0,1 (3 m/s a c = 30). La ville vieillit, la batterie fond.",
+      "etapes": [
+        {
+          "aller": [
+            0,
+            {
+              "fois": 1,
+              "de": "yb"
+            }
+          ],
+          "beta": 0.1,
+          "arret": true
+        },
+        {
+          "aller": [
+            0,
+            {
+              "fois": 1,
+              "de": "yv"
+            }
+          ],
+          "beta": 0.1
+        },
+        {
+          "aller": [
+            {
+              "fois": 1,
+              "de": "xa"
+            },
+            {
+              "fois": 1,
+              "de": "yv"
+            }
+          ],
+          "beta": 0.1,
+          "arret": true
+        }
+      ]
+    }
+  }
+}
