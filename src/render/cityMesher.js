@@ -25,11 +25,13 @@
  * MIN_BUILDING_HEIGHT (3 m) ; un toit vu d'en haut ouvrirait des fentes sous aberration.
  *
  * Attributs (docs/interfaces.md) : position (repère Three : X = x, Y = z, Z = −y),
- * color (réflectance r, g, b linéaire), aSpec (ir, uv, ombrage cuit). Lampadaires :
- * position et aEmit (ligne de LUT du corps noir, intensité).
+ * color (réflectance r, g, b linéaire), aSpec (ir, uv, ombrage cuit), aFacade (style codé,
+ * u, z, W : motif de façade dessiné par le shader, voir facades.js ; toits et murs mitoyens :
+ * style 0). Lampadaires : position et aEmit (ligne de LUT du corps noir, intensité).
  */
 import { BufferAttribute, BufferGeometry, Sphere, Vector3 } from 'three';
 import { blackbodyRow } from '../physics/constants.js';
+import { encodeFacade, facadeStyle } from './facades.js';
 import { expandScene, footprint } from './layout.js';
 import { splitRange, uniqueSorted, zipperStrip } from './subdivide.js';
 
@@ -85,8 +87,9 @@ function ambientOcclusion(z) {
 
 /**
  * @typedef {{x0: number, y0: number, x1: number, y1: number, h: number,
- *            rgb: number[], ir: number, uv: number}} Box
- *   bâtiment d'un îlot, dans le repère du jeu ; rgb linéaire.
+ *            rgb: number[], ir: number, uv: number, style?: number, seed?: number}} Box
+ *   bâtiment d'un îlot, dans le repère du jeu ; rgb linéaire ; style et graine de façade
+ *   (facades.facadeStyle ; défaut : 0, pas de motif).
  */
 
 /** Agrandit un tableau typé (capacité doublée) pour contenir au moins `size` éléments. */
@@ -99,8 +102,9 @@ function ensure(array, size) {
 
 /**
  * Maillage en cours de construction : sommets dans le repère du jeu (float64, pour
- * des tests de hauteur exacts), bâtiment d'origine et ombrage par sommet. `finish`
- * retire les sommets inutilisés et écrit les attributs dans le repère Three.
+ * des tests de hauteur exacts), bâtiment d'origine, ombrage et façade (style codé, u, W)
+ * par sommet. `finish` retire les sommets inutilisés et écrit les attributs dans le repère
+ * Three.
  * @param {Box[]} boxes
  */
 function createWriter(boxes, step) {
@@ -113,17 +117,25 @@ function createWriter(boxes, step) {
   let pos = new Float64Array(3 * estimate);
   let shade = new Float32Array(estimate);
   let owner = new Uint16Array(estimate);
+  let fac = new Float32Array(3 * estimate);
   let idx = new Uint32Array(6 * estimate);
   let nv = 0;
   let ni = 0;
   return {
-    /** Ajoute un sommet (x, y, z du jeu) du bâtiment n° box et renvoie son indice. */
-    vertex(x, y, z, box, s) {
+    /**
+     * Ajoute un sommet (x, y, z du jeu) du bâtiment n° box et renvoie son indice ; s : ombrage ;
+     * style, u, W : façade (aFacade = (style, u, z, W) ; 0 : pas de motif).
+     */
+    vertex(x, y, z, box, s, style = 0, u = 0, W = 0) {
       if (nv === shade.length) {
         pos = ensure(pos, 3 * (nv + 1));
         shade = ensure(shade, nv + 1);
         owner = ensure(owner, nv + 1);
+        fac = ensure(fac, 3 * (nv + 1));
       }
+      fac[3 * nv] = style;
+      fac[3 * nv + 1] = u;
+      fac[3 * nv + 2] = W;
       pos[3 * nv] = x;
       pos[3 * nv + 1] = y;
       pos[3 * nv + 2] = z;
@@ -148,6 +160,7 @@ function createWriter(boxes, step) {
       const positions = new Float32Array(used * 3);
       const colors = new Float32Array(used * 3);
       const specs = new Float32Array(used * 3);
+      const facades = new Float32Array(used * 4);
       for (let i = 0; i < nv; i++) {
         const j = remap[i];
         if (j < 0) continue;
@@ -161,10 +174,14 @@ function createWriter(boxes, step) {
         specs[3 * j] = b.ir;
         specs[3 * j + 1] = b.uv;
         specs[3 * j + 2] = shade[i];
+        facades[4 * j] = fac[3 * i];
+        facades[4 * j + 1] = fac[3 * i + 1];
+        facades[4 * j + 2] = pos[3 * i + 2]; // z
+        facades[4 * j + 3] = fac[3 * i + 2];
       }
       const indices = used <= 65535 ? new Uint16Array(ni) : new Uint32Array(ni);
       for (let k = 0; k < ni; k++) indices[k] = remap[idx[k]];
-      return { positions, colors, specs, indices, vertexCount: used, triangleCount: ni / 3 };
+      return { positions, colors, specs, facades, indices, vertexCount: used, triangleCount: ni / 3 };
     },
   };
 }
@@ -190,7 +207,8 @@ function wallFaces(b) {
  * @param {Box[]} boxes bâtiments de l'îlot
  * @param {number} step pas maximal de la grille des murs (m)
  * @returns {{positions: Float32Array, colors: Float32Array, specs: Float32Array,
- *            indices: Uint16Array | Uint32Array, vertexCount: number, triangleCount: number}}
+ *            facades: Float32Array, indices: Uint16Array | Uint32Array, vertexCount: number,
+ *            triangleCount: number}} facades : aFacade (style codé, u, z, W) par sommet
  */
 export function meshBlock(boxes, step) {
   if (boxes.length > 65535) throw new Error('Îlot trop grand : plus de 65 535 bâtiments');
@@ -243,7 +261,11 @@ function covers(spans, from, to) {
   return reach >= to - TOL;
 }
 
-/** Un mur : lignes verticales, bandes « fermeture éclair », parties mitoyennes omises. */
+/**
+ * Un mur : lignes verticales, bandes « fermeture éclair », parties mitoyennes omises.
+ * Façade : u = abscisse depuis le bord gauche du mur vu de dehors, W = longueur du mur. Un mur
+ * qu'un voisin touche (mur mitoyen, pignon au-dessus d'un voisin plus bas) reste sans motif.
+ */
 function meshWall(w, boxes, bi, face, step, zLine) {
   const b = boxes[bi];
   // Voisins collés contre ce mur : coupures aux bords de leur contact, zones cachées.
@@ -260,6 +282,8 @@ function meshWall(w, boxes, bi, face, step, zLine) {
   });
   // Mur commun entièrement caché par des voisins au moins aussi hauts : rien à mailler.
   if (covers(hidden.filter((hd) => hd.h >= b.h - TOL), face.from, face.to)) return;
+  const style = hidden.length > 0 ? 0 : encodeFacade(b.style ?? 0, b.h, b.seed ?? 0);
+  const W = face.to - face.from;
 
   const levels = splitRange(face.from, face.to, step, breaks);
   if (face.reversed) levels.reverse();
@@ -267,7 +291,8 @@ function meshWall(w, boxes, bi, face, step, zLine) {
     const px = face.axis === 'x' ? c : face.fixed;
     const py = face.axis === 'x' ? face.fixed : c;
     const zs = zLine(px, py, bi);
-    const idx = zs.map((z) => w.vertex(px, py, z, bi, face.shade * ambientOcclusion(z)));
+    const u = face.reversed ? face.to - c : c - face.from;
+    const idx = zs.map((z) => w.vertex(px, py, z, bi, face.shade * ambientOcclusion(z), style, u, W));
     return { c, zs, idx };
   });
 
@@ -286,7 +311,7 @@ function meshWall(w, boxes, bi, face, step, zLine) {
   }
 }
 
-/** Toit : grille grossière, triangles anti-horaires vus d'en haut. */
+/** Toit : grille grossière, triangles anti-horaires vus d'en haut ; sans motif (style 0). */
 function meshRoof(w, b, bi, step) {
   const s = Math.max(step, ROOF_STEP);
   const xs = splitRange(b.x0, b.x1, s);
@@ -419,6 +444,7 @@ function createChunk(id, boxes, lodSteps) {
         geometry.setAttribute('position', new BufferAttribute(m.positions, 3));
         geometry.setAttribute('color', new BufferAttribute(m.colors, 3));
         geometry.setAttribute('aSpec', new BufferAttribute(m.specs, 3));
+        geometry.setAttribute('aFacade', new BufferAttribute(m.facades, 4));
         geometry.setIndex(new BufferAttribute(m.indices, 1));
         geometry.boundingSphere = boundingSphere(center, radius);
         geometry.name = `ilot:${id}:lod${level}`;
@@ -488,7 +514,7 @@ export function buildCity(scene, palette, { lodSteps = [...DEFAULT_LOD_STEPS], l
   for (const b of layout.buildings) {
     if (!colorCache.has(b.color)) colorCache.set(b.color, hexToLinearRgb(b.color));
     const f = footprint(b);
-    const box = { x0: f.x0, y0: f.y0, x1: f.x1, y1: f.y1, h: b.height, rgb: colorCache.get(b.color), ir: b.ir, uv: b.uv };
+    const box = { x0: f.x0, y0: f.y0, x1: f.x1, y1: f.y1, h: b.height, rgb: colorCache.get(b.color), ir: b.ir, uv: b.uv, ...facadeStyle(f, b.height) };
     if (!groups.has(b.blockId)) groups.set(b.blockId, []);
     groups.get(b.blockId).push(box);
   }

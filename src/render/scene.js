@@ -73,13 +73,15 @@ function headingGap(snapshot) {
  * @param {any} sceneJson scène de src/data/scenes/ (schéma « coursier-scene/1 »)
  * @param {Record<string, {srgb: string, ir?: number, uv?: number}>} palette src/data/palette.json
  * @param {{tier?: 'default' | 'lite', lodSteps?: number[], physics?: {lengthUnit: number},
- *          level?: import('./levelObjects.js').LevelView | null}} [options]
+ *          level?: import('./levelObjects.js').LevelView | null, facades?: 0 | 1 | 2}} [options]
  *   profil de qualité (choisit la visibilité « lite » ou « defaut » de la scène) ; pas des LOD
  *   (m) ; constantes physiques de la partie (physicsFor(c)) : la scène est développée pour
  *   leur unité de longueur L (défaut : réglage par défaut) ; level : vue statique d'un niveau
- *   (zones, clients, portes, lampes : render/levelObjects.js), mise à jour par updateLevel
+ *   (zones, clients, portes, lampes : render/levelObjects.js), mise à jour par updateLevel ;
+ *   facades : détail des motifs de façade (quality.facades : 0 coupés, 1 simplifiés, 2 complets ;
+ *   défaut : selon le profil)
  */
-export function createWorld(renderer, sceneJson, palette, { tier = 'default', lodSteps, physics, level = null } = {}) {
+export function createWorld(renderer, sceneJson, palette, { tier = 'default', lodSteps, physics, level = null, facades } = {}) {
   const city = buildCity(sceneJson, palette, {
     ...(lodSteps ? { lodSteps } : {}),
     ...(physics ? { lengthUnit: physics.lengthUnit } : {}),
@@ -97,7 +99,7 @@ export function createWorld(renderer, sceneJson, palette, { tier = 'default', lo
 
   // Matériaux relativistes et leurs variantes « vision classique » (mêmes uniformes).
   const relMaterials = {
-    surface: createSurfaceMaterial(),
+    surface: createSurfaceMaterial({ facades: facades ?? (tier === 'lite' ? 1 : 2), palette }),
     emitter: createEmitterMaterial(),
     environment: createEnvironmentMaterial(),
   };

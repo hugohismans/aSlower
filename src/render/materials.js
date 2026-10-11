@@ -29,7 +29,7 @@ import {
 import { adaptationExposure } from '../physics/spectrum.js';
 import { REL } from './uniforms.js';
 import { createDopplerLutTexture } from './dopplerLut.js';
-import { SHADERS } from './shaders/index.js';
+import { SHADERS, setFacadePalette } from './shaders/index.js';
 
 /** Réflectances ir et uv du sol, en fraction de sa luminance (asphalte, béton : spectre plat). */
 const GROUND_IR_UV = Object.freeze([0.9, 0.5]);
@@ -76,15 +76,28 @@ function relMaterial(name, shader, ownUniforms = {}, options = {}) {
 }
 
 /**
- * Façades et sol maillé éventuel : attributs `color` (réflectance r, g, b linéaire) et
- * `aSpec` (ir, uv, ombrage). Faces avant seulement : le maillage doit être orienté vers
- * l'extérieur (sens trigonométrique vu de dehors). L'aberration conserve l'orientation.
+ * Façades et sol maillé éventuel : attributs `color` (réflectance r, g, b linéaire),
+ * `aSpec` (ir, uv, ombrage) et `aFacade` (style codé, u, z, W : motif de façade,
+ * shaders/rel_facade.glsl ; une géométrie sans aFacade reçoit (0, 0, 0, 0), pas de motif).
+ * Faces avant seulement : le maillage doit être orienté vers l'extérieur (sens
+ * trigonométrique vu de dehors). L'aberration conserve l'orientation.
  * Les meshes doivent avoir `frustumCulled = false` (l'aberration ramène devant ce qui est
  * derrière) et `userData.r` (distance à l'œil en cm, entière) pour le tri.
+ * @param {{facades?: 0 | 1 | 2, palette?: Record<string, {srgb: string, ir?: number, uv?: number}>}} [options]
+ *   facades : détail des façades (define FACADES) : 0 = motifs coupés, 1 = simplifiés (profil
+ *   « lite »), 2 = complets (facades.facadeDetail) ; palette (src/data/palette.json) : source
+ *   des matériaux de façade (shaders/index.setFacadePalette), à donner au moins une fois avant
+ *   la compilation
  * @returns {ShaderMaterial}
  */
-export function createSurfaceMaterial() {
-  return relMaterial('rel-surface', SHADERS.surface, {}, { vertexColors: true, side: FrontSide });
+export function createSurfaceMaterial({ facades = 2, palette } = {}) {
+  if (palette) setFacadePalette(palette);
+  const material = relMaterial('rel-surface', SHADERS.surface, {}, { vertexColors: true, side: FrontSide });
+  material.defines = { FACADES: facades };
+  // Valeur explicite quand la géométrie n'a pas d'aFacade (objets des niveaux) : sinon la valeur
+  // générique de l'emplacement, partagée par tout le contexte WebGL, pourrait être non nulle.
+  material.defaultAttributeValues.aFacade = [0, 0, 0, 0];
+  return material;
 }
 
 /**
@@ -174,6 +187,7 @@ export function createClassicVariant(material) {
     toneMapped: false,
   });
   variant.onBeforeRender = material.onBeforeRender;
+  variant.defaultAttributeValues = { ...material.defaultAttributeValues };
   variant.userData = { ...material.userData, classic: true };
   return variant;
 }

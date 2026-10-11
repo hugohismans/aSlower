@@ -223,6 +223,7 @@ const PURE_FILES = [
   'src/render/subdivide.js',
   'src/render/lod.js',
   'src/render/culling.js',
+  'src/render/facades.js',
   'src/render/layout.js',
   'src/render/adaptiveDpr.js',
   'src/hud/format.js',

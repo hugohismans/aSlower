@@ -1,6 +1,9 @@
 /**
  * Sources GLSL du rendu relativiste et enregistrement des chunks `rel_*` dans
- * THREE.ShaderChunk (utilisables par `#include <rel_vertex>`, `<rel_doppler>`, `<rel_fog>`).
+ * THREE.ShaderChunk (utilisables par `#include <rel_vertex>`, `<rel_doppler>`, `<rel_fog>`,
+ * `<rel_facade>`). Le chunk `rel_facade` est précédé des constantes des matériaux de façade
+ * (FAC_*), générées depuis la palette (src/data/palette.json) par setFacadePalette
+ * (render/facades.js, facadeGlslConstants), appelé par createSurfaceMaterial.
  *
  * Les fichiers .glsl sont importés tels quels (`?raw`) : leur texte complet, en-têtes de
  * licence `/*! … *\/` compris, reste dans le bundle publié. Les commentaires sont retirés
@@ -8,9 +11,11 @@
  * (accents), que certains compilateurs mobiles acceptent mal.
  */
 import { ShaderChunk } from 'three';
+import { facadeGlslConstants } from '../facades.js';
 import relVertex from './rel_vertex.glsl?raw';
 import relDoppler from './rel_doppler.glsl?raw';
 import relFog from './rel_fog.glsl?raw';
+import relFacade from './rel_facade.glsl?raw';
 import surfaceVert from './surface.vert.glsl?raw';
 import surfaceFrag from './surface.frag.glsl?raw';
 import emitterVert from './emitter.vert.glsl?raw';
@@ -39,6 +44,7 @@ export const GLSL_SOURCES = Object.freeze({
   rel_vertex: relVertex,
   rel_doppler: relDoppler,
   rel_fog: relFog,
+  rel_facade: relFacade,
   'surface.vert': surfaceVert,
   'surface.frag': surfaceFrag,
   'emitter.vert': emitterVert,
@@ -51,11 +57,28 @@ export const GLSL_SOURCES = Object.freeze({
   'lamp.frag': lampFrag,
 });
 
-/** Enregistre les chunks rel_* dans THREE.ShaderChunk (idempotent ; fait à l'import). */
+/**
+ * Enregistre les chunks rel_* dans THREE.ShaderChunk (idempotent ; fait à l'import). Tant que
+ * setFacadePalette n'a pas été appelé, `rel_facade` est une directive #error explicite.
+ */
 export function registerShaderChunks() {
   for (const name of ['rel_vertex', 'rel_doppler', 'rel_fog']) {
     ShaderChunk[name] = stripGlslComments(GLSL_SOURCES[name]);
   }
+  if (!ShaderChunk.rel_facade) ShaderChunk.rel_facade = '#error rel_facade : setFacadePalette(palette) non appele\n';
+}
+
+/**
+ * Pose le chunk `rel_facade` : constantes FAC_* des matériaux de façade, générées depuis la
+ * palette (src/data/palette.json), puis le texte de rel_facade.glsl. À appeler avant la
+ * compilation du matériau des surfaces (createSurfaceMaterial le fait).
+ * @param {Record<string, {srgb: string, ir?: number, uv?: number}>} palette
+ * @returns {string} constantes générées
+ */
+export function setFacadePalette(palette) {
+  const constants = facadeGlslConstants(palette);
+  ShaderChunk.rel_facade = constants + stripGlslComments(GLSL_SOURCES.rel_facade);
+  return constants;
 }
 
 registerShaderChunks();

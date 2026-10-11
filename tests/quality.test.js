@@ -103,4 +103,13 @@ describe('DPR appliqué (profil, DPR adaptatif, ?dpr=)', () => {
     q.adaptiveDpr = 1;
     expect(resolvePixelRatio(q, 932, 430)).toBe(1.5);
   });
+
+  it('façades : complètes par défaut, simplifiées en « lite », coupées par ?facades=0', () => {
+    expect(createQuality({ search: '', deviceDpr: 2 }).facades).toBe(2);
+    expect(createQuality({ search: '?facades=0', deviceDpr: 2 }).facades).toBe(0);
+    armBootGuard(); // plantage au démarrage précédent : profil « lite »
+    const lite = createQuality({ search: '', deviceDpr: 2 });
+    expect(lite.tier).toBe('lite');
+    expect(lite.facades).toBe(1);
+  });
 });

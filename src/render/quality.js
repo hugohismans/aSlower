@@ -17,6 +17,7 @@
  *     un bouton Réessayer. Jamais de coupure définitive : un jeu n'a pas de repli sans WebGL.
  */
 import { local, session } from '../storage.js';
+import { facadeDetail } from './facades.js';
 
 /** Plafond de pixels physiques du canevas. */
 export const MAX_PIXELS = 2.2e6;
@@ -49,6 +50,8 @@ export const LITE_TTL_MS = 3 * 24 * 3600 * 1000;
  *   écrit par main.js), plafonné par le DPR du profil ; null : DPR du profil
  * @property {number} crashes plantages au démarrage consécutifs
  * @property {boolean} unstable deux plantages d'affilée ou plus (« WebGL instable »)
+ * @property {0 | 1 | 2} facades détail des motifs de façade : `?facades=0|1|2`, sinon 1
+ *   (simplifiés : ni volets, ni balcons, ni joints) en « lite » et 2 (complets) sinon
  */
 
 /**
@@ -181,6 +184,7 @@ export function createQuality({ search, deviceDpr } = {}) {
     adaptiveDpr: null,
     crashes,
     unstable: crashes >= 2,
+    facades: facadeDetail(query, tier),
   };
 }
 
