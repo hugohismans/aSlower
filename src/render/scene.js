@@ -73,16 +73,20 @@ function headingGap(snapshot) {
  * @param {any} sceneJson scène de src/data/scenes/ (schéma « coursier-scene/1 »)
  * @param {Record<string, {srgb: string, ir?: number, uv?: number}>} palette src/data/palette.json
  * @param {{tier?: 'default' | 'lite', lodSteps?: number[], physics?: {lengthUnit: number},
- *          level?: import('./levelObjects.js').LevelView | null}} [options]
+ *          level?: import('./levelObjects.js').LevelView | null,
+ *          decor?: {enabled?: boolean, density?: number, small?: boolean} | false}} [options]
  *   profil de qualité (choisit la visibilité « lite » ou « defaut » de la scène) ; pas des LOD
  *   (m) ; constantes physiques de la partie (physicsFor(c)) : la scène est développée pour
  *   leur unité de longueur L (défaut : réglage par défaut) ; level : vue statique d'un niveau
- *   (zones, clients, portes, lampes : render/levelObjects.js), mise à jour par updateLevel
+ *   (zones, clients, portes, lampes : render/levelObjects.js), mise à jour par updateLevel ;
+ *   decor : réglage d'exécution du décor (decorOptions : `?decor=0`, profil « lite »), le même
+ *   que celui des collisions du niveau (game/level.createLevel)
  */
-export function createWorld(renderer, sceneJson, palette, { tier = 'default', lodSteps, physics, level = null } = {}) {
+export function createWorld(renderer, sceneJson, palette, { tier = 'default', lodSteps, physics, level = null, decor } = {}) {
   const city = buildCity(sceneJson, palette, {
     ...(lodSteps ? { lodSteps } : {}),
     ...(physics ? { lengthUnit: physics.lengthUnit } : {}),
+    ...(decor === undefined ? {} : { decor }),
   });
   const steps = lodSteps ?? [...DEFAULT_LOD_STEPS];
   const coarsest = steps.length - 1;

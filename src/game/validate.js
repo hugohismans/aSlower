@@ -29,8 +29,11 @@
  *                                    ({"fois": 2, "de": "nom"}), évaluées dans l'ordre
  *   "scene": {…},                    la ville : format « coursier-scene/1 » (render/layout.js :
  *                                    graine, limites, visibilite, rues, rangees, batiments,
- *                                    lampadaires, titre?, description?) SANS schema, id,
- *                                    depart ni parametres (pris au niveau)
+ *                                    lampadaires, decor?, decorExclusions?, titre?,
+ *                                    description?) SANS schema, id, depart ni parametres (pris
+ *                                    au niveau). Le décor évite d'office les zones, portes,
+ *                                    reprises, le départ et les itinéraires du pilote
+ *                                    (game/level.levelDecorExclusions)
  *   "depart": {"pos": [x, y], "capDegres": 90, "beta": 0},   capDegres : 0 = est, 90 = nord ;
  *                                    beta facultatif : départ lancé (fraction de c, < tanh φmax)
  *   "batterie": {"tauMax": 150},     temps propre maximal (s) : τ ≥ tauMax = échec
@@ -85,14 +88,15 @@
  * c de `lightSpeeds` (10, 30 et 100 m/s par défaut) : id = nom du fichier, numéro, φmax ≤ 3,
  * scène développable (layout.js), aucune géométrie sous le sol (y = 0 en repère Three),
  * capteurs de porte ≥ 12 m, lieux dans la carte, hors des bâtiments et ATTEIGNABLES depuis le
- * départ (remplissage sur une grille de 1 m, portes ouvertes), références d'ids, délais…
+ * départ (remplissage sur une grille de 1 m, portes ouvertes), références d'ids, délais,
+ * aucun obstacle du décor dans une zone, sur une porte, une reprise ou le départ…
  * Un message propre à certains c porte « (c = 10 m/s) ».
  */
 import { C_DEFAULT, C_MAX, C_MIN, PHI_MAX_LIMIT, physicsFor } from '../physics/constants.js';
 import { PLAYER_RADIUS } from '../physics/collisions.js';
 import { expandScene } from '../render/layout.js';
 import { BUBBLES_SCHEMA, validateBubbles } from './bubbles.js';
-import { DEFAULT_ZONE_RADIUS, doorBox, LEVEL_SCHEMA, resolveLevel, sceneOfLevel } from './level.js';
+import { decorBoxes, DEFAULT_ZONE_RADIUS, doorBox, LEVEL_SCHEMA, resolveLevel, sceneOfLevel } from './level.js';
 
 /** Motif des ids de niveau (= noms de fichiers). */
 export const LEVEL_ID_PATTERN = /^n\d{2}-[a-z0-9]+(-[a-z0-9]+)*$/;
@@ -111,7 +115,7 @@ export const VALIDATION_LIGHT_SPEEDS = Object.freeze([C_MIN, C_DEFAULT, C_MAX]);
 export const MAX_TIME = 3600;
 
 const EXPRESSION_KEYS = ['fois', 'de', 'plus', 'min', 'max', 'arrondiSup', 'arrondiInf', 'puisPlus'];
-const SCENE_KEYS = ['titre', 'description', 'graine', 'limites', 'visibilite', 'rues', 'rangees', 'batiments', 'lampadaires'];
+const SCENE_KEYS = ['titre', 'description', 'graine', 'limites', 'visibilite', 'rues', 'rangees', 'batiments', 'lampadaires', 'decor', 'decorExclusions'];
 
 const isPlainObject = (x) => x !== null && typeof x === 'object' && !Array.isArray(x);
 /** Nombre en français, 1 décimale (« 6,0 »). */
@@ -472,7 +476,7 @@ function semanticForC(json, c, palette, err, warn) {
   }
   let scene;
   try {
-    scene = expandScene(sceneOfLevel(level), palette, { lengthUnit: physics.lengthUnit });
+    scene = expandScene(sceneOfLevel(level, physics.lengthUnit), palette, { lengthUnit: physics.lengthUnit });
   } catch (error) {
     err('scene', /** @type {Error} */ (error).message);
     return;
@@ -548,12 +552,37 @@ function semanticForC(json, c, palette, err, warn) {
   // Reprises.
   (level.reprises ?? []).forEach((r, i) => pointCheck(r.pos[0], r.pos[1], `reprises[${i}] (${r.id}).pos`, 'point de reprise'));
 
+  // Décor : aucun obstacle dans une zone, sur une porte, une reprise ou le départ (le placement
+  // les évite : voir game/level.levelDecorExclusions ; ceci le vérifie).
+  const props = decorBoxes(scene);
+  const boxDistance = (x, y, b) => Math.hypot(Math.max(b.x0 - x, 0, x - b.x1), Math.max(b.y0 - y, 0, y - b.y1));
+  const decorNear = (x, y, r) => props.find((b) => boxDistance(x, y, b) < r);
+  level.colis.forEach((p, i) => {
+    for (const kind of ['retrait', 'livraison']) {
+      const stop = p[kind];
+      const hit = stop && decorNear(stop.lieu[0], stop.lieu[1], stop.rayon ?? DEFAULT_ZONE_RADIUS);
+      if (hit) err(`colis[${i}] (${p.id}).${kind}.lieu`, `objet du décor (${hit.id}) dans la zone`);
+    }
+  });
+  (level.portes ?? []).forEach((d, i) => {
+    const box = doorBox({ x: d.pos[0], y: d.pos[1], capDegres: d.capDegres, largeur: d.largeur }, d.id);
+    const hit = props.find((b) => b.x0 < box.x1 + 1 && b.x1 > box.x0 - 1 && b.y0 < box.y1 + 1 && b.y1 > box.y0 - 1);
+    if (hit) err(`portes[${i}] (${d.id}).pos`, `objet du décor (${hit.id}) sur le passage de la porte`);
+  });
+  (level.reprises ?? []).forEach((r, i) => {
+    const hit = decorNear(r.pos[0], r.pos[1], PLAYER_RADIUS + 1);
+    if (hit) err(`reprises[${i}] (${r.id}).pos`, `objet du décor (${hit.id}) sur le point de reprise`);
+  });
+  const atStart = decorNear(start.x, start.y, PLAYER_RADIUS + 1);
+  if (atStart) err('depart.pos', `objet du décor (${atStart.id}) sur le départ`);
+
   // Parcours du bot : points de passage dans la carte.
   for (const name of ['reference', 'naif']) {
     const route = level.parcours?.[name];
     if (!route) continue;
     route.etapes.forEach((s, i) => {
       if (s.aller && !inBounds(s.aller[0], s.aller[1])) err(`parcours.${name}.etapes[${i}].aller`, 'point hors des limites de la carte');
+      else if (s.aller && decorNear(s.aller[0], s.aller[1], PLAYER_RADIUS)) warn(`parcours.${name}.etapes[${i}].aller`, 'point sur un objet du décor');
     });
   }
 }

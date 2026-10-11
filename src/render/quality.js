@@ -3,6 +3,9 @@
  *
  * - DPR par défaut : min(devicePixelRatio, 2), plafonné pour ne pas dépasser MAX_PIXELS
  *   pixels physiques (iPhone 14 Pro Max en paysage : 932 × 430 px CSS à DPR 2 ≈ 1,6 Mpx).
+ * - Décor statique (mobilier, platanes : render/decorLayout.js) : `?decor=0` le coupe (mesures) ;
+ *   le profil « lite » en garde DECOR_LITE_DENSITY, sans les petits objets (champ decor). Le
+ *   même réglage sert au rendu et aux collisions du niveau : on ne heurte que ce qu'on voit.
  * - `?dpr=` dans l'URL impose le DPR (mesures, captures) ; sinon, en jeu, le DPR adaptatif
  *   (adaptiveDpr.js, piloté par main.js) peut l'abaisser par paliers (champ adaptiveDpr) ; `?qualite=normale` oublie les
  *   plantages mémorisés et le profil « lite ».
@@ -24,6 +27,8 @@ export const MAX_PIXELS = 2.2e6;
 export const DPR_MAX = 2;
 /** DPR du profil « lite » (après un plantage au démarrage). */
 export const DPR_LITE = 0.75;
+/** Fraction du décor gardée par le profil « lite » (sans les petits objets). */
+export const DECOR_LITE_DENSITY = 0.6;
 /** Bornes du DPR imposé par `?dpr=`. */
 const DPR_OVERRIDE_MIN = 0.25;
 const DPR_OVERRIDE_MAX = 4;
@@ -47,6 +52,8 @@ export const LITE_TTL_MS = 3 * 24 * 3600 * 1000;
  * @property {number} maxPixels plafond de pixels physiques
  * @property {number | null} adaptiveDpr DPR choisi par le DPR adaptatif (render/adaptiveDpr.js,
  *   écrit par main.js), plafonné par le DPR du profil ; null : DPR du profil
+ * @property {{enabled: boolean, density: number, small: boolean}} decor réglage d'exécution du
+ *   décor (layout.expandScene, option decor) : `?decor=0`, profil « lite »
  * @property {number} crashes plantages au démarrage consécutifs
  * @property {boolean} unstable deux plantages d'affilée ou plus (« WebGL instable »)
  */
@@ -62,6 +69,19 @@ export function parseDprOverride(search) {
   const dpr = Number(raw.replace(',', '.'));
   if (!Number.isFinite(dpr) || dpr <= 0) return null;
   return Math.min(Math.max(dpr, DPR_OVERRIDE_MIN), DPR_OVERRIDE_MAX);
+}
+
+/**
+ * Réglage d'exécution du décor : `?decor=0` (ou `non`, `false`) le coupe ; le profil « lite »
+ * garde DECOR_LITE_DENSITY du décor, sans les petits objets.
+ * @param {string} search ex. location.search
+ * @param {'default' | 'lite'} tier
+ * @returns {{enabled: boolean, density: number, small: boolean}}
+ */
+export function decorOptions(search, tier) {
+  const raw = new URLSearchParams(search).get('decor');
+  const enabled = raw === null || !['0', 'non', 'false'].includes(raw.trim().toLowerCase());
+  return tier === 'lite' ? { enabled, density: DECOR_LITE_DENSITY, small: false } : { enabled, density: 1, small: true };
 }
 
 /**
@@ -179,6 +199,7 @@ export function createQuality({ search, deviceDpr } = {}) {
     dprOverride: parseDprOverride(query),
     maxPixels: MAX_PIXELS,
     adaptiveDpr: null,
+    decor: decorOptions(query, tier),
     crashes,
     unstable: crashes >= 2,
   };

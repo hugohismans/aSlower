@@ -225,6 +225,8 @@ const PURE_FILES = [
   'src/render/culling.js',
   'src/render/layout.js',
   'src/render/adaptiveDpr.js',
+  'src/render/decorLayout.js',
+  'src/render/decorMesher.js',
   'src/hud/format.js',
   'src/hud/levelFormat.js',
   'src/hud/skyMath.js',
