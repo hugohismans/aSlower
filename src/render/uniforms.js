@@ -12,7 +12,6 @@ import { Vector2, Vector3, Vector4 } from 'three';
 import {
   BEAM_EXPONENT,
   BEAM_MAX,
-  C,
   EYE_HEIGHT,
   LUT_HEIGHT,
   LUT_LOG2_RANGE,
@@ -72,19 +71,23 @@ export const REL = {
 
 /**
  * Met à jour l'observateur relativiste à partir de l'instantané du joueur.
- * - β monde = (vx, vy)/C, passé au repère Three : (βx, 0, −βy) ;
+ * - β monde = (vx, vy)/c, c = snapshot.c (vitesse de la lumière de la partie), passé au
+ *   repère Three : (βx, 0, −βy) ;
  * - vision classique : β_eff = k·β, γ_eff = 1/√(1 − k²β²), uG2 = γ_eff²/(γ_eff + 1).
  * γ_eff est calculé en double précision sous la forme 1/√((1 − k²) + k²/γ²), qui évite
  * l'annulation de 1 − β² près de c (γ vient de la vitesse propre, sans perte).
  * - exposition : uExposure = adaptationExposure(D droit devant = γ_eff + √(γ_eff² − 1)),
  *   1 à l'arrêt et en vision classique (spectrum.js).
- * @param {{vx: number, vy: number, gamma?: number}} snapshot instantané de physics/player.js
+ * @param {{vx: number, vy: number, c: number, gamma?: number}} snapshot instantané de
+ *   physics/player.js (c obligatoire : pas de vitesse de la lumière implicite)
  * @param {number} k 1 = relativiste, 0 = vision classique (borné à [0, 1])
  */
 export function updateObserver(snapshot, k) {
+  const c = snapshot.c;
+  if (!(c > 0)) throw new RangeError(`updateObserver : snapshot.c (vitesse de la lumière) attendu (reçu : ${c})`);
   const kk = Math.min(Math.max(Number.isFinite(k) ? k : 1, 0), 1);
-  const bx = snapshot.vx / C;
-  const by = snapshot.vy / C;
+  const bx = snapshot.vx / c;
+  const by = snapshot.vy / c;
   const gamma = snapshot.gamma ?? 1 / Math.sqrt(1 - (bx * bx + by * by));
   REL.uBeta.value.set(kk * bx, 0, -kk * by);
   const k2 = kk * kk;

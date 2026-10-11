@@ -1,5 +1,7 @@
 // Tests de src/physics/relativity.js : cinématique, addition des vitesses, segment
-// hyperbolique, aberration et Doppler.
+// hyperbolique, aberration et Doppler. Constantes du réglage par défaut (c = 30 m/s,
+// a = 3 m/s²) sauf mention ; vitesses écrites en fractions de c. Un groupe vérifie aussi
+// l'injection de c (paramètre facultatif) avec les valeurs du cahier des charges (c = 100).
 import { describe, expect, it } from 'vitest';
 import { A, C } from '../src/physics/constants.js';
 import {
@@ -65,8 +67,8 @@ describe('vitesse propre, vitesse, rapidité', () => {
   it('γ, v et φ sont cohérents, et u ↔ v sont inverses', () => {
     const r = rng(1);
     for (let i = 0; i < 1000; i++) {
-      const ux = (r() - 0.5) * 2000;
-      const uy = (r() - 0.5) * 2000;
+      const ux = (r() - 0.5) * 20 * C;
+      const uy = (r() - 0.5) * 20 * C;
       const g = gammaFromU(ux, uy);
       const v = velocityFromU(ux, uy);
       const speed = Math.hypot(v.x, v.y);
@@ -88,17 +90,17 @@ describe('vitesse propre, vitesse, rapidité', () => {
 
   it('uFromVelocity refuse |v| ≥ c', () => {
     expect(() => uFromVelocity(C, 0)).toThrow();
-    expect(() => uFromVelocity(80, 70)).toThrow();
+    expect(() => uFromVelocity(0.8 * C, 0.7 * C)).toThrow();
     expect(() => uFromVelocity(NaN, 0)).toThrow();
   });
 });
 
 describe('composeVelocities (v ⊕ w)', () => {
   it('v = 0 : renvoie w ; w = 0 : renvoie v', () => {
-    expect(composeVelocities({ x: 0, y: 0 }, { x: 30, y: -40 })).toEqual({ x: 30, y: -40 });
-    const r = composeVelocities({ x: 60, y: 20 }, { x: 0, y: 0 });
-    expectNear(r.x, 60, 1e-12);
-    expectNear(r.y, 20, 1e-12);
+    expect(composeVelocities({ x: 0, y: 0 }, { x: 0.3 * C, y: -0.4 * C })).toEqual({ x: 0.3 * C, y: -0.4 * C });
+    const r = composeVelocities({ x: 0.6 * C, y: 0.2 * C }, { x: 0, y: 0 });
+    expectNear(r.x, 0.6 * C, 1e-12);
+    expectNear(r.y, 0.2 * C, 1e-12);
   });
 
   it('colinéaire : les rapidités s’additionnent', () => {
@@ -118,32 +120,32 @@ describe('composeVelocities (v ⊕ w)', () => {
   });
 
   it('n’est pas commutative (même norme, directions différentes)', () => {
-    const v = { x: 80, y: 0 };
-    const w = { x: 0, y: 50 };
+    const v = { x: 0.8 * C, y: 0 };
+    const w = { x: 0, y: 0.5 * C };
     const vw = composeVelocities(v, w);
     const wv = composeVelocities(w, v);
     // Normes égales (γ_total = γ_v·γ_w quand v ⊥ w), directions différentes (rotation de Wigner).
     expectNear(Math.hypot(vw.x, vw.y), Math.hypot(wv.x, wv.y), 1e-12);
     expect(Math.abs(Math.atan2(vw.y, vw.x) - Math.atan2(wv.y, wv.x))).toBeGreaterThan(0.1);
-    // Valeurs attendues : v ⊕ w = (80, 50/γ_v), w ⊕ v = (80/γ_w, 50).
-    expectNear(vw.x, 80, 1e-12);
-    expectNear(vw.y, 50 * Math.sqrt(1 - 0.64), 1e-12);
-    expectNear(wv.x, 80 * Math.sqrt(1 - 0.25), 1e-12);
-    expectNear(wv.y, 50, 1e-12);
+    // Valeurs attendues : v ⊕ w = (0,8c, 0,5c/γ_v), w ⊕ v = (0,8c/γ_w, 0,5c).
+    expectNear(vw.x, 0.8 * C, 1e-12);
+    expectNear(vw.y, 0.5 * C * Math.sqrt(1 - 0.64), 1e-12);
+    expectNear(wv.x, 0.8 * C * Math.sqrt(1 - 0.25), 1e-12);
+    expectNear(wv.y, 0.5 * C, 1e-12);
   });
 
   it('reste sous c', () => {
-    const res = composeVelocities({ x: 99, y: 0 }, { x: 99, y: 5 });
+    const res = composeVelocities({ x: 0.99 * C, y: 0 }, { x: 0.99 * C, y: 0.05 * C });
     expect(Math.hypot(res.x, res.y)).toBeLessThan(C);
   });
 });
 
 describe('hyperbolicSegment', () => {
-  it('depuis l’arrêt, τ = 10 s à a = 10 m/s² : valeurs exactes en un seul segment', () => {
+  it('depuis l’arrêt, τ = 10 s à a = c/10 : valeurs exactes en un seul segment', () => {
     const seg = hyperbolicSegment(0, 0, A, 0, 10);
-    expectNear(velocityFromU(seg.ux, seg.uy).x, 100 * Math.tanh(1), 1e-9);
-    expectNear(seg.dt, 10 * Math.sinh(1), 1e-9);
-    expectNear(seg.dx, 1000 * (Math.cosh(1) - 1), 1e-9);
+    expectNear(velocityFromU(seg.ux, seg.uy).x, C * Math.tanh(1), 1e-9);
+    expectNear(seg.dt, (C / A) * Math.sinh(1), 1e-9);
+    expectNear(seg.dx, ((C * C) / A) * (Math.cosh(1) - 1), 1e-9);
     expect(seg.uy).toBe(0);
     expect(seg.dy).toBe(0);
   });
@@ -152,7 +154,7 @@ describe('hyperbolicSegment', () => {
     const r = rng(3);
     let worst = 0;
     for (let i = 0; i < 10000; i++) {
-      const U = 300 * r();
+      const U = 3 * C * r();
       const th = 2 * Math.PI * r();
       const ph = 2 * Math.PI * r();
       const a = A * (0.05 + r());
@@ -173,10 +175,11 @@ describe('hyperbolicSegment', () => {
   // (En poussée oblique, deux demi-segments diffèrent d'un segment entier : la direction
   // de poussée est relue dans un référentiel comobile différent, rotation de Wigner.)
   it('poussée colinéaire : 300 segments de 0,01 s = un segment de 3 s', () => {
-    const one = hyperbolicSegment(50, 0, 7, 0, 3);
-    let s = { ux: 50, uy: 0, x: 0, t: 0 };
+    const [u0, a] = [0.5 * C, 0.7 * A];
+    const one = hyperbolicSegment(u0, 0, a, 0, 3);
+    let s = { ux: u0, uy: 0, x: 0, t: 0 };
     for (let i = 0; i < 300; i++) {
-      const seg = hyperbolicSegment(s.ux, s.uy, 7, 0, 0.01);
+      const seg = hyperbolicSegment(s.ux, s.uy, a, 0, 0.01);
       s = { ux: seg.ux, uy: seg.uy, x: s.x + seg.dx, t: s.t + seg.dt };
     }
     expectNear(s.ux, one.ux, 1e-10);
@@ -185,7 +188,7 @@ describe('hyperbolicSegment', () => {
   });
 
   it('poussée oblique : â fixe dans le référentiel comobile initial (Fermi-Walker), découpage non indifférent', () => {
-    const [ux, uy, ax, ay, h] = [100, 0, 0, 10, 2];
+    const [ux, uy, ax, ay, h] = [C, 0, 0, A, 2];
     const one = hyperbolicSegment(ux, uy, ax, ay, h);
     // Hyperbole dans le référentiel comobile initial (boost pur de u₀), puis boost vers le monde.
     const a = Math.hypot(ax, ay);
@@ -213,12 +216,12 @@ describe('hyperbolicSegment', () => {
   });
 
   it('sans poussée : roue libre exacte (Δx = u·h, Δt = γ·h)', () => {
-    const seg = hyperbolicSegment(40, -30, 0, 0, 2);
-    expect(seg.ux).toBe(40);
-    expect(seg.uy).toBe(-30);
-    expectNear(seg.dx, 80, 1e-12);
-    expectNear(seg.dy, -60, 1e-12);
-    expectNear(seg.dt, 2 * gammaFromU(40, -30), 1e-12);
+    const seg = hyperbolicSegment(0.4 * C, -0.3 * C, 0, 0, 2);
+    expect(seg.ux).toBe(0.4 * C);
+    expect(seg.uy).toBe(-0.3 * C);
+    expectNear(seg.dx, 0.8 * C, 1e-12);
+    expectNear(seg.dy, -0.6 * C, 1e-12);
+    expectNear(seg.dt, 2 * gammaFromU(0.4 * C, -0.3 * C), 1e-12);
   });
 
   it('frein colinéaire : la rapidité baisse de a·h/c', () => {
@@ -321,7 +324,38 @@ describe('aberration et Doppler', () => {
   });
 
   it('emissionTimeStatic : t − d/c', () => {
-    expect(emissionTimeStatic(10, 300)).toBe(7);
+    expect(emissionTimeStatic(10, 300)).toBe(10 - 300 / C); // 0 à c = 30 m/s
     expect(emissionTimeStatic(5, 0)).toBe(5);
+  });
+});
+
+describe('constantes injectées (paramètre c facultatif)', () => {
+  it('c = 100, a = 10 (cahier des charges) : v = 76,159416 m/s, t = 11,752012 s, x = 543,080635 m', () => {
+    const seg = hyperbolicSegment(0, 0, 10, 0, 10, 100);
+    expectNear(velocityFromU(seg.ux, seg.uy, 100).x, 76.159416, 1e-6);
+    expectNear(seg.dt, 11.752012, 1e-6);
+    expectNear(seg.dx, 543.080635, 1e-6);
+    expectNear(rapidityFromU(seg.ux, seg.uy, 100), 1, 1e-15);
+    expectNear(gammaFromU(seg.ux, seg.uy, 100), Math.cosh(1), 1e-14);
+  });
+
+  it('pour c = 10, 30 et 100 : mêmes résultats sans dimension (β, γ, φ, temps), longueurs ∝ c', () => {
+    const ref = hyperbolicSegment(0.4 * 30, 0.2 * 30, 0.6 * 3, -0.3 * 3, 2.5, 30);
+    for (const c of [10, 30, 57, 100]) {
+      const k = c / 30;
+      const seg = hyperbolicSegment(0.4 * c, 0.2 * c, 0.06 * c, -0.03 * c, 2.5, c);
+      expectNear(seg.ux / c, ref.ux / 30, 1e-14);
+      expectNear(seg.uy / c, ref.uy / 30, 1e-14);
+      expectNear(seg.dx, k * ref.dx, 1e-12 * c);
+      expectNear(seg.dt, ref.dt, 1e-14);
+      const v = velocityFromU(0.9 * c, 0.1 * c, c);
+      expectNear(Math.hypot(v.x, v.y) / c, Math.tanh(rapidityFromU(0.9 * c, 0.1 * c, c)), 1e-15);
+      const u = uFromVelocity(v.x, v.y, c);
+      expectNear(u.x, 0.9 * c, 1e-12 * c);
+      expect(() => uFromVelocity(c, 0, c)).toThrow(RangeError);
+      const w = composeVelocities({ x: 0.5 * c, y: 0 }, { x: 0.5 * c, y: 0 }, c);
+      expectNear(w.x, 0.8 * c, 1e-12 * c); // (0,5 + 0,5)/(1 + 0,25) = 0,8
+      expect(emissionTimeStatic(10, 3 * c, c)).toBe(7);
+    }
   });
 });

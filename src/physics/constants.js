@@ -5,15 +5,47 @@
  * y vers le nord, z vers le haut. Le rendu Three.js utilise X = x, Y = z, Z = −y.
  */
 
-/** Vitesse de la lumière dans la ville (m/s). */
-export const C = 100;
+/**
+ * Vitesse de la lumière : un RÉGLAGE DU JOUEUR (décision du 2026-10-11), entier de C_MIN à
+ * C_MAX m/s, C_DEFAULT par défaut. Toute la partie lit ses constantes physiques dans
+ * `physicsFor(c)` ; le moteur garde c/a = TIME_UNIT = 10 s (même rythme de jeu quel que soit
+ * c), si bien que a = c/10 et que l'unité de longueur vaut L = c²/a = 10·c mètres.
+ */
+export const C_DEFAULT = 30;
+export const C_MIN = 10;
+export const C_MAX = 100;
 
-/** Accélération propre maximale du moteur (m/s²). */
-export const A = 10;
+/** Unité naturelle de temps c/a (s), la même pour tous les réglages de c. */
+export const TIME_UNIT = 10;
 
-/** Unités naturelles : c²/a = 1 000 m et c/a = 10 s. */
-export const LENGTH_UNIT = (C * C) / A;
-export const TIME_UNIT = C / A;
+/**
+ * @typedef {{c: number, a: number, lengthUnit: number}} PhysicsConstants
+ * c : vitesse de la lumière (m/s) ; a : accélération propre maximale du moteur (m/s²) ;
+ * lengthUnit : L = c²/a (m).
+ */
+
+/**
+ * Constantes physiques d'une partie pour la vitesse de la lumière c.
+ * @param {number} c entier de C_MIN à C_MAX (m/s)
+ * @returns {Readonly<PhysicsConstants>} {c, a = c/TIME_UNIT, lengthUnit = c·TIME_UNIT}
+ */
+export function physicsFor(c) {
+  if (!(Number.isInteger(c) && c >= C_MIN && c <= C_MAX)) {
+    throw new RangeError(`Vitesse de la lumière : entier de ${C_MIN} à ${C_MAX} m/s attendu (reçu : ${c})`);
+  }
+  return Object.freeze({ c, a: c / TIME_UNIT, lengthUnit: c * TIME_UNIT });
+}
+
+/** Constantes physiques du réglage par défaut (c = 30 m/s, a = 3 m/s², L = 300 m). */
+export const DEFAULT_PHYSICS = physicsFor(C_DEFAULT);
+
+/**
+ * Valeurs par défaut des fonctions physiques quand aucune constante n'est injectée
+ * (= DEFAULT_PHYSICS). Le jeu, lui, passe toujours les constantes de la partie.
+ */
+export const C = DEFAULT_PHYSICS.c;
+export const A = DEFAULT_PHYSICS.a;
+export const LENGTH_UNIT = DEFAULT_PHYSICS.lengthUnit;
 
 /**
  * Plafond de rapidité φ (v = c·tanh φ, γ = cosh φ). Valeur par défaut et borne
@@ -26,7 +58,10 @@ export const PHI_MAX_LIMIT = 3;
 /** Plafond du temps propre simulé par image (s) : on ne simule pas un joueur absent. */
 export const MAX_FRAME_DT = 0.1;
 
-/** Sous-pas internes de l'intégrateur : au plus 1/60 s et au plus 1 m parcouru. */
+/**
+ * Sous-pas internes de l'intégrateur : au plus 1/60 s et au plus 1 m parcouru (à l'échelle
+ * humaine, indépendant de c).
+ */
 export const SUBSTEP_MAX_DT = 1 / 60;
 export const SUBSTEP_MAX_DIST = 1;
 
@@ -34,8 +69,10 @@ export const SUBSTEP_MAX_DIST = 1;
  * Conduite « arcade » (choix de l'auteur) : la route fournit la force latérale,
  * hors du budget du moteur. Le virage fait tourner la vitesse propre u à |u|
  * constant, au taux dθ/dτ = −steer·TURN_RATE (rad par seconde de temps propre ; steer > 0 :
- * à droite, θ diminue). Rayon dans la ville, volant à fond : r = |u|/TURN_RATE
- * (117 m à 76 m/s, 206 m à 90 m/s).
+ * à droite, θ diminue). Rayon dans la ville, volant à fond : r = |u|/TURN_RATE = γv/TURN_RATE,
+ * proportionnel à c à β donné : 0,117·L à β = 0,76 et 0,206·L à β = 0,9 (L = 10·c m), soit
+ * 35 m et 62 m à c = 30 m/s, 117 m et 206 m à c = 100 m/s. Le taux, en rad par seconde,
+ * ne dépend pas de c (les temps du jeu sont les mêmes pour tout c).
  */
 export const TURN_RATE = 1.0;
 /** Taux de pivot à l'arrêt (rad/s), pour se réorienter sans avancer. */

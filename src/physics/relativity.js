@@ -2,9 +2,13 @@
 /**
  * Relativité restreinte du jeu (module pur : ni DOM, ni three).
  *
- * Unités SI, c = C = 100 m/s. Les vitesses « propres » u = γv (m/s) servent d'état
- * à l'intégrateur : |v| = |u|/√(1 + |u|²/c²) reste sous c pour tout u fini (en
- * float64, tant que la rapidité reste en deçà de ≈ 18 ; le jeu la plafonne à 3).
+ * Unités SI. La vitesse de la lumière c est un réglage de la partie (physicsFor dans
+ * constants.js) : chaque fonction qui en dépend la reçoit en DERNIER paramètre, facultatif
+ * (défaut : C, celle du réglage par défaut, 30 m/s). Les fonctions sans dimension (Doppler,
+ * aberration : β sans unité) n'en dépendent pas.
+ * Les vitesses « propres » u = γv (m/s) servent d'état à l'intégrateur : |v| =
+ * |u|/√(1 + |u|²/c²) reste sous c pour tout u fini (en float64, tant que la rapidité reste
+ * en deçà de ≈ 18 ; le jeu la plafonne à 3).
  *
  * Reprises d'OpenRelativity, réécrites :
  * - `composeVelocities` : addition relativiste des vitesses de MovementScripts.cs:164-183
@@ -15,8 +19,6 @@
  * Ajouts propres au jeu : segment hyperbolique exact, aberration inverse (ciel).
  */
 import { C } from './constants.js';
-
-const C2 = C * C;
 
 /**
  * sinh(e)/e sans division par zéro ni perte de précision près de 0.
@@ -34,19 +36,21 @@ function sinhc(e) {
  * Facteur de Lorentz γ = √(1 + |u|²/c²) d'une vitesse propre u.
  * @param {number} ux
  * @param {number} uy
+ * @param {number} [c] vitesse de la lumière (m/s)
  */
-export function gammaFromU(ux, uy) {
-  return Math.sqrt(1 + (ux * ux + uy * uy) / C2);
+export function gammaFromU(ux, uy, c = C) {
+  return Math.sqrt(1 + (ux * ux + uy * uy) / (c * c));
 }
 
 /**
  * Vitesse v = u/γ (m/s) d'une vitesse propre u.
  * @param {number} ux
  * @param {number} uy
+ * @param {number} [c] vitesse de la lumière (m/s)
  * @returns {{x: number, y: number}}
  */
-export function velocityFromU(ux, uy) {
-  const g = gammaFromU(ux, uy);
+export function velocityFromU(ux, uy, c = C) {
+  const g = gammaFromU(ux, uy, c);
   return { x: ux / g, y: uy / g };
 }
 
@@ -54,11 +58,12 @@ export function velocityFromU(ux, uy) {
  * Vitesse propre u = γv d'une vitesse v (m/s). Lève une erreur si |v| ≥ c.
  * @param {number} vx
  * @param {number} vy
+ * @param {number} [c] vitesse de la lumière (m/s)
  * @returns {{x: number, y: number}}
  */
-export function uFromVelocity(vx, vy) {
-  const b2 = (vx * vx + vy * vy) / C2;
-  if (!(b2 < 1)) throw new RangeError(`Vitesse supérieure ou égale à c : |v| = ${Math.sqrt(b2) * C} m/s`);
+export function uFromVelocity(vx, vy, c = C) {
+  const b2 = (vx * vx + vy * vy) / (c * c);
+  if (!(b2 < 1)) throw new RangeError(`Vitesse supérieure ou égale à c : |v| = ${Math.sqrt(b2) * c} m/s`);
   const g = 1 / Math.sqrt(1 - b2);
   return { x: g * vx, y: g * vy };
 }
@@ -67,9 +72,10 @@ export function uFromVelocity(vx, vy) {
  * Rapidité φ = asinh(|u|/c) : v = c·tanh φ, γ = cosh φ. Elle s'additionne en ligne droite.
  * @param {number} ux
  * @param {number} uy
+ * @param {number} [c] vitesse de la lumière (m/s)
  */
-export function rapidityFromU(ux, uy) {
-  return Math.asinh(Math.hypot(ux, uy) / C);
+export function rapidityFromU(ux, uy, c = C) {
+  return Math.asinh(Math.hypot(ux, uy) / c);
 }
 
 /**
@@ -79,18 +85,20 @@ export function rapidityFromU(ux, uy) {
  *   v ⊕ w = (v + w∥ + w⊥/γ_v)/(1 + v·w/c²), w∥ et w⊥ relatifs à la direction de v.
  * @param {{x: number, y: number}} v vitesse du référentiel (m/s), |v| < c
  * @param {{x: number, y: number}} w vitesse dans ce référentiel (m/s), |w| < c
+ * @param {number} [c] vitesse de la lumière (m/s)
  * @returns {{x: number, y: number}}
  */
-export function composeVelocities(v, w) {
+export function composeVelocities(v, w, c = C) {
+  const c2 = c * c;
   const v2 = v.x * v.x + v.y * v.y;
-  if (!(v2 < C2)) throw new RangeError('composeVelocities : |v| doit rester sous c');
+  if (!(v2 < c2)) throw new RangeError('composeVelocities : |v| doit rester sous c');
   const vw = v.x * w.x + v.y * w.y;
-  const invGamma = Math.sqrt(1 - v2 / C2);
+  const invGamma = Math.sqrt(1 - v2 / c2);
   // Composantes de w parallèle et perpendiculaire à v (tout w est « perpendiculaire » si v = 0).
   const k = v2 > 0 ? vw / v2 : 0;
   const parX = k * v.x;
   const parY = k * v.y;
-  const den = 1 + vw / C2;
+  const den = 1 + vw / c2;
   return {
     x: (v.x + parX + (w.x - parX) * invGamma) / den,
     y: (v.y + parY + (w.y - parY) * invGamma) / den,
@@ -117,13 +125,15 @@ export function composeVelocities(v, w) {
  * @param {number} ax poussée propre (m/s²)
  * @param {number} ay
  * @param {number} h durée en temps propre (s), h ≥ 0
+ * @param {number} [c] vitesse de la lumière (m/s)
  * @returns {{ux: number, uy: number, dx: number, dy: number, dt: number}}
  */
-export function hyperbolicSegment(ux, uy, ax, ay, h) {
-  const eta = (Math.hypot(ax, ay) * h) / C;
-  const g0 = gammaFromU(ux, uy);
+export function hyperbolicSegment(ux, uy, ax, ay, h, c = C) {
+  const c2 = c * c;
+  const eta = (Math.hypot(ax, ay) * h) / c;
+  const g0 = gammaFromU(ux, uy, c);
   const au = ax * ux + ay * uy;
-  const k = au / (C2 * (g0 + 1));
+  const k = au / (c2 * (g0 + 1));
   const accX = ax + k * ux;
   const accY = ay + k * uy;
   const s = sinhc(eta);
@@ -136,7 +146,7 @@ export function hyperbolicSegment(ux, uy, ax, ay, h) {
     uy: Math.cosh(eta) * uy + hs * accY,
     dx: hs * ux + h2k * accX,
     dy: hs * uy + h2k * accY,
-    dt: hs * g0 + (h2k * au) / C2,
+    dt: hs * g0 + (h2k * au) / c2,
   };
 }
 
@@ -205,7 +215,8 @@ export function aberrateInverse(beta, nApparent) {
  * immobile situé à la distance d (m) : t − d/c.
  * @param {number} t
  * @param {number} d
+ * @param {number} [c] vitesse de la lumière (m/s)
  */
-export function emissionTimeStatic(t, d) {
-  return t - d / C;
+export function emissionTimeStatic(t, d, c = C) {
+  return t - d / c;
 }

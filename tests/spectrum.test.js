@@ -42,13 +42,18 @@ import {
   blackbodyRow,
   ADAPTATION_REFERENCE,
   SKY_CLEAR_ROW,
+  C,
 } from '../src/physics/constants.js';
 
 /* ---------------------------- Outils de référence ---------------------------- */
 
-/** Facteur Doppler d'une source vue de face à la vitesse v (m/s), c = 100 m/s. */
-const dopplerHeadOn = (v) => {
-  const beta = v / 100;
+/**
+ * Facteur Doppler d'une source vue de face à la vitesse v (m/s), c = C (réglage par défaut,
+ * 30 m/s). Les couleurs ne dépendent que de β = v/c : les vitesses des tests sont écrites
+ * β·C (à c = 100 m/s, β = 0,9 était « 90 m/s »).
+ */
+const dopplerHeadOn = (v, c = C) => {
+  const beta = v / c;
   return Math.sqrt((1 + beta) / (1 - beta));
 };
 
@@ -306,7 +311,7 @@ describe('gamut, projecteur, tone mapping', () => {
     expect(beamFactor(1.2)).toBeCloseTo(1.2 ** 4, 12);
     expect(beamFactor(0.5)).toBeCloseTo(0.0625, 12);
     expect(beamFactor(9)).toBe(BEAM_MAX);
-    expect(beamFactor(4.36)).toBeCloseTo(4.36 ** 4, 9); // 90 m/s de face : D⁴ non borné
+    expect(beamFactor(4.36)).toBeCloseTo(4.36 ** 4, 9); // β = 0,9 de face : D⁴ non borné
     expect(beamFactor(2, 2, 10)).toBe(4);
   });
 
@@ -374,9 +379,10 @@ describe('classifyHue', () => {
   });
 
   it('lampe à 640 nm : « vert » exactement quand λ₀/D ∈ [510 ; 562] nm (±3 nm), balayage fin de v', () => {
-    const greenSpeeds = [];
+    const greenSteps = [];
+    const dBeta = 5e-5;
     for (let i = 0; i <= 8000; i++) {
-      const v = i * 0.005; // 0 à 40 m/s
+      const v = i * dBeta * C; // β de 0 à 0,4 (0 à 12 m/s à c = 30)
       const D = dopplerHeadOn(v);
       const lambdaSeen = 640 / D;
       const isGreen = classifyHue(perceivedColor({ kind: 'line', lambda: 640 }, D)) === 'vert';
@@ -385,18 +391,20 @@ describe('classifyHue', () => {
       expect(classifyHue(adapted) === 'vert', `v = ${v} m/s (adaptation)`).toBe(isGreen);
       if (lambdaSeen >= 513 && lambdaSeen <= 559) expect(isGreen, `v = ${v} m/s`).toBe(true);
       if (lambdaSeen < 507 || lambdaSeen > 565) expect(isGreen, `v = ${v} m/s`).toBe(false);
-      if (isGreen) greenSpeeds.push(v);
+      if (isGreen) greenSteps.push(i);
     }
-    // une seule plage, v ≈ [12,9 ; 22,3] m/s
-    const lo = greenSpeeds[0];
-    const hi = greenSpeeds[greenSpeeds.length - 1];
-    expect(greenSpeeds.length).toBe(Math.round((hi - lo) / 0.005) + 1);
+    // une seule plage, β ≈ [0,129 ; 0,223] : v ≈ [3,9 ; 6,7] m/s à c = 30 ([12,9 ; 22,3] à c = 100)
+    expect(greenSteps.length).toBe(greenSteps[greenSteps.length - 1] - greenSteps[0] + 1);
+    const lo = greenSteps[0] * dBeta * C;
+    const hi = greenSteps[greenSteps.length - 1] * dBeta * C;
     expect(640 / dopplerHeadOn(lo)).toBeGreaterThan(559);
     expect(640 / dopplerHeadOn(lo)).toBeLessThan(565);
     expect(640 / dopplerHeadOn(hi)).toBeGreaterThan(507);
     expect(640 / dopplerHeadOn(hi)).toBeLessThan(513);
-    expect(lo).toBeCloseTo(12.9, 0);
-    expect(hi).toBeCloseTo(22.3, 0);
+    expect(lo / C).toBeCloseTo(0.129, 2);
+    expect(hi / C).toBeCloseTo(0.223, 2);
+    expect(lo).toBeCloseTo(3.87, 1);
+    expect(hi).toBeCloseTo(6.69, 1);
     // au repos la lampe est rouge
     expect(classifyHue(perceivedColor({ kind: 'line', lambda: 640 }, 1))).toBe('rouge');
   });
@@ -558,8 +566,8 @@ describe('préréglage OpenRelativity (comparaison)', () => {
     expect(constrainRgbOpenRelativity([2, 1, 0])).toEqual([1, 0.5, 0]);
   });
 
-  it('s\'éteint de face vers 54 m/s, contrairement au modèle du jeu', () => {
-    const D = dopplerHeadOn(54);
+  it('s\'éteint de face vers β = 0,54, contrairement au modèle du jeu', () => {
+    const D = dopplerHeadOn(0.54 * C);
     expect(luminance(openRelativityColor([1, 1, 1], D))).toBeLessThan(0.02);
     const ours = luminance(apply(colorMatrix(D), [1, 1, 1, 0.3, 0.3])) * beamFactor(D);
     expect(ours).toBeGreaterThan(0.2);
@@ -569,15 +577,15 @@ describe('préréglage OpenRelativity (comparaison)', () => {
 describe('projecteur physique et adaptation (revue J1)', () => {
   const lumAhead = (rho, D) => luminance(gamutMap(apply(colorMatrix(D), rho))) * beamFactor(D);
 
-  it('façades de face : plus lumineuses à 90 m/s qu’à 48 m/s (BEAM_MAX = 8 inversait l’ordre)', () => {
+  it('façades de face : plus lumineuses à β = 0,9 qu’à β = 0,477 (BEAM_MAX = 8 inversait l’ordre)', () => {
     for (const hex of [...Object.values(FACADES), 'EDE6D6']) {
       const rho = [...srgbHexToLinear(hex), 0.3, 0.1];
-      const at48 = lumAhead(rho, dopplerHeadOn(47.7));
-      const at90 = lumAhead(rho, dopplerHeadOn(90));
+      const at48 = lumAhead(rho, dopplerHeadOn(0.477 * C));
+      const at90 = lumAhead(rho, dopplerHeadOn(0.9 * C));
       expect(at90 / at48, hex).toBeGreaterThan(3);
-      // l'ancienne borne : 90 m/s plus sombre que 48 m/s
+      // l'ancienne borne : β = 0,9 plus sombre que β = 0,477
       const old = (D) => luminance(gamutMap(apply(colorMatrix(D), rho))) * beamFactor(D, 4, 8);
-      expect(old(dopplerHeadOn(90)) / old(dopplerHeadOn(47.7)), hex).toBeLessThan(0.5);
+      expect(old(dopplerHeadOn(0.9 * C)) / old(dopplerHeadOn(0.477 * C)), hex).toBeLessThan(0.5);
     }
   });
 
@@ -586,8 +594,8 @@ describe('projecteur physique et adaptation (revue J1)', () => {
     expect(adaptationExposure(0.5)).toBe(1);
     const rest = luminance(ADAPTATION_REFERENCE);
     let previous = 1;
-    for (const v of [5, 20, 30, 50, 76.16, 90, 95]) {
-      const D = dopplerHeadOn(v);
+    for (const beta of [0.05, 0.2, 0.3, 0.5, 0.7616, 0.9, 0.95]) {
+      const D = dopplerHeadOn(beta * C);
       const E = adaptationExposure(D);
       expect(E).toBeLessThan(previous);
       previous = E;

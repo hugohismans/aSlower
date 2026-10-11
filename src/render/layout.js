@@ -13,8 +13,10 @@
  *   schema       "coursier-scene/1"
  *   id, titre, description
  *   graine       entier
+ *   parametres   {nom: longueur, …}                       (facultatif ; voir « Longueurs de jeu »)
  *   limites      {min: [x, y], max: [x, y]}               (facultatif)
- *   visibilite   {lite: m, defaut: m}                     (brouillard opaque à cette distance)
+ *   visibilite   {lite: m, defaut: m}                     (facultatif : brouillard opaque à cette
+ *                distance ; par défaut `visibilityFor(L)`)
  *   depart       {pos: [x, y], capDegres}                 (0 = est, 90 = nord, sens trigonométrique)
  *   rues[]       {id, nom?, de: [x, y], a: [x, y], largeur, repeter?: {nombre, pas: [dx, dy]}}
  *                largeur = chaussée ; streetMap.js ajoute 3 m de trottoir de chaque côté
@@ -33,6 +35,19 @@
  *                  du bord de la chaussée au lampadaire, sur le trottoir),
  *                  cotes? ("deux" | "gauche" | "droite")}
  *
+ * Longueurs de jeu (scènes paramétriques) : la vitesse de la lumière est un réglage du
+ * joueur, et les distances « de jeu » (longueur d'une avenue, départ, butée, taille d'un
+ * quartier) suivent l'unité naturelle L = c²/a = 10·c m. Partout où un nombre est attendu
+ * (coordonnée, longueur, nombre de répétitions), la scène peut donner une EXPRESSION :
+ *   {fois: k, de?: "L" | nom d'un paramètre, plus?: b, min?: m, max?: M,
+ *    arrondiSup?: p, arrondiInf?: p, puisPlus?: b2}
+ *   valeur = borne(k·base + b, m, M), arrondie au multiple de p supérieur (ou inférieur),
+ *   puis + b2.
+ * Paramètres prédéfinis : L et `visibilite` (= visibilityFor(L).default). `parametres` en
+ * définit d'autres, évalués dans l'ordre (chacun peut utiliser les précédents). Un nombre de
+ * répétitions doit valoir un entier. Les éléments à l'échelle humaine (îlots, rues,
+ * hauteurs, lampadaires) restent en mètres.
+ *
  * Îlots et chunks : chaque îlot d'une rangée, et chaque bâtiment isolé, reçoit un
  * `blockId`. Le maillage fait un chunk par blockId (render/cityMesher.js). Un
  * bâtiment n'est jamais coupé, et deux bâtiments qui se touchent finissent
@@ -43,7 +58,7 @@
  * les bords communs de deux bâtiments mitoyens sont alors des valeurs identiques,
  * et centre ± demi-taille les redonne exactement en virgule flottante.
  */
-import { BLACKBODY_TEMPERATURES, EYE_HEIGHT } from '../physics/constants.js';
+import { BLACKBODY_TEMPERATURES, EYE_HEIGHT, LENGTH_UNIT } from '../physics/constants.js';
 
 export const SCENE_SCHEMA = 'coursier-scene/1';
 
@@ -62,8 +77,29 @@ export const MIN_BUILDING_HEIGHT = Math.ceil((EYE_HEIGHT + 1) / LAYOUT_GRID) * L
 export const DEFAULT_IR = 0.3;
 export const DEFAULT_UV = 0.15;
 
-/** Visibilité par défaut si la scène n'en donne pas (m). */
-export const DEFAULT_VISIBILITY = Object.freeze({ lite: 400, default: 600 });
+/**
+ * Visibilité par défaut (brouillard opaque, m) : proportionnelle à L, bornée.
+ * - défaut = clamp(1,2·L, 300, 600). Proportionnelle à L, elle garde le même temps de lecture
+ *   de la route à β donné (1,2·L est parcouru en 12/β s) ; le plancher de 300 m garde au moins
+ *   quatre îlots de 80 m lisibles à petit c (c ≤ 25 m/s), le plafond de 600 m est le budget
+ *   d'appels de dessin mesuré au jalon 1 (quartier : 211 appels sur l'iPhone 14 Pro Max).
+ *   c = 30 m/s : 360 m ; c = 10 m/s : 300 m ; c ≥ 50 m/s : 600 m (valeur du jalon 1).
+ * - lite = 0,7 × défaut (profil d'après plantage : moitié moins d'îlots dans le disque).
+ */
+export const VISIBILITY_PER_L = 1.2;
+export const VISIBILITY_MIN = 300;
+export const VISIBILITY_MAX = 600;
+export const VISIBILITY_LITE_RATIO = 0.7;
+
+/**
+ * Visibilité par défaut pour l'unité de longueur L (m).
+ * @param {number} lengthUnit L = c²/a (m)
+ * @returns {{lite: number, default: number}}
+ */
+export function visibilityFor(lengthUnit) {
+  const v = Math.min(Math.max(VISIBILITY_PER_L * lengthUnit, VISIBILITY_MIN), VISIBILITY_MAX);
+  return { lite: Math.round(VISIBILITY_LITE_RATIO * v), default: v };
+}
 
 const SIDES = ['sud', 'nord', 'ouest', 'est'];
 const TOL = 1e-6;
@@ -496,6 +532,78 @@ function contentBounds(buildings, streets, lamps) {
 }
 
 /* ------------------------------------------------------------------------- */
+/* Longueurs de jeu (expressions en L)                                        */
+/* ------------------------------------------------------------------------- */
+
+/** Propriété propre (Object.hasOwn est ES2022 ; la cible est es2020). */
+const hasOwn = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
+
+const EXPRESSION_KEYS = new Set(['fois', 'de', 'plus', 'min', 'max', 'arrondiSup', 'arrondiInf', 'puisPlus']);
+
+/** Une expression est un objet qui porte la clé `fois`. */
+const isExpression = (v) => v !== null && typeof v === 'object' && !Array.isArray(v) && hasOwn(v, 'fois');
+
+/**
+ * Valeur d'une expression de longueur (voir l'en-tête du module).
+ * @param {any} e
+ * @param {Record<string, number>} params
+ * @param {string} where
+ */
+function evalLength(e, params, where) {
+  for (const key of Object.keys(e)) need(EXPRESSION_KEYS.has(key), `${where} : clé « ${key} » inconnue dans une expression`);
+  const base = e.de ?? 'L';
+  need(hasOwn(params, base), `${where} : paramètre « ${base} » inconnu`);
+  need(isNum(e.fois), `${where}.fois : nombre attendu`);
+  for (const key of ['plus', 'min', 'max', 'arrondiSup', 'arrondiInf', 'puisPlus']) {
+    if (e[key] !== undefined) need(isNum(e[key]), `${where}.${key} : nombre attendu`);
+  }
+  let v = e.fois * params[base] + (e.plus ?? 0);
+  if (e.min !== undefined) v = Math.max(v, e.min);
+  if (e.max !== undefined) v = Math.min(v, e.max);
+  if (e.arrondiSup !== undefined) {
+    need(e.arrondiSup > 0, `${where}.arrondiSup : pas positif attendu`);
+    v = Math.ceil(v / e.arrondiSup - 1e-9) * e.arrondiSup;
+  }
+  if (e.arrondiInf !== undefined) {
+    need(e.arrondiInf > 0, `${where}.arrondiInf : pas positif attendu`);
+    v = Math.floor(v / e.arrondiInf + 1e-9) * e.arrondiInf;
+  }
+  v += e.puisPlus ?? 0;
+  return Math.round(v * 1e6) / 1e6; // au micromètre : 0,025 × 400 redonne l'entier 10
+}
+
+/**
+ * Remplace les expressions de la scène par leur valeur pour l'unité de longueur L.
+ * @param {any} scene
+ * @param {number} lengthUnit
+ * @returns {any} copie de la scène (sans `parametres`), toutes longueurs en mètres
+ */
+export function resolveSceneLengths(scene, lengthUnit) {
+  need(isNum(lengthUnit) && lengthUnit > 0, `Unité de longueur L positive attendue (reçu : ${lengthUnit})`);
+  /** @type {Record<string, number>} */
+  const params = { L: lengthUnit, visibilite: visibilityFor(lengthUnit).default };
+  const defs = scene.parametres ?? {};
+  need(defs && typeof defs === 'object' && !Array.isArray(defs), 'parametres : objet {nom: expression} attendu');
+  for (const [name, def] of Object.entries(defs)) {
+    need(!hasOwn(params, name), `parametres.${name} : nom déjà pris`);
+    params[name] = isExpression(def) ? evalLength(def, params, `parametres.${name}`) : def;
+    need(isNum(params[name]), `parametres.${name} : nombre ou expression attendu`);
+  }
+  const walk = (v, where) => {
+    if (isExpression(v)) return evalLength(v, params, where);
+    if (Array.isArray(v)) return v.map((x, i) => walk(x, `${where}[${i}]`));
+    if (v !== null && typeof v === 'object') {
+      const out = {};
+      for (const [k, x] of Object.entries(v)) out[k] = walk(x, where ? `${where}.${k}` : k);
+      return out;
+    }
+    return v;
+  };
+  const { parametres: _ignored, ...rest } = scene;
+  return walk(rest, '');
+}
+
+/* ------------------------------------------------------------------------- */
 /* Point d'entrée                                                             */
 /* ------------------------------------------------------------------------- */
 
@@ -509,19 +617,22 @@ function contentBounds(buildings, streets, lamps) {
  */
 
 /**
- * Développe une scène JSON.
- * @param {any} scene contenu d'un fichier de src/data/scenes/
+ * Développe une scène JSON pour l'unité de longueur L de la partie.
+ * @param {any} sceneJson contenu d'un fichier de src/data/scenes/
  * @param {Record<string, {srgb: string, ir?: number, uv?: number}>} palette src/data/palette.json
+ * @param {{lengthUnit?: number}} [options] L = c²/a (m) ; défaut : LENGTH_UNIT (réglage par défaut)
  * @returns {{buildings: Building[], lamps: Lamp[], streets: Street[],
  *            start: {x: number, y: number, heading: number},
  *            visibility: {lite: number, default: number},
- *            bounds: {xmin: number, ymin: number, xmax: number, ymax: number}}}
+ *            bounds: {xmin: number, ymin: number, xmax: number, ymax: number},
+ *            lengthUnit: number}}
  */
-export function expandScene(scene, palette) {
-  need(scene && typeof scene === 'object', 'Scène absente');
-  const name = scene.id ?? 'scène';
-  need(scene.schema === SCENE_SCHEMA, `Scène « ${name} » : schéma « ${scene.schema} » au lieu de « ${SCENE_SCHEMA} »`);
+export function expandScene(sceneJson, palette, { lengthUnit = LENGTH_UNIT } = {}) {
+  need(sceneJson && typeof sceneJson === 'object', 'Scène absente');
+  const name = sceneJson.id ?? 'scène';
+  need(sceneJson.schema === SCENE_SCHEMA, `Scène « ${name} » : schéma « ${sceneJson.schema} » au lieu de « ${SCENE_SCHEMA} »`);
   need(palette && typeof palette === 'object', `Scène « ${name} » : palette absente`);
+  const scene = resolveSceneLengths(sceneJson, lengthUnit);
   const seed = Number.isInteger(scene.graine) ? scene.graine : 0;
 
   const { list: streets, byId } = expandStreets(scene.rues ?? []);
@@ -538,9 +649,10 @@ export function expandScene(scene, palette) {
   const start = { x: pos[0], y: pos[1], heading: (capDegrees / 180) * Math.PI };
 
   const vis = scene.visibilite ?? {};
+  const fallback = visibilityFor(lengthUnit);
   const visibility = {
-    lite: isNum(vis.lite) ? vis.lite : DEFAULT_VISIBILITY.lite,
-    default: isNum(vis.defaut) ? vis.defaut : DEFAULT_VISIBILITY.default,
+    lite: isNum(vis.lite) ? vis.lite : fallback.lite,
+    default: isNum(vis.defaut) ? vis.defaut : fallback.default,
   };
 
   const lim = scene.limites;
@@ -549,5 +661,5 @@ export function expandScene(scene, palette) {
       ? { xmin: lim.min[0], ymin: lim.min[1], xmax: lim.max[0], ymax: lim.max[1] }
       : contentBounds(buildings, streets, lamps);
 
-  return { buildings, lamps, streets, start, visibility, bounds };
+  return { buildings, lamps, streets, start, visibility, bounds, lengthUnit };
 }

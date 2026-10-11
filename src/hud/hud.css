@@ -122,6 +122,17 @@
   gap: 8px;
 }
 
+/* Rappel du réglage de c, sous la jauge. */
+.hud-c {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.2;
+  text-align: right;
+  white-space: nowrap;
+}
+
 .hud-speed-value {
   min-width: 8ch;
   font-size: 22px;
@@ -195,7 +206,7 @@
   box-shadow: 0 0 0 1px var(--bg);
 }
 
-/* Mur hachuré à c = 100 m/s : la vitesse ne l'atteint jamais. */
+/* Mur hachuré à c (vitesse de la lumière de la partie) : la vitesse ne l'atteint jamais. */
 .gauge-wall {
   position: relative;
   display: flex;

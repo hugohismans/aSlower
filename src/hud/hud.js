@@ -5,15 +5,24 @@
  *   ville » (t, les délais), avec la pastille d'écart t − τ : rouge pleine avec ▲
  *   quand γ > 1,02 (l'écart se creuse), grise sous 1,01.
  * - Phrase γ en langage simple (« La ville va ×4 plus vite que toi »).
- * - Jauge de vitesse linéaire avec un mur hachuré à c = 100 m/s : à poussée
- *   constante, l'aiguille ralentit en approchant du mur (l'asymptote).
+ * - Jauge de vitesse linéaire avec un mur hachuré à c (vitesse de la lumière de la partie,
+ *   réglage du joueur, lue dans snapshot.c) : à poussée constante, l'aiguille ralentit en
+ *   approchant du mur (l'asymptote). Sous la jauge, le rappel « c = 30 m/s ».
  *
  * Performances : textes rafraîchis à 12 Hz et écrits seulement s'ils changent ;
  * jauge déplacée par `transform` (composition seule) ; AUCUNE lecture de mise en
  * page (getBoundingClientRect, offsetWidth…) dans la boucle.
  */
-import { PHI_MAX_DEFAULT } from '../physics/constants.js';
-import { createGammaPhrase, formatClock, formatGap, formatSpeed, gapState, gaugeFraction } from './format.js';
+import { C_DEFAULT, PHI_MAX_DEFAULT } from '../physics/constants.js';
+import {
+  createGammaPhrase,
+  formatClock,
+  formatGap,
+  formatLightSpeed,
+  formatSpeed,
+  gapState,
+  gaugeFraction,
+} from './format.js';
 
 /** Période de rafraîchissement des textes (ms) : 12 Hz. */
 const TEXT_PERIOD_MS = 1000 / 12;
@@ -21,7 +30,7 @@ const TEXT_PERIOD_MS = 1000 / 12;
 /** Plus petit déplacement de l'aiguille qui vaut une écriture de style (fraction de la jauge). */
 const GAUGE_EPSILON = 0.0005;
 
-/** Graduations de la jauge (m/s), avant le mur à c. */
+/** Graduations de la jauge (% de c : 50, 90 et 99 %, soit 15, 27 et 29,7 m/s à c = 30), avant le mur. */
 const GAUGE_TICKS = [50, 90, 99];
 
 /** Balisage du HUD, injecté une fois dans le conteneur. */
@@ -55,6 +64,7 @@ const TEMPLATE = `
         </div>
         <div class="gauge-wall"><span>c</span></div>
       </div>
+      <p class="hud-c" data-ref="c">c\u202f=\u202f30\u202fm/s</p>
     </section>
   </div>
   <div class="hud-badge" data-ref="classic" hidden>Vision classique</div>
@@ -64,7 +74,8 @@ const TEMPLATE = `
 /**
  * @param {HTMLElement} rootElement conteneur du HUD (#hud de index.html)
  * @param {{phiMax?: number}} [options] plafond de rapidité du joueur (décimales de la
- *   vitesse) ; `snapshot.phiMax`, s'il est fourni, l'emporte
+ *   vitesse) ; `snapshot.phiMax`, s'il est fourni, l'emporte. La vitesse de la lumière est
+ *   lue à chaque image dans `snapshot.c` (celle de la partie).
  * @returns {{update(snapshot: object, extra?: {k?: number, fps?: number}): void,
  *            show(): void, hide(): void}}
  */
@@ -83,6 +94,7 @@ export function createHud(rootElement, { phiMax = PHI_MAX_DEFAULT } = {}) {
     needle: ref('needle'),
     classic: ref('classic'),
     fps: ref('fps'),
+    c: ref('c'),
   };
 
   /** Dernier texte écrit par élément : on n'écrit que ce qui change. */
@@ -102,14 +114,15 @@ export function createHud(rootElement, { phiMax = PHI_MAX_DEFAULT } = {}) {
 
   return {
     /**
-     * @param {{speed: number, gamma: number, tau: number, t: number, phiMax?: number}} snapshot
-     *   instantané du joueur (physics/player.js → snapshot)
+     * @param {{speed: number, gamma: number, tau: number, t: number, c: number, phiMax?: number}} snapshot
+     *   instantané du joueur (physics/player.js → snapshot ; c : vitesse de la lumière)
      * @param {{k?: number, fps?: number}} [extra] k ∈ [0, 1] (1 = effets relativistes,
      *   0 = vision classique) ; fps affiché seulement s'il est fourni
      */
     update(snapshot, { k = 1, fps } = {}) {
       // Jauge : à chaque image, par transform (le cache et l'aiguille glissent de f × largeur).
-      const f = gaugeFraction(snapshot.speed);
+      const c = snapshot.c > 0 ? snapshot.c : C_DEFAULT;
+      const f = gaugeFraction(snapshot.speed, c);
       if (Math.abs(f - lastGauge) > GAUGE_EPSILON) {
         lastGauge = f;
         const shift = `translate3d(${(f * 100).toFixed(2)}%, 0, 0)`;
@@ -138,7 +151,8 @@ export function createHud(rootElement, { phiMax = PHI_MAX_DEFAULT } = {}) {
       writeText('t', formatClock(snapshot.t));
       writeText('gap', formatGap(gap));
       writeText('gamma', phrase(snapshot.gamma));
-      writeText('speed', formatSpeed(snapshot.speed, snapshot.phiMax ?? phiMax));
+      writeText('speed', formatSpeed(snapshot.speed, snapshot.phiMax ?? phiMax, c));
+      writeText('c', formatLightSpeed(c));
 
       const state = gapState(gapStateNow, snapshot.gamma, gap);
       if (state !== gapStateNow) {

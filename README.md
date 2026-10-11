@@ -1,6 +1,7 @@
 # Coursier de la lumière lente
 
-Livre des colis dans une ville où la lumière ne va qu'à **100 m/s**.
+Livre des colis dans une ville où la lumière ne va qu'à **30 m/s** (≈ 108 km/h) — ou à la
+vitesse que tu choisis, de 10 à 100 m/s.
 
 Jeu web en 3D (navigateur, ordinateur et GSM) qui fait vivre la relativité restreinte au
 volant d'un véhicule de livraison. Il est inspiré de *A Slower Speed of Light* (MIT Game
@@ -10,15 +11,21 @@ Lab) et adapte une partie d'[OpenRelativity](https://github.com/MITGameLab/OpenR
 
 ## Le concept
 
-Dans la ville, la lumière va à c = 100 m/s et ton moteur pousse à 10 m/s². L'échelle
-naturelle du jeu est donc le kilomètre (c²/a = 1 000 m) et la dizaine de secondes
-(c/a = 10 s).
+Dans la ville, la lumière va à c = 30 m/s (≈ 108 km/h) et ton moteur pousse à 3 m/s².
+L'échelle naturelle du jeu est donc de quelques centaines de mètres (c²/a = 300 m) et la
+dizaine de secondes (c/a = 10 s).
+
+**La vitesse de la lumière est un réglage** : sur l'écran titre (ou au menu pause,
+« Changer c », qui recommence la partie), choisis un entier de 10 à 100 m/s (préréglages
+10, 30, 50 et 100). L'accélération suit, a = c/10 : le rythme du jeu (c/a = 10 s) ne change
+pas, seules les distances changent (c²/a = 10·c mètres : 100 m à c = 10, 1 km à c = 100).
+Plus c est bas, plus les effets arrivent tôt. Le réglage est mémorisé dans le navigateur.
 
 - **Deux horloges.** « Ta montre » mesure ton temps propre τ : c'est ta batterie.
   « L'horloge de la ville » mesure le temps t de la ville : c'est celui des délais.
   Quand tu roules vite, la ville vieillit plus vite que toi (Δt = γ·Δτ) et l'écart
   entre les deux horloges se creuse.
-- **Le mur de la lumière.** À poussée constante, la vitesse approche 100 m/s sans jamais
+- **Le mur de la lumière.** À poussée constante, la vitesse approche c sans jamais
   l'atteindre ; c'est ta rapidité qui augmente régulièrement.
 - **Ce que tu vois** est calculé, pas truqué : la ville se resserre devant toi
   (aberration), ses couleurs glissent vers le bleu devant et vers le rouge derrière
@@ -34,8 +41,9 @@ naturelle du jeu est donc le kilomètre (c²/a = 1 000 m) et la dizaine de secon
 - la physique exacte et testée (horloges, poussée, frein, virage, plafond de vitesse) ;
 - le rendu relativiste (aberration, Doppler, effet projecteur, ciel et brouillard) ;
 - un HUD minimal (les deux horloges et leur écart, une phrase sur γ, la jauge de vitesse) ;
-- les commandes au clavier et au toucher, et deux scènes de test (une avenue droite de
-  4 km et un quartier d'environ 1,3 × 1,3 km).
+- les commandes au clavier et au toucher, et deux scènes de test dont les longueurs suivent
+  c²/a (une avenue droite de 4·c²/a, soit 1 200 m à c = 30 m/s, et un quartier qui contient
+  tout le disque de visibilité, 0,8 × 0,8 km à c = 30 m/s).
 
 Pas encore de colis, de délais ni de batterie limitée : ils arrivent avec les niveaux.
 Feuille de route complète dans [`docs/conception.md`](docs/conception.md) (§ 9) :
@@ -73,8 +81,8 @@ est plus haute que large (écran partagé, Slide Over), le panneau demande d'agr
 fenêtre. Le zoom par pincement est désactivé (il rendait le jeu injouable sur iOS).
 
 Quand tu lâches tout, le véhicule garde sa vitesse (pas de frottement) : pour s'arrêter,
-il faut freiner, et cela prend de la place (543 m depuis 76 m/s). Le frein arrête
-exactement, sans marche arrière.
+il faut freiner, et cela prend de la place : (c²/a)(γ − 1), soit 163 m depuis 22,8 m/s
+(76 % de c) à c = 30 m/s. Le frein arrête exactement, sans marche arrière.
 
 Appareil de test de l'auteur : iPhone 14 Pro Max (Safari iOS). Il faut un navigateur
 récent avec WebGL 2 (Safari iOS 15.4 ou plus, Chrome, Firefox, Edge).
@@ -94,10 +102,11 @@ npm run build     # construit le site dans dist/, puis vérifie les licences (sc
 npm run preview   # sert dist/ : http://localhost:4173/aSlower/
 ```
 
-Paramètres d'URL (combinables, par exemple `?scene=quartier-test&bench&dpr=1`) :
+Paramètres d'URL (combinables, par exemple `?scene=quartier-test&bench&c=30&dpr=1`) :
 
 | Paramètre | Effet |
 |---|---|
+| `?c=30` | vitesse de la lumière de la partie, entier de 10 à 100 m/s (a = c/10). Prioritaire sur le réglage de l'écran titre et jamais mémorisée ; hors plage, ramenée dans la plage ; non entière, ignorée (avec un message). Exemple : `?c=100&bench` reproduit les mesures du jalon 1 |
 | `?scene=avenue-test` ou `?scene=quartier-test` | scène de développement à charger (`src/data/scenes/`) ; `avenue-test` par défaut |
 | `?diag` | panneau de diagnostic : images par seconde, temps d'image p50 et p95, temps CPU du rendu, appels de dessin, triangles, durée de la première image, GPU, DPR. La touche E (ou la case du panneau) coupe et rétablit la passe ciel/sol, pour mesurer son coût |
 | `?bench` | parcours de mesure automatique et déterministe (aucune entrée, pas fixe de 1/60 s par image), avec le panneau de diagnostic. Sur `avenue-test` : poussée pleine jusqu'à γ ≈ 2,5, puis freinage jusqu'à l'arrêt. Sur `quartier-test` : caméra scriptée le long d'une rue, β imposé de 0 à 0,92. À la fin, le panneau affiche p50/p95 des temps d'image, le CPU du rendu, les appels de dessin et triangles maximaux ; le résultat complet est dans `window.__benchResult` (et la console). Ajouter `&sansciel` mesure le même parcours sans la passe ciel/sol (coût de la passe par différence) |
@@ -147,12 +156,14 @@ docs/                   conception (plan, décisions, glossaire) et contrat d'in
 - **Physique exacte.** L'état du véhicule est sa position, sa vitesse propre u = γv et
   ses deux horloges, en double précision. Sous poussée constante, chaque pas suit la
   solution exacte (mouvement hyperbolique) : le résultat ne dépend pas du nombre d'images
-  par seconde (en virage avec poussée, à moins d'un millimètre près). Test de référence : 10 s de poussée depuis l'arrêt donnent
-  v = 100·tanh 1 = 76,159 m/s, t = 10·sinh 1 = 11,752 s et x = 1 000·(cosh 1 − 1) =
-  543,081 m.
+  par seconde (en virage avec poussée, à moins d'un millimètre près). Test de référence
+  (cahier des charges, exécuté avec c = 100 m/s et a = 10 m/s² injectées) : 10 s de
+  poussée depuis l'arrêt donnent v = 100·tanh 1 = 76,159 m/s, t = 10·sinh 1 = 11,752 s et
+  x = 1 000·(cosh 1 − 1) = 543,081 m ; à c = 30 m/s (défaut) : 22,848 m/s, 11,752 s et
+  162,924 m.
 - **Conduite « arcade ».** La route fournit la force latérale, hors du budget du moteur :
   tourner fait pivoter la vitesse sans la changer. La rapidité est plafonnée (φ ≤ 3,
-  soit 99,5 m/s et γ ≈ 10).
+  soit 99,5 % de c — 29,85 m/s à c = 30 — et γ ≈ 10).
 - **Aberration par sommet.** Chaque sommet est vu dans sa direction apparente
   n′ = (n + (γ²/(γ+1)·(β·n) + γ)·β)/D, avec D = γ(1 + β·n), à sa distance réelle. Les
   façades sont subdivisées pour que les droites puissent se courber.

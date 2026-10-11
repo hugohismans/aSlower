@@ -474,13 +474,15 @@ function createEmitters(lamps) {
  * Construit la ville d'une scène.
  * @param {any} scene JSON de src/data/scenes/
  * @param {Record<string, {srgb: string, ir?: number, uv?: number}>} palette src/data/palette.json
- * @param {{lodSteps?: number[]}} [options] pas des LOD (m), croissants
+ * @param {{lodSteps?: number[], lengthUnit?: number}} [options] pas des LOD (m), croissants ;
+ *   unité de longueur L = c²/a de la partie (m), pour les longueurs de jeu de la scène
+ *   (layout.expandScene ; défaut : réglage par défaut)
  */
-export function buildCity(scene, palette, { lodSteps = [...DEFAULT_LOD_STEPS] } = {}) {
+export function buildCity(scene, palette, { lodSteps = [...DEFAULT_LOD_STEPS], lengthUnit } = {}) {
   if (!Array.isArray(lodSteps) || lodSteps.length === 0 || lodSteps.some((s, i) => !(s > 0) || (i > 0 && s < lodSteps[i - 1]))) {
     throw new Error(`lodSteps : pas positifs et croissants attendus (${lodSteps})`);
   }
-  const layout = expandScene(scene, palette);
+  const layout = expandScene(scene, palette, lengthUnit === undefined ? undefined : { lengthUnit });
   const groups = new Map();
   const colorCache = new Map();
   for (const b of layout.buildings) {
@@ -499,5 +501,6 @@ export function buildCity(scene, palette, { lodSteps = [...DEFAULT_LOD_STEPS] } 
     visibility: layout.visibility,
     bounds: layout.bounds,
     buildings: layout.buildings, // emprises développées (ombres de streetMap.createStreetMap)
+    lengthUnit: layout.lengthUnit,
   };
 }

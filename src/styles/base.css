@@ -192,6 +192,99 @@ body {
   text-wrap: balance;
 }
 
+/* Réglage de la vitesse de la lumière (src/hud/lightSpeed.js) : écran titre et menu pause. */
+.c-setting {
+  margin: clamp(10px, 3vh, 20px) auto 0;
+}
+
+.c-setting-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px 14px;
+}
+
+.c-setting-label {
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.c-setting-stepper,
+.c-setting-presets {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.c-setting-field {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.btn-step {
+  width: 48px;
+  padding: 0;
+  font-size: 24px;
+  line-height: 1;
+}
+
+.btn-preset {
+  padding: 0 10px;
+  font-size: 16px;
+}
+
+.btn-preset[aria-pressed='true'] {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* Champ : ≥ 16 px (Safari iOS zoomerait sinon), texte sélectionnable. */
+.c-setting-input {
+  width: 3.4em;
+  min-height: 48px;
+  padding: 0 4px;
+  border: 2px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel-solid);
+  color: var(--text);
+  font: inherit;
+  font-size: 22px;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.c-setting-input:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.c-setting-unit {
+  color: var(--muted);
+  font-size: 16px;
+}
+
+.c-setting-help,
+.c-setting-message {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 500;
+  text-wrap: balance;
+}
+
+.c-setting-message {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.c-setting-message:empty {
+  display: none;
+}
+
 /* Aide tactile seulement sur écran tactile, aide clavier seulement avec une souris. */
 .title-help-touch {
   display: none;

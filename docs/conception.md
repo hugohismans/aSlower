@@ -2,7 +2,9 @@
 
 > Contrat entre modules (signatures, repères, attributs, imports permis) : [`docs/interfaces.md`](interfaces.md). En cas de désaccord sur une signature, c'est le contrat qui fait foi ; ce document donne le pourquoi.
 
-Statut : **jalon 1 terminé** le 2026-10-11, prochain : jalon 2 (plan validé ; décisions de l'auteur du 2026-10-11 intégrées, voir §11). Le dépôt `hugohismans/aSlower` est public ; GitHub Pages y est publié en mode « GitHub Actions ». Les prototypes jetables du bac à sable (§0) ont servi de base au code du jalon 1. Publication sur <https://hugohismans.github.io/aSlower/> (la casse de l'URL compte).
+Statut : **jalon 1 terminé** le 2026-10-11, prochain : jalon 2 (plan validé ; décisions de l'auteur du 2026-10-11 intégrées, voir §11, dont la décision 10 : **la vitesse de la lumière est un réglage du joueur**, entier de 10 à 100 m/s, 30 m/s par défaut, a = c/10).
+
+> **Unités naturelles.** Le moteur garde c/a = **T = 10 s** quel que soit le réglage ; l'unité de longueur vaut **L = c²/a = 10·c m** (300 m au réglage par défaut c = 30 m/s, 1 000 m à c = 100 m/s, valeur du cahier des charges). Les distances de jeu ci-dessous sont données en L (et en mètres à c = 30), les vitesses en fractions de c (β) ; les temps ne dépendent pas de c. Les éléments à l'échelle humaine (îlots de 56 m, rues, hauteurs, lampadaires tous les 40 m, œil à 1,6 m) restent en mètres. Le dépôt `hugohismans/aSlower` est public ; GitHub Pages y est publié en mode « GitHub Actions ». Les prototypes jetables du bac à sable (§0) ont servi de base au code du jalon 1. Publication sur <https://hugohismans.github.io/aSlower/> (la casse de l'URL compte).
 
 Méthode : six analyses en parallèle (shaders et physique d'OpenRelativity, mathématiques, rendu Three.js, outillage et contrôles, game design), puis une relecture critique sous quatre angles. Chaque objection a été contre-vérifiée et tous les chiffres ci-dessous ont été recalculés par script.
 
@@ -17,7 +19,7 @@ Méthode : six analyses en parallèle (shaders et physique d'OpenRelativity, mat
   - objets mobiles jamais contractés ;
   - intensité en D² au lieu de D⁴ ;
   - frottement non invariant par rotation.
-- **Valeurs des tests obligatoires**, recalculées : v = 76,159416 m/s, t = 11,752012 s, x = 543,080635 m.
+- **Valeurs des tests obligatoires** (cahier des charges, c = 100 m/s et a = 10 m/s², injectées dans les tests), recalculées : v = 76,159416 m/s, t = 11,752012 s, x = 543,080635 m. Au réglage par défaut (c = 30, a = 3) : v = 30·tanh 1 = 22,847825 m/s, t = 10·sinh 1 = 11,752012 s, x = 300·(cosh 1 − 1) = 162,924190 m.
 - **Prototypes jetables** (bac à sable, rien dans le dépôt) :
   - intégrateur exact ;
   - solveur de temps retardé ;
@@ -30,21 +32,21 @@ Méthode : six analyses en parallèle (shaders et physique d'OpenRelativity, mat
 
 ## 1. Constats qui modifient le cahier des charges
 
-### 1.1 L'échelle naturelle est le kilomètre
-Avec c = 100 m/s et a = 10 m/s², les unités naturelles sont **c²/a = 1 000 m** et **c/a = 10 s**.
+### 1.1 L'échelle naturelle est L = c²/a
+Avec a = c/10, les unités naturelles sont **L = c²/a = 10·c m** et **T = c/a = 10 s**. Au réglage par défaut (c = 30 m/s ≈ 108 km/h, a = 3 m/s²), L = 300 m ; à c = 100 m/s (cahier des charges, a = 10 m/s²), L = 1 000 m.
 
-| Pour… | il faut… |
-|---|---|
-| atteindre γ = 2 (86,6 m/s) | 13,2 s de poussée et **1 000 m** (autant pour freiner) |
-| s'arrêter depuis 50 / 76 / 90 m/s | 155 / 543 / 1 294 m |
-| tourner à fond à 20 / 50 / 76 / 90 m/s (conduite arcade, §3) | rayon 20 / 58 / 117 / 206 m (r = \|u\|/TURN_RATE, avec TURN_RATE = 1,0 rad/s) |
-| échapper à un flash (horizon de Rindler) | 1 000 m d'avance |
+| Pour… | il faut… (en L, puis à c = 30 m/s) | à c = 100 m/s |
+|---|---|---|
+| atteindre γ = 2 (β = 0,866) | 13,2 s de poussée et **L** (autant pour freiner) : 26,0 m/s, **300 m** | 86,6 m/s, 1 000 m |
+| s'arrêter depuis β = 0,5 / 0,76 / 0,9 | (γ − 1)·L = 0,155 / 0,543 / 1,294 L : depuis 15 / 22,8 / 27 m/s, 46 / 163 / 388 m | 155 / 543 / 1 294 m |
+| tourner à fond à β = 0,2 / 0,5 / 0,76 / 0,9 (conduite arcade, §3) | rayon γβ·c/TURN_RATE = 0,020 / 0,058 / 0,117 / 0,206 L : 6 / 17 / 35 / 62 m (r = \|u\|/TURN_RATE, TURN_RATE = 1,0 rad/s pour tout c) | 20 / 58 / 117 / 206 m |
+| échapper à un flash (horizon de Rindler) | L d'avance : 300 m | 1 000 m |
 
-La « petite ville » mesure environ 3 × 2 km : îlots de 50 à 60 m, avenues droites de 2 à 3 km (4 km pour la seule scène de test J1). Chaque niveau charge un quartier de 0,7 à 2,4 km. La lumière la traverse en 30 s : c'est une petite ville pour un véhicule.
+La « petite ville » mesure environ 3 L × 2 L (0,9 × 0,6 km à c = 30) : îlots de 50 à 60 m (échelle humaine, pour tout c), avenues droites de 2 à 3 L (4 L pour la seule scène de test J1 : 1 200 m). Chaque niveau charge un quartier de 0,7 à 2,4 L (210 à 720 m à c = 30). La lumière la traverse en 30 s, pour tout c : c'est une petite ville pour un véhicule. À c = 30, la ville compte donc 3,3 fois moins d'îlots par L qu'à c = 100 : moins de géométrie, mais des niveaux plus « serrés » (moins de rues entre deux points de jeu), à valider niveau par niveau.
 
 ### 1.2 Sur un trajet simple, foncer gagne sur les deux horloges
-Pour un trajet A→B fixé, τ = ∫dx/(γv) et t = ∫dx/v **diminuent tous les deux** quand on va plus vite. Exemple sur 1 000 m :
-- à 20 m/s : τ = 51 s et t = 52 s ;
+Pour un trajet A→B fixé, τ = ∫dx/(γv) et t = ∫dx/v **diminuent tous les deux** quand on va plus vite. Exemple sur L (300 m à c = 30 ; mêmes temps pour tout c) :
+- à β = 0,2 (6 m/s à c = 30) : τ = 51 s et t = 52 s ;
 - à fond (poussée puis freinage) : τ = 19,3 s et t = 22,4 s.
 
 Avec une simple échéance « avant t = X », le dilemme n'existe donc pas. La vraie tension entre τ et t vient des **fenêtres « pas avant »** : client absent, pont levé, pommes pas mûres. Attendre sur place coûte 1 s de batterie par seconde de ville, alors que rouler vite fait passer la ville au prix de 1/γ. Le paradoxe des jumeaux devient la solution : pour « sauter dans le futur » de la ville sans vider sa batterie, on fait un détour rapide.
@@ -52,12 +54,12 @@ Avec une simple échéance « avant t = X », le dilemme n'existe donc pas. La v
 Les autres freins au « foncer » : la porte colorée (il faut une vitesse précise), les distances de freinage et de virage, le retard de la lumière (pont).
 
 ### 1.3 Le modèle de couleur d'OpenRelativity rend le jeu illisible
-OpenRelativity remplace chaque canal par une raie étroite (615, 550 et 463 nm). Vue de face, la luminance tombe sous 10 % vers 28 m/s et devient quasi nulle (< 2 %) vers 50–54 m/s, quelle que soit la teinte. Or le jeu vise 50 à 95 m/s.
+OpenRelativity remplace chaque canal par une raie étroite (615, 550 et 463 nm). Vue de face, la luminance tombe sous 10 % vers β = 0,28 et devient quasi nulle (< 2 %) vers β = 0,50–0,54, quelle que soit la teinte. Or le jeu vise β = 0,5 à 0,95 (15 à 28,5 m/s à c = 30).
 
 Retenu (décision 3, §11 ; détails au §4) : le modèle le plus fidèle à la physique, « réflectance × soleil à 5 800 K », avec une composante infrarouge en plateau jusqu'à l'infini et une composante ultraviolette, les fonctions colorimétriques de Wyman et al., des lampadaires « corps noir » et l'effet projecteur physique (D⁴, borné). Le modèle d'OpenRelativity reste disponible en préréglage pour comparer.
 
 ### 1.4 « Δv = a·Δτ » et « Δt = γ·Δτ » ne sont exacts qu'à pas infinitésimal
-Appliqué tel quel à chaque image, le test des 543 m donne 542,10 m à 60 i/s et 541,12 m à 30 i/s. On garde l'esprit demandé avec la forme exacte :
+Appliqué tel quel à chaque image, le test des 543 m (c = 100, a = 10) donne 542,10 m à 60 i/s et 541,12 m à 30 i/s. On garde l'esprit demandé avec la forme exacte :
 - dans le référentiel instantané, on compose w = c·tanh(a·Δτ/c) (≈ a·Δτ) par l'addition relativiste vectorielle v ⊕ w ;
 - x et t avancent par la solution exacte (sinh, cosh) sur le pas.
 
@@ -67,12 +69,13 @@ Erreur ≤ 2e-11 sur les trois valeurs, quel que soit le découpage, y compris u
 
 | Cahier des charges | Plan | Pourquoi |
 |---|---|---|
-| « petite ville » | ≈ 3 × 2 km, quartiers par niveau | §1.1 |
+| « petite ville » | ≈ 3 L × 2 L (0,9 × 0,6 km à c = 30), quartiers par niveau | §1.1 |
+| c = 100 m/s | c réglable par le joueur, entier de 10 à 100 m/s, 30 par défaut ; a = c/10 | décision 10 |
 | foncer pas toujours gagnant | fenêtres « pas avant » | §1.2 (décision 2) |
 | Δv = a·Δτ, Δt = γ·Δτ | forme exacte équivalente | §1.4 |
 | approximation spectrale RGB | 5 canaux (r, g, b, IR, UV) × soleil à 5 800 K | §1.3 (décision 3) |
 | Δτ = temps réel écoulé | Δτ plafonné à 0,1 s par image, horloges gelées en pause et pendant les bulles bloquantes du tutoriel | ne pas simuler un joueur absent |
-| a = 10 m/s² au maximum | a = 10 m/s² pour la poussée et le frein seulement ; la route fournit la force latérale (conduite arcade), y compris sur l'anneau du niveau 6 (160 à 300 m/s² centripètes) | sinon des kilomètres pour tourner (décision 1) |
+| a = 10 m/s² au maximum | a = c/10 (3 m/s² à c = 30, 10 m/s² à c = 100) pour la poussée et le frein seulement ; la route fournit la force latérale (conduite arcade), y compris sur l'anneau du niveau 6 (16 à 30·a centripètes : 48 à 90 m/s² à c = 30) | sinon des kilomètres pour tourner (décision 1) |
 | respect des délais = critère de score | un retard coûte seulement l'étoile « Ponctuel » ; l'échec ne vient que de la batterie vide et du flash | décision 6 |
 | gyroscope, bulles | J2 (J1 : tactile glisser + clavier) | priorité au risque technique |
 | objets mobiles | solveur pur et testé en J1, rendu en J4 | les niveaux mobiles arrivent en J4 |
@@ -112,9 +115,9 @@ Pause sur `visibilitychange`.
 ## 3. Physique (module pur et testé)
 
 ### API (`physics/player.js`, signatures exactes dans `docs/interfaces.md`)
-- `createPlayer({x, y, heading, phiMax})`.
+- `createPlayer({x, y, heading, phiMax, physics})` : `physics` = `physicsFor(c)` de la partie (c et a gardés dans l'état ; les tests du cahier des charges injectent {c: 100, a: 10}). `relativity.js` et `retarded.js` prennent c en paramètre facultatif.
 - `step(state, {thrust, brake, steer}, dτ)` : sans plafond, sous-pas internes.
-- `snapshot(state)` renvoie `{x, y, vx, vy, speed, beta, gamma, rapidity, tau, t, ux, uy, heading, hx, hy}`, avec `speed` < c en m/s.
+- `snapshot(state)` renvoie `{x, y, vx, vy, speed, beta, gamma, rapidity, tau, t, ux, uy, heading, hx, hy, c}`, avec `speed` < c en m/s ; le HUD et le rendu lisent c dans l'instantané.
 - `clampFrameDt(dtReal)` : pure, testée à part.
 
 ### État et intégration
@@ -129,18 +132,18 @@ Pause sur `visibilitychange`.
 - **Exactitude** : exact en ligne droite et en virage pur. En virage avec poussée, schéma de Strang d'ordre 2 (0,39 mm d'écart après 10 s de poussée pleine, volant à mi-course, à 60 Hz). La rotation de Thomas-Wigner n'est pas simulée, car aucune orientation propre n'est suivie ; c'est documenté.
 
 ### Conduite (modèle « voiture arcade », décision 1)
-- **La route fournit la force latérale**, hors du budget du moteur : a = 10 m/s² (accélération propre) ne vaut que pour la poussée et le frein, tous deux le long du cap, donc colinéaires à u. Pas de cercle d'adhérence.
+- **La route fournit la force latérale**, hors du budget du moteur : a = c/10 (accélération propre ; 3 m/s² à c = 30) ne vaut que pour la poussée et le frein, tous deux le long du cap, donc colinéaires à u. Pas de cercle d'adhérence.
 - Le cap suit la vitesse quand on roule ; le virage fait tourner u (et le cap) à |u| constant.
-- Taux de virage en temps propre : dθ/dτ = −steer·TURN_RATE (`steer` > 0 : à droite, sens horaire ; TURN_RATE = 1,0 rad/s dans `constants.js`). Dans la ville, le rayon vaut r = |u|/TURN_RATE = γv/TURN_RATE : 20 m à 20 m/s, 117 m à 76 m/s, 206 m à 90 m/s, volant à fond.
+- Taux de virage en temps propre : dθ/dτ = −steer·TURN_RATE (`steer` > 0 : à droite, sens horaire ; TURN_RATE = 1,0 rad/s dans `constants.js`). Dans la ville, le rayon vaut r = |u|/TURN_RATE = γv/TURN_RATE, volant à fond : 0,117·L à β = 0,76 et 0,206·L à β = 0,9, soit 35 m à 22,8 m/s et 62 m à 27 m/s à c = 30 (117 et 206 m à c = 100). TURN_RATE ne dépend pas de c (les temps du jeu non plus) : les rayons suivent la ville, à l'échelle de L.
 - **À l'arrêt**, le volant fait pivoter le cap sur place à PIVOT_RATE (0,8 rad/s) ; la poussée part ensuite dans la direction du cap.
 - **Relâcher** : roue libre exacte (Δt = γh, Δx = u·h), sans frottement.
-- **Frein** : poussée opposée, prioritaire sur l'accélérateur, bornée pour s'arrêter exactement à v = 0, sans marche arrière en J1. Marche arrière lente (≤ 5 m/s) en maintenant le frein à l'arrêt, en J3.
+- **Frein** : poussée opposée, prioritaire sur l'accélérateur, bornée pour s'arrêter exactement à v = 0, sans marche arrière en J1. Marche arrière lente (≤ 0,05·c, 1,5 m/s à c = 30) en maintenant le frein à l'arrêt, en J3.
 - **Collisions (J3)** : test balayé ; la composante normale de u est annulée. La pénalité prend la forme d'un **étourdissement à l'arrêt** de κ_choc·(γ_avant − γ_après) s, ajouté à τ et à t, de sorte que la batterie reste égale à τ.
 
 ### Horloges
 - Batterie = τ, qui s'use aussi à l'arrêt. Tout ce qui appartient à la ville (délais, pont, flash, pommier) avance en t.
 - Le HUD affiche t, l'heure de la ville à l'endroit du joueur, synchronisée dans le référentiel de la ville. L'écart t − τ ne dépend d'aucune convention.
-- Les objets **vus** sont affichés à leur temps d'émission t_e. Leurs horloges défilent donc au rythme D par rapport à ta montre (×2,7 en fonçant vers elles à 76 m/s, ×0,37 en s'éloignant), et non γ. Les bulles et le carnet l'expliquent.
+- Les objets **vus** sont affichés à leur temps d'émission t_e. Leurs horloges défilent donc au rythme D par rapport à ta montre (×2,7 en fonçant vers elles à β = 0,76, soit 22,8 m/s à c = 30 ; ×0,37 en s'éloignant), et non γ. Les bulles et le carnet l'expliquent.
 - Objets fixes qui changent d'état (porte, client) : t_e = t − d/c, via `emissionTimeStatic` (J3).
 
 ### Temps retardé des objets mobiles (`physics/retarded.js`, livré et testé en J1, rendu en J4)
@@ -150,16 +153,18 @@ Pause sur `visibilitychange`.
 - Historique en anneau seulement pour les objets réactifs. Objet masqué si t_e < t_apparition.
 
 ### Tests Vitest (J1)
-**Obligatoires.** Depuis l'arrêt, τ = 10 s. Valeurs attendues calculées dans le test : 100·tanh 1, 10·sinh 1, 1000·(cosh 1 − 1).
+**Obligatoires** (cahier des charges, **exécutés avec c = 100, a = 10 injectés** : `createPlayer({physics: {c: 100, a: 10}})`). Depuis l'arrêt, τ = 10 s. Valeurs attendues calculées dans le test : 100·tanh 1, 10·sinh 1, 1000·(cosh 1 − 1) (76,159416 m/s, 11,752012 s, 543,080635 m). Les mêmes tests tournent aussi avec les constantes du jeu par défaut (c = 30, a = 3 : 22,847825 m/s, 11,752012 s, 162,924190 m) et avec c = 10 (a = 1 : 7,615942 m/s, 11,752012 s, 54,308063 m), valeurs c·tanh 1, (c/a)·sinh 1, (c²/a)(cosh 1 − 1).
 - Tolérances : v et t à 1e-6, x à 1e-5 m.
 - Quatre découpages : 1/60, 1/30, aléatoire à graine fixe sommant à 10 s, un appel unique `step(10)`.
 - Ces tolérances détectent aussi un retour accidentel à un schéma approché (jusqu'à 1e-2 m d'erreur).
 
 **Complémentaires** :
-- freinage depuis φ = 1 : arrêt à 543,080635 m, sans recul ;
-- accélérer puis freiner : 1 086,161270 m, t = 23,504024 s ;
+- freinage depuis φ = 1 : arrêt à (c²/a)(cosh 1 − 1), sans recul (543,080635 m à c = 100, 162,924190 m à c = 30) ;
+- accélérer puis freiner : 2·(c²/a)(cosh 1 − 1), t = 23,504024 s (1 086,161270 m à c = 100, 325,848381 m à c = 30) ;
 - virage pur : |u| conservé à 1e-12 ;
-- jumeaux, aller-retour de 1 000 m : τ = 38,497 s, t = 44,721 s ;
+- jumeaux, aller-retour de L : τ = 38,497 s, t = 44,721 s pour tout c (1 000 m à c = 100, 300 m à c = 30) ;
+- injection de c dans `relativity.js` et `retarded.js` (c = 100 et c = 30 : mêmes résultats sans dimension, temps identiques) ;
+- `physicsFor` (plage, entiers, a = c/10), réglage de c (`game/settings.js` : saisie refusée ou ramenée, `?c=`, stockage `aslower:v1:reglages`), scènes paramétriques (avenue de 4·L pour c = 10, 30 et 100, quartier qui contient le disque de visibilité, sans chevauchement), HUD (jauge et décimales près de c pour plusieurs c) ;
 - cohérence de `snapshot` : |v| = |u|/γ et γ = 1/√(1 − v²/c²) ;
 - composition : non-commutativité, colinéaire = addition des rapidités ;
 - plafond : après 1 000 s de poussée, φ = φ_max et |v| = c·tanh φ_max ;
@@ -188,8 +193,8 @@ Port vectoriel du pipeline d'OpenRelativity, sans rotation ni acos. Pour le déc
 - Chaque surface porte 5 canaux de réflectance (r, g, b, IR, UV), qui **partitionnent l'unité** sur [0 ; ∞) : IR = 0 sous 830 nm et 1 au-delà jusqu'à l'infini ; UV = 1 sous 360 nm et 0 au-dessus.
 - On intègre les CMF de Wyman et al. (2013) sur [360 ; 830] nm, avec un éclairage solaire de 5 800 K.
 - M_k(D) = 𝐍·RGB(∫ CMF(λ)·D·E(Dλ)·ρ_k(Dλ) dλ), où 𝐍 est une **matrice 3×3** : l'inverse du bloc RGB de l'intégrale à D = 1, appliquée aux 5 colonnes. On obtient ainsi **M(1) = [I | 0]**. Au repos, IR et UV sont exactement invisibles, puisque leurs bases n'ont aucun support dans [360 ; 830] nm.
-- **Effet projecteur** : couleur = M(D)·ρ × min(D^p, borne). Avec cette convention, **p = 4 est le réglage physique, et c'est le réglage par défaut** (décision 3) : `BEAM_EXPONENT = 4`, borné par `BEAM_MAX = 4096` (= 8⁴, `constants.js`). D⁴ est donc exact jusqu'à D = 8 (γ ≈ 4,1 de face), sur tous les niveaux prévus ; la borne reste (cahier des charges) et garde les valeurs loin du maximum half float (65 504). L'ancienne borne 8 coupait le projecteur dès 47,7 m/s de face : une façade vue de face s'assombrissait quand on accélérait.
-- **Adaptation de l'œil** : la luminosité d'ensemble est rendue par une exposition E = `adaptationExposure(D_avant)` = 1/G(D_avant), avec D_avant = e^φ (droit devant) et G le gain, projecteur compris, d'une façade de référence (`ADAPTATION_REFERENCE` : gris 0,6, ir 0,3, uv 0,15) vue de face. Cette façade garde sa luminance du repos ; les rapports de luminance dans l'image restent physiques. E = 1 à l'arrêt et en vision classique, 0,31 à 30 m/s, 0,093 à 76 m/s, 0,039 à 90 m/s ; `updateObserver` la pose dans `uExposure`. Le cockpit, comobile et éclairé par la lumière projetée vers l'avant, n'y est pas soumis. Le tone mapping (genou 0,75) ne fait plus que compresser les hautes lumières.
+- **Effet projecteur** : couleur = M(D)·ρ × min(D^p, borne). Avec cette convention, **p = 4 est le réglage physique, et c'est le réglage par défaut** (décision 3) : `BEAM_EXPONENT = 4`, borné par `BEAM_MAX = 4096` (= 8⁴, `constants.js`). D⁴ est donc exact jusqu'à D = 8 (γ ≈ 4,1 de face), sur tous les niveaux prévus, pour tout c ; la borne reste (cahier des charges) et garde les valeurs loin du maximum half float (65 504). L'ancienne borne 8 coupait le projecteur dès β = 0,477 de face (14,3 m/s à c = 30) : une façade vue de face s'assombrissait quand on accélérait.
+- **Adaptation de l'œil** : la luminosité d'ensemble est rendue par une exposition E = `adaptationExposure(D_avant)` = 1/G(D_avant), avec D_avant = e^φ (droit devant) et G le gain, projecteur compris, d'une façade de référence (`ADAPTATION_REFERENCE` : gris 0,6, ir 0,3, uv 0,15) vue de face. Cette façade garde sa luminance du repos ; les rapports de luminance dans l'image restent physiques. E = 1 à l'arrêt et en vision classique, 0,31 à β = 0,3, 0,093 à β = 0,76, 0,039 à β = 0,9 (9, 22,8 et 27 m/s à c = 30 ; les couleurs ne dépendent que de β) ; `updateObserver` la pose dans `uExposure`. Le cockpit, comobile et éclairé par la lumière projetée vers l'avant, n'y est pas soumis. Le tone mapping (genou 0,75) ne fait plus que compresser les hautes lumières.
 - **Lampes à raie** : lineRGB(λ₀/D) × min(D^p, borne).
 - **Lampes corps noir** : XYZ(B(D·T))/D⁴ rapporté à XYZ(B(T)), × min(D^p, borne). On ne compte jamais deux fois les D⁴.
 - Tone mapping qui préserve la teinte (Reinhard sur le maximum), car la teinte porte l'information du jeu.
@@ -205,9 +210,9 @@ Port vectoriel du pipeline d'OpenRelativity, sans rotation ni acos. Pour le déc
 Varying highp `vRel` (position relative à l'œil, non aberrée), puis n = normalize(vRel), D = γ(1 + β·n) et LUT. Le calcul par sommet donnait des taches de teinte, jusqu'à ΔE 30 dès le LOD le plus fin. Repli si la mesure l'exige : un « mode palette » à une seule lecture par pixel. L'économie du profil lite vient du DPR, pas de la couleur.
 
 ### Gameplay
-**Le même module `spectrum.js` sert au gameplay.** `perceivedColor()` reprend toute la chaîne du shader (D par la géométrie réelle, projecteur, tone mapping), avec `{exposure: adaptationExposure(e^φ)}` pour suivre la même adaptation que l'écran. La fenêtre « vert » de la lampe à 640 nm du N3 n'en dépend pas (13,0–22,3 m/s) ; « noir » arrive dès 40,7 m/s au lieu de 44,6. Les lampes de puzzle ne sont pas diffusées par le brouillard (atténuation seulement).
+**Le même module `spectrum.js` sert au gameplay.** `perceivedColor()` reprend toute la chaîne du shader (D par la géométrie réelle, projecteur, tone mapping), avec `{exposure: adaptationExposure(e^φ)}` pour suivre la même adaptation que l'écran. La fenêtre « vert » de la lampe à 640 nm du N3 n'en dépend pas (β = 0,130–0,223, soit **≈ 3,9–6,7 m/s à c = 30** ; 13,0–22,3 m/s à c = 100) ; « noir » arrive dès β = 0,407 au lieu de 0,446 (12,2 au lieu de 13,4 m/s à c = 30). Les lampes de puzzle ne sont pas diffusées par le brouillard (atténuation seulement).
 
-Test d'adaptation (il remplace l'ancien test de lisibilité « ≥ 2 % de la luminance du blanc », pensé pour un projecteur borné à 8 sans adaptation) : la façade de référence vue de face, multipliée par E, garde sa luminance du repos à 2e-3 près pour v ∈ {5, 20, 30, 50, 76, 90, 95} m/s ; E décroît strictement avec v et vaut 1 à l'arrêt ; les façades vues de face sont plus lumineuses à 90 m/s qu'à 47,7 m/s (`tests/spectrum.test.js`). Au-delà de D = 830/360 ≈ 2,31 (68 m/s de face), seule la base IR d'une surface est visible : les façades de la palette ont donc des réflectances proche IR **variées** (ir de 0,1 à 0,6, moyenne 0,31 ≈ la référence), comme les pigments réels (≈ 0,05 pour le noir de carbone, 0,6–0,85 pour les oxydes de fer ou le blanc de titane) ; à D = 3, leurs luminances diffèrent d'un facteur ≥ 3. Même avec l'ancienne borne 8, une façade d'ir 0,1 vue de face à γ = 4 garde 2,5 % de la luminance du blanc.
+Test d'adaptation (il remplace l'ancien test de lisibilité « ≥ 2 % de la luminance du blanc », pensé pour un projecteur borné à 8 sans adaptation) : la façade de référence vue de face, multipliée par E, garde sa luminance du repos à 2e-3 près pour β ∈ {0,05 ; 0,2 ; 0,3 ; 0,5 ; 0,76 ; 0,9 ; 0,95} ; E décroît strictement avec v et vaut 1 à l'arrêt ; les façades vues de face sont plus lumineuses à β = 0,9 qu'à β = 0,477 (`tests/spectrum.test.js`). Au-delà de D = 830/360 ≈ 2,31 (β = 0,68 de face, 20,4 m/s à c = 30), seule la base IR d'une surface est visible : les façades de la palette ont donc des réflectances proche IR **variées** (ir de 0,1 à 0,6, moyenne 0,31 ≈ la référence), comme les pigments réels (≈ 0,05 pour le noir de carbone, 0,6–0,85 pour les oxydes de fer ou le blanc de titane) ; à D = 3, leurs luminances diffèrent d'un facteur ≥ 3. Même avec l'ancienne borne 8, une façade d'ir 0,1 vue de face à γ = 4 garde 2,5 % de la luminance du blanc.
 
 ### Ciel, sol et brouillard
 Une passe plein écran après les opaques, à z = 1 (renderOrder 1, sans écriture de profondeur). Elle couvre environ 41 % de l'écran, soit environ 1 ms estimée sur un Mali-G52. Pour chaque pixel :
@@ -216,9 +221,9 @@ Une passe plein écran après les opaques, à z = 1 (renderOrder 1, sans écritu
 - marquages tracés analytiquement, carte Canvas2D pour le plan et les ombres ;
 - ciel procédural : brume à l'horizon, lumière diffuse d'un corps noir à 6 500 K près de l'horizon, et vers le zénith un **ciel dégagé à spectre continu**, ρ ∝ (550/λ)⁴ + 0,35·(550/λ)^1,3 (Rayleigh + aérosols à 90° du soleil : τ_A ≈ 0,1, Ångström 1,3, Henyey-Greenstein g = 0,7), nul sous 295 nm (ozone), de luminance 0,186 au repos, tabulé dans la ligne `SKY_CLEAR_ROW` de la LUT. Décalé, il reste bleu et lisse (les anciennes réflectances en créneaux donnaient du violet et du cyan saturé). Coût : 8 lectures de texture par pixel de la passe au lieu de 7. Au repos, il est un peu plus pâle qu'avant, à cause des aérosols ;
 - brouillard en distance monde, mélangé avant le Doppler (correct pour un milieu immobile dans la ville), totalement opaque à `visibilite` ;
-- `visibilite` est fixée par niveau et par profil dans le JSON (300–400 m en lite, 600 m ailleurs, sauf exception du niveau).
+- `visibilite` : par défaut `visibilityFor(L)` (`render/layout.js`), **défaut = clamp(1,2·L ; 300 ; 600) m, lite = 0,7 × défaut** ; un niveau peut la fixer dans son JSON. À c = 30 : 360 m (lite 252 m) ; à c = 10 : 300 m (lite 210 m) ; à c ≥ 50 : 600 m (lite 420 m, la valeur du jalon 1). Pourquoi : proportionnelle à L, elle garde le même temps de lecture de la route à β donné (1,2·L parcouru en 12/β s) ; le plancher de 300 m garde au moins quatre îlots lisibles devant soi (la ville reste à l'échelle humaine) ; le plafond de 600 m est le budget d'appels de dessin mesuré au J1 (quartier : 211 appels). À c = 30, le disque de visibilité contient 2,8 fois moins d'îlots qu'à 600 m : marge de performance sur GSM moyen.
 
-**Objets clés** (pont, pommier, lampes de puzzle) : ils sont exemptés du brouillard et de la coupe, avec une atténuation propre faible, et sont toujours dessinés. Le validateur vérifie que chaque objet clé reste visible depuis ses points d'observation de référence (N4 : point de non-retour ; N6 : anneau, à 500 m).
+**Objets clés** (pont, pommier, lampes de puzzle) : ils sont exemptés du brouillard et de la coupe, avec une atténuation propre faible, et sont toujours dessinés. Le validateur vérifie que chaque objet clé reste visible depuis ses points d'observation de référence (N4 : point de non-retour ; N6 : anneau, à 0,5·L, 150 m à c = 30).
 
 **Règle** : aucune géométrie sous y = 0. La rivière est un matériau de la carte, et le validateur le vérifie.
 
@@ -230,13 +235,13 @@ L'aberration courbe les droites, mais seulement entre sommets.
 - **Trois LOD** : 1,5 / 5 / 15 m.
 - **Règle** : LOD k permis si s_k ≤ κ·d_min, avec κ = min(0,2 ; √(8ε/(γβ))), où ε est la tolérance angulaire (2 px CSS). d_min est la distance apparente du point le plus proche du chunk, avec D minimal sur le champ visible, et 10 % d'hystérésis.
 - **Image propre à environ 3 px près jusqu'à γ ≈ 2,5**. Au-delà (niveaux 5 et 6), on ajoute un LOD de 0,75–1 m pour les 2 à 6 chunks les plus proches (J5).
-- **Triangles visibles par image (modèle calculé)** : 11 à 64 k sur l'avenue, 13 à 85 k en quartier. Le LOD0 est généré à la demande pour les îlots proches, LOD1 et LOD2 restent résidents. Tout générer en LOD0 donnerait environ 385 k triangles pour l'avenue de 4 km.
+- **Triangles visibles par image (modèle calculé)** : 11 à 64 k sur l'avenue, 13 à 85 k en quartier. Le LOD0 est généré à la demande pour les îlots proches, LOD1 et LOD2 restent résidents. Tout générer en LOD0 donnerait environ 385 k triangles pour l'avenue de 4 km (c = 100) ; ces chiffres datent du J1 à c = 100 m/s, l'avenue de 4·L en a 3,3 fois moins à c = 30. Les pas des LOD (1,5 / 5 / 15 m) et la règle κ·d_min sont géométriques : ils ne dépendent pas de c.
 
 ### Culling et nombre d'appels de dessin (draw calls)
 - `frustumCulled = false` : le culling de Three passe avant le shader et ferait disparaître la moitié des chunks visibles à β = 0,76, puisque l'aberration ramène devant ce qui est derrière.
-- **J1** : coupe à `visibilite`, exacte à ≤ 6/255 près sur quelques pixels au-dessus de l'horizon (le ciel brumeux n'a pas exactement la couleur de la brume ; nul à grande vitesse), puisque r est conservé et que le brouillard y est opaque ; au plus 42 chunks sur l'avenue.
+- **J1** : coupe à `visibilite`, exacte à ≤ 6/255 près sur quelques pixels au-dessus de l'horizon (le ciel brumeux n'a pas exactement la couleur de la brume ; nul à grande vitesse), puisque r est conservé et que le brouillard y est opaque ; au plus 42 chunks sur l'avenue à c = 100 (visibilité 600 m), moins à c = 30 (360 m).
 - **J3** : culling par « cône apparent » exact, environ 0,3 µs par chunk.
-- **Appels de dessin** : en quartier, 98 à 294 chunks sont visibles pour un brouillard à 600 m. D'où des super-chunks LOD2 de 256 m, ou un `BatchedMesh` piloté par notre culling (à mesurer en J1). Le budget d'appels de dessin est vérifié par niveau dans `levels.test.js`, qui peut importer le découpage en chunks de `render/`. Le validateur, lui, ne dépend que de physics.
+- **Appels de dessin** : en quartier, 98 à 294 chunks sont visibles pour un brouillard à 600 m (c ≥ 50) ; à 360 m (c = 30), environ 2,8 fois moins. D'où des super-chunks LOD2 de 256 m, ou un `BatchedMesh` piloté par notre culling (à mesurer en J1). Le budget d'appels de dessin est vérifié par niveau dans `levels.test.js`, qui peut importer le découpage en chunks de `render/`. Le validateur, lui, ne dépend que de physics.
 - **Ordre de rendu** : cockpit d'abord (écrit la profondeur), puis opaques triés par r, passe ciel/sol, transparents et fantômes. `setOpaqueSort` remplace tout le tri de three : notre comparateur trie donc d'abord par `renderOrder` (cockpit −1, opaques 0, ciel/sol 1), puis par r.
 
 ### Objets mobiles (J4)
@@ -295,7 +300,8 @@ Position des objets à l'instant t de la **ville**, passée par la même aberrat
 **HUD** :
 - **Horloges** : « Ta montre » et « Horloge de la ville » côte à côte. Pastille d'écart : **rouge avec ▲ quand γ > 1,02** (retour sous 1,01), grise quand l'écart est stable. Contraste de 5,6:1, symbole en plus de la couleur.
 - **Phrase γ** (formulation du cahier des charges) : « même rythme » sous 1,01, puis « la ville va 15 % plus vite que toi », puis « ×2 », « ×2,5 »… avec hystérésis. Le carnet précise qu'il s'agit des horloges de la ville que tu croises.
-- **Jauge de vitesse** : linéaire, avec un mur hachuré à 100 m/s. L'aiguille ralentit à poussée constante, ce qui montre l'asymptote. Des décimales s'ajoutent près de c, jusqu'à 99,5 m/s avec φ_max = 3 (99,5055, tronqué).
+- **Jauge de vitesse** : linéaire, avec un mur hachuré à c (celle de la partie), et le rappel « c = 30 m/s » sous la jauge. L'aiguille ralentit à poussée constante, ce qui montre l'asymptote. Des décimales s'ajoutent près de c (premier chiffre de l'écart c − v), jusqu'à c·tanh 3 = 0,99505·c avec φ_max = 3, tronqué : **29,8 m/s à c = 30** (29,85), 9,95 m/s à c = 10, 99,5 m/s à c = 100. Graduations à 50, 90 et 99 % de c.
+- **Réglage de c** (décision 10) : sur l'écran titre, « Vitesse de la lumière : [−] 30 [+] m/s », préréglages 10 / 30 / 50 / 100, aide « Plus c est bas, plus les effets arrivent tôt » et l'équivalent en km/h (30 m/s ≈ 108 km/h) ; cibles de 48 px. Saisie non entière refusée, entier hors plage ramené dans la plage, avec un message. Mémorisé dans `aslower:v1:reglages` ({c}) ; `?c=n` prioritaire (tests), jamais mémorisé. Au menu pause, « Changer c » recommence la partie au départ avec la nouvelle valeur. c est aussi affiché dans `#diag`.
 - **Mises à jour** : texte à 12 Hz, écrit seulement s'il change ; jauge par `transform` ; aucune lecture de mise en page dans la boucle.
 - **Bulles (J2)** :
   - une seule fois par profil, stockées dans `aslower:v1:bulles` (try/catch, repli en mémoire) ;
@@ -321,7 +327,7 @@ Position des objets à l'instant t de la **ville**, passée par la même aberrat
 - **Aucune fenêtre de vitesse dans le JSON** : les portes appellent `spectrum.js`.
 
 ### Réussite, échecs et étoiles
-- **Réussite** : tous les colis obligatoires livrés (zone + v ≤ 3 m/s pendant 0,5 s de τ), même en retard (décision 6).
+- **Réussite** : tous les colis obligatoires livrés (zone + v ≤ 0,03·c pendant 0,5 s de τ : 0,9 m/s à c = 30, 3 m/s à c = 100 ; à confirmer), même en retard (décision 6).
 - **Échecs** : seulement la batterie vide (τ ≥ τmax) et le flash (N5). Un délai dépassé n'est **pas** un échec : il coûte l'étoile « Ponctuel ».
 - **Reprises** (pas d'échec) : chute du pont, choc contre une porte. On repart au point défini dans le JSON, avec quelques secondes ajoutées aux deux horloges.
 - **Étoiles**, une par critère du cahier des charges :
@@ -333,25 +339,27 @@ Position des objets à l'instant t de la **ville**, passée par la même aberrat
 
 ### Les six niveaux
 
+Les distances sont en L = c²/a = 10·c m et les vitesses en β (fractions de c) ; entre parenthèses, les valeurs au réglage par défaut **c = 30 m/s (L = 300 m)**. Les temps (délais, batterie, horloges) ne dépendent pas de c. Pour c = 100 m/s (cahier des charges, L = 1 000 m), multiplier les mètres et les m/s par 10/3 : ce sont les chiffres du premier jet. Les tailles des objets (pont, pommier, lampes) sont à l'échelle humaine : vus de 3,3 fois plus près à c = 30, ils paraissent 3,3 fois plus grands.
+
 | N° | Titre proposé | Notion | Mécanique (chiffres vérifiés, à recalibrer par le bot) |
 |---|---|---|---|
-| 1 | Premier jour | inertie, frein, Doppler | Deux livraisons (300 m, puis virage et 420 m). Relâcher garde la vitesse ; il faut 48 m pour s'arrêter à 30 m/s. Batterie large (150 s). |
-| 2 | Le Grand Boulevard | deux horloges | Délais en heure de la ville (60 s puis 100 s ; un retard coûte l'étoile « Ponctuel »), batterie de 90 s. Boulevard de 2 km (τ 26 s, écart 8 s) contre un raccourci sinueux, plus coûteux sur les deux horloges. Une fenêtre « pas avant » légère introduit le coût de l'attente. |
-| 3 | La Porte Verte | Doppler | Lampe rouge (raie fixée à 640 nm, comme dans le test J1) à voir verte : **≈ 13 à 22 m/s** dans l'axe. Lampe infrarouge à 900 nm, « éteinte », vue verte vers **44–52 m/s**. Trop vite, la lampe bleuit puis noircit (UV), et c'est le choc. |
-| 4 | Le Pont Rømer | retard de la lumière | Pont-levis dont l'horaire est en heure de la ville (panneau). **Le niveau démarre lancé** à environ 76 m/s, profil de référence inscrit dans le JSON. Décision au **point de non-retour** : à 76 m/s, il faut 543 m pour s'arrêter, et l'image du pont a alors 5,4 s de retard. Le pont est signalé par de grands feux, car le tablier ne fait que ≈ 9 px à cette distance. Le pont peut paraître baissé alors qu'il est déjà levé. Débloque le contour fantôme. |
-| 5 | La Pellicule | horizon de Rindler | Flash à t = 20 s, 400 m derrière le studio. **Condition de victoire** : atteindre l'abri (800 m, hors de la ligne de vue du flash) avant le front, soit partir vers le nord avant t ≈ 17 s (≈ 18 s si l'on part à 10 m/s). Avec l'approche prévue (300 m puis un virage), on ne part vers le nord qu'à t ≈ 12 s, à environ 10 m/s. **Bonus « au-delà de l'horizon »** si l'on part avant t = 14,0 s depuis l'arrêt (1 000 m d'avance), ou 14,95 s à 10 m/s (905 m d'avance) : fenêtre réelle d'environ 3 s. La lumière ne te rattrape alors jamais tant que tu accélères. Compte à rebours du flash affiché. |
-| 6 | Le Pommier de Langevin | paradoxe des jumeaux | Pommes mûres à t = 200 s, batterie de 120 s : attendre est impossible. Anneau (Ø 1 km), φ_max fixé pour γ ≤ 4. Faire passer 200 s de ville coûte 72 à 83 s de batterie sur l'anneau, et environ **101 à 111 s** avec l'accès, les 500 m jusqu'au pommier et la livraison (marge de 9 à 19 s, à recalibrer par le bot). Le pommier, au centre de l'anneau, est vu avec D = γ : il vieillit **visiblement** ×γ (étapes : fleurs, fruits verts, mûrs, tombés). C'est un **pommier géant** (≈ 45 m), sans quoi il ne ferait que 2 à 3 px à 500 m. Le bilan « Luc a vieilli de … s, toi de … s » est produit par le bot. |
+| 1 | Premier jour | inertie, frein, Doppler | Deux livraisons (0,3·L = 90 m, puis virage et 0,42·L = 126 m). Relâcher garde la vitesse ; il faut 0,048·L (14,5 m) pour s'arrêter à β = 0,3 (9 m/s). Batterie large (150 s). |
+| 2 | Le Grand Boulevard | deux horloges | Délais en heure de la ville (60 s puis 100 s ; un retard coûte l'étoile « Ponctuel »), batterie de 90 s. Boulevard de 2·L (600 m ; τ 26 s, écart 8 s) contre un raccourci sinueux, plus coûteux sur les deux horloges. Une fenêtre « pas avant » légère introduit le coût de l'attente. |
+| 3 | La Porte Verte | Doppler | Lampe rouge (raie fixée à 640 nm, comme dans le test J1) à voir verte : **β ≈ 0,13 à 0,22, soit ≈ 3,9 à 6,7 m/s** dans l'axe. Lampe infrarouge à 900 nm, « éteinte », vue verte vers **β = 0,44–0,52 (13,2–15,6 m/s)**. Trop vite, la lampe bleuit puis noircit (UV), et c'est le choc. |
+| 4 | Le Pont Rømer | retard de la lumière | Pont-levis dont l'horaire est en heure de la ville (panneau). **Le niveau démarre lancé** à β ≈ 0,76 (22,8 m/s), profil de référence inscrit dans le JSON. Décision au **point de non-retour** : à β = 0,76, il faut 0,543·L (163 m) pour s'arrêter, et l'image du pont a alors 5,4 s de retard (pour tout c). Le pont est signalé par de grands feux : le tablier ne fait que ≈ 30 px à 163 m (≈ 9 px à 543 m, à c = 100). Le pont peut paraître baissé alors qu'il est déjà levé. Débloque le contour fantôme. |
+| 5 | La Pellicule | horizon de Rindler | Flash à t = 20 s, 0,4·L (120 m) derrière le studio. **Condition de victoire** : atteindre l'abri (0,8·L = 240 m, hors de la ligne de vue du flash) avant le front, soit partir vers le nord avant t ≈ 17 s (≈ 18 s si l'on part à β = 0,1, 3 m/s). Avec l'approche prévue (0,3·L = 90 m puis un virage), on ne part vers le nord qu'à t ≈ 12 s, à environ β = 0,1. **Bonus « au-delà de l'horizon »** si l'on part avant t = 14,0 s depuis l'arrêt (L = 300 m d'avance), ou 14,95 s à β = 0,1 (0,905·L = 272 m d'avance) : fenêtre réelle d'environ 3 s. La lumière ne te rattrape alors jamais tant que tu accélères. Compte à rebours du flash affiché. |
+| 6 | Le Pommier de Langevin | paradoxe des jumeaux | Pommes mûres à t = 200 s, batterie de 120 s : attendre est impossible. Anneau (Ø L = 300 m), φ_max fixé pour γ ≤ 4. Faire passer 200 s de ville coûte 72 à 83 s de batterie sur l'anneau, et environ **101 à 111 s** avec l'accès, les 0,5·L (150 m) jusqu'au pommier et la livraison (marge de 9 à 19 s, à recalibrer par le bot). Le pommier, au centre de l'anneau, est vu avec D = γ : il vieillit **visiblement** ×γ (étapes : fleurs, fruits verts, mûrs, tombés). C'est un **pommier géant**, sans quoi il ne ferait que 2 à 3 px à 500 m (c = 100) : ≈ 45 m à c = 100 ; à c = 30, vu de 150 m, ≈ 15 m suffisent (taille ∝ L, à recalibrer). Le bilan « Luc a vieilli de … s, toi de … s » est produit par le bot. |
 
 ### Détails qui corrigent le premier jet
-- **N3, contrat du capteur** : la porte s'ouvre si la lampe, telle qu'on la voit, a la teinte demandée pendant 0,4 s de τ, à une distance comprise entre 12 et 150 m (200 m pour l'infrarouge). D est calculé avec la géométrie réelle (hauteur et décalage de la lampe). Au passage sous la porte, l'angle fait revenir la lampe au rouge : on n'évalue donc jamais là. Tests du bot : franchir la porte à la vitesse de référence ; à fond, c'est le choc.
-- **N4, règle juste** : ce que tu vois a r/c de retard, et le pont continue de bouger pendant ton trajet. Seul compte son état à ton arrivée : il faut se fier à l'horaire de la ville. La condition dépend de r, donc de la vitesse d'approche : 155 m (1,55 s) à 50 m/s, 543 m (5,4 s) à 76 m/s. D'où le départ lancé, qui impose le profil de référence. Le cycle (durée « baissé » ≤ r/c et ≤ P − r/c) est réglé pour que les fenêtres de réussite en vision relativiste et en vision classique soient disjointes. Tests du bot :
+- **N3, contrat du capteur** : la porte s'ouvre si la lampe, telle qu'on la voit, a la teinte demandée pendant 0,4 s de τ, à une distance comprise entre 12 m et 0,15·L (45 m à c = 30 ; 0,2·L pour l'infrarouge), mais au moins 12 m de plage (à recalibrer à petit c). D est calculé avec la géométrie réelle (hauteur et décalage de la lampe). Au passage sous la porte, l'angle fait revenir la lampe au rouge : on n'évalue donc jamais là. Tests du bot : franchir la porte à la vitesse de référence ; à fond, c'est le choc.
+- **N4, règle juste** : ce que tu vois a r/c de retard, et le pont continue de bouger pendant ton trajet. Seul compte son état à ton arrivée : il faut se fier à l'horaire de la ville. La condition dépend de r, donc de la vitesse d'approche : 0,155·L (46 m ; 1,55 s) à β = 0,5, 0,543·L (163 m ; 5,4 s) à β = 0,76. D'où le départ lancé, qui impose le profil de référence. Le cycle (durée « baissé » ≤ r/c et ≤ P − r/c) est réglé pour que les fenêtres de réussite en vision relativiste et en vision classique soient disjointes. Tests du bot :
   - à profil égal, la fenêtre exprimée en phase vue est décalée d'exactement r/c entre k = 1 et k = 0 ;
   - « je fonce dès que je le vois baissé » échoue ;
   - « je suis l'horaire » réussit.
 
-  En fonçant vers le pont, on voit son « film » en accéléré : ×(1+β) par rapport à l'horloge de la ville (×1,76 à 76 m/s), soit ×D = γ(1+β) par rapport à ta montre (×2,7).
-- **N5, jauge** : elle mesure l'écart **dans ton référentiel** : g' = |Δx'| − cΔt', soit g·e^φ en ligne droite. Dans la ville, l'écart diminue toujours, même au-delà de l'horizon. La jauge porte le repère « horizon : 1 000 m ». La bulle « l'écart ne se referme plus » se déclenche sur dg'/dτ ≥ −0,5 m/s.
-- **N6, anneau** : avec la conduite arcade (décision 1), la route fournit les 160 à 300 m/s² d'accélération centripète, hors du budget du moteur : plus besoin d'un rail d'exception. Un rayon de 500 m demande le volant à |u|/(500 m · TURN_RATE), soit 0,77 à γ = 4 (TURN_RATE = 1,0 rad/s). Un guidage facultatif pour rester sur l'anneau reste à décider en J5. Le mécanisme des « vivants » (étapes d'âge affichées en t_e) arrive en J4.
+  En fonçant vers le pont, on voit son « film » en accéléré : ×(1+β) par rapport à l'horloge de la ville (×1,76 à β = 0,76), soit ×D = γ(1+β) par rapport à ta montre (×2,7).
+- **N5, jauge** : elle mesure l'écart **dans ton référentiel** : g' = |Δx'| − cΔt', soit g·e^φ en ligne droite. Dans la ville, l'écart diminue toujours, même au-delà de l'horizon. La jauge porte le repère « horizon : L » (300 m à c = 30). La bulle « l'écart ne se referme plus » se déclenche sur dg'/dτ ≥ −0,005·c (−0,15 m/s à c = 30).
+- **N6, anneau** : avec la conduite arcade (décision 1), la route fournit 16 à 30·a d'accélération centripète (48 à 90 m/s² à c = 30, 160 à 300 m/s² à c = 100), hors du budget du moteur : plus besoin d'un rail d'exception. Un rayon de 0,5·L demande le volant à |u|/(0,5·L · TURN_RATE) = γβ/5, soit 0,77 à γ = 4, pour tout c (TURN_RATE = 1,0 rad/s). Un guidage facultatif pour rester sur l'anneau reste à décider en J5. Le mécanisme des « vivants » (étapes d'âge affichées en t_e) arrive en J4.
 
 ### Habillage (proposition, facultative)
 - Ville de Lumière-sur-Lente, entreprise Photon Express.
@@ -359,7 +367,7 @@ Position des objets à l'instant t de la **ville**, passée par la même aberrat
 - Jumeau sédentaire « Luc » au dépôt.
 - Façades saturées dans l'ordre de l'arc-en-ciel, pour que la rue « glisse d'un cran » avec le Doppler. Primaires pures réservées aux lampes ; ni noir (réservé à « hors du visible »), ni grandes surfaces blanches.
 - Modélisation low poly (boîtes, aplats) ; seule la subdivision invisible des faces est imposée par l'aberration.
-- Pas de son diégétique : avec c = 100 m/s, le son à 343 m/s irait plus vite que la lumière.
+- Pas de son diégétique : avec c ≤ 100 m/s, le son à 343 m/s irait plus vite que la lumière.
 
 ## 7. Licences et crédits
 
@@ -432,11 +440,11 @@ aSlower/
 │   ├── storage.js                 # local + session, try/catch, repli mémoire, préfixe aslower:v1:
 │   ├── data/
 │   │   ├── palette.json           # couleurs nommées : r, g, b, ir, uv
-│   │   ├── scenes/avenue-test.json  quartier-test.json      # J1 (scènes de développement)
+│   │   ├── scenes/avenue-test.json  quartier-test.json      # J1 (scènes de développement, longueurs en L)
 │   │   ├── bubbles.json           # J2 : textes et déclencheurs des bulles
 │   │   └── notebook.json          # J5 : carnet de physique
 │   ├── physics/                   # PUR : ni three ni DOM
-│   │   ├── constants.js           # C = 100, A = 10, PHI_MAX
+│   │   ├── constants.js           # c réglable : C_MIN..C_MAX = 10..100, C_DEFAULT = 30, physicsFor(c), PHI_MAX
 │   │   ├── relativity.js          # γ, composition, aberration, Doppler, emissionTimeStatic
 │   │   ├── player.js              # état u = γv, segment exact, conduite, snapshot, clampFrameDt
 │   │   ├── spectrum.js            # bases, CMF, M(D), raies, corps noirs, perceivedColor
@@ -469,9 +477,11 @@ aSlower/
 │   │   └── tilt.js  tiltMath.js  device.js                  # J2 (tiltMath pur ; device : plein écran, Wake Lock)
 │   ├── hud/
 │   │   ├── hud.js  hud.css  format.js (PUR)  credits.js  diag.js   # J1 (diag : #diag, ?bench)
+│   │   ├── lightSpeed.js          # J1 : réglage « Vitesse de la lumière » (titre, pause)
 │   │   ├── bubbles.js  announcer.js                                # J2 (affichage)
 │   │   └── spectrometer.js                                         # J3
 │   ├── game/
+│   │   ├── settings.js            # J1 : réglage de c (saisie, ?c=, stockage aslower:v1:reglages)
 │   │   ├── conditions.js  bubbles.js   # J2 : déclencheurs (sans eval), moteur « une seule fois »
 │   │   └── states.js  level.js  rules.js  score.js  validate.js  bot.js   # J3
 │   ├── levels/                    # J3+
@@ -480,7 +490,7 @@ aSlower/
 │   └── styles/base.css
 └── tests/
     ├── J1 : player  relativity  retarded  spectrum (LUT échantillonnée comme le GPU)
-    │        render-math  layout  lod  culling  format  storage  purity  licence  check-dist  loop
+    │        render-math  layout  lod  culling  format  storage  purity  licence  check-dist  loop  settings
     ├── J2 : tiltMath  conditions
     ├── J3 : collisions  rules  levels (+ fixtures/levels-invalid/)  score  states  culling (cône apparent)
     └── J4 : living
@@ -503,7 +513,7 @@ aSlower/
 ### J1 : socle physique et rendu
 
 **Bilan (2026-10-11) : terminé.** 292 tests verts, CI et Pages en ligne, vision classique identique au pixel près
-au rendu sans effets. Mesure `?bench` sur l'iPhone 14 Pro Max de l'auteur (Safari, DPR 2, profil normal) :
+au rendu sans effets. Mesure `?bench` sur l'iPhone 14 Pro Max de l'auteur (Safari, DPR 2, profil normal), **à c = 100 m/s, avant la décision 10** (reproductible avec `?c=100&bench`) :
 avenue 59 i/s, image p95 17 ms (max 68 ms), 39 appels, 21,7 k triangles ; quartier 59 i/s, p95 17 ms
 (max 34 ms), 211 appels, 110 k triangles ; CPU du rendu ≤ 2 ms au p95. Commandes tactiles et virage validés
 par l'auteur. Reste à mesurer : un GSM Android moyen (J2).
@@ -514,9 +524,9 @@ Un seul jalon à valider. Chaque étape est publiée sur Pages et jouable sur le
 | **J1a** | Outillage, CI (tests → build → check-dist → Pages), notices, Crédits, README. `physics/` complet (constants, relativity, player, spectrum, retarded) avec ses tests. Scène avenue **non relativiste** chargée depuis `avenue-test.json` (cityMesher, LOD par distance). Clavier et tactile (mode glisser) ; paysage strictement imposé (panneau « Tourne ton GSM »). HUD minimal : deux horloges et leur écart, phrase γ, jauge. |
 | **J1b** | Aberration et retard dans le vertex shader. Vision classique (k). `#diag` et `?bench`. **Première mesure sur le GSM.** `#diag` affiche : temps d'image p50 et p95, temps CPU de `render()`, appels de dessin et triangles (`renderer.info`), durée de la première image, présence de `KHR_parallel_shader_compile`, `gl.RENDERER`, DPR atteint, et un interrupteur de la passe ciel/sol. |
 | **J1c** | LUT Doppler par fragment, projecteur, tone mapping. Lampadaires corps noir, panneaux IR/UV. |
-| **J1d** | Passe ciel/sol/brouillard, mesurée par différence avec J1b ; leviers si nécessaire. Scène `quartier-test` (≈ 1,3 × 1,3 km, pour contenir tout le disque de 600 m) pour mesurer les appels de dessin, et super-chunks ou `BatchedMesh` si besoin. |
+| **J1d** | Passe ciel/sol/brouillard, mesurée par différence avec J1b ; leviers si nécessaire. Scène `quartier-test` (demi-côté = visibilité + 12 m arrondi aux 80 m supérieurs, pour contenir tout le disque de visibilité : ≈ 1,3 × 1,3 km à c ≥ 50, 0,8 × 0,8 km à c = 30, 0,64 × 0,64 km à c = 10) pour mesurer les appels de dessin, et super-chunks ou `BatchedMesh` si besoin. |
 
-**Scène de test** : avenue droite de **4 km**, bordée d'environ 280 bâtiments aux couleurs de l'arc-en-ciel. Il faut 1,5 km pour atteindre γ ≈ 2,5 (91,7 m/s), autant pour freiner, et il reste 1 km de marge. Au bout, une place avec une butée douce (pas de collision avant J3). Pas de batterie ni de délai.
+**Scène de test** : avenue droite de **4·L** (1 200 m à c = 30, 4 km à c = 100), bordée de bâtiments aux couleurs de l'arc-en-ciel (≈ 6 par îlot de 80 m : environ 80 à c = 30, 280 à c = 100). Il faut 1,5·L pour atteindre γ ≈ 2,5 (β = 0,917 : 27,5 m/s à c = 30), autant pour freiner, et il reste L de marge (450 + 450 + 300 m à c = 30). Îlots, rues transversales et lampadaires (tous les 40 m) gardent leur espacement en mètres ; la place, la butée et les panneaux IR/UV sont placés en L. Au bout, une place avec une butée douce (pas de collision avant J3). Pas de batterie ni de délai.
 
 **Livré en plus de la demande, et pourquoi** :
 - CI et Pages : tester sur le GSM, puisque le gyroscope exige HTTPS ;
@@ -536,7 +546,7 @@ Un seul jalon à valider. Chaque étape est publiée sur Pages et jouable sur le
    - la LUT, échantillonnée comme sur le GPU (half + interpolation), vaut [I | 0] à 1e-3 près à D = 1 ;
    - invariance du corps noir, qui fixe l'exposant : pour un blanc plat (r + g + b + ir + uv ≡ 1), D⁴·M(D)·w = 𝐍·RGB(XYZ(B(D·5 800 K))) à 1e-4 près pour D ∈ {0,5 ; 2 ; 6 ; 20} ;
    - une lampe corps noir à D ≠ 1 ne reçoit pas deux fois le facteur D⁴ ;
-   - lampe à 640 nm : spectrum.js la classe « verte » exactement quand λ₀/D ∈ [510 ; 562] nm, D étant calculé indépendamment dans le test (soit v ∈ [12,9 ; 22,3] m/s ; tolérance de ±3 nm sur les bornes) ;
+   - lampe à 640 nm : spectrum.js la classe « verte » exactement quand λ₀/D ∈ [510 ; 562] nm, D étant calculé indépendamment dans le test (soit β ∈ [0,129 ; 0,223], v ∈ [3,9 ; 6,7] m/s à c = 30 et [12,9 ; 22,3] m/s à c = 100 ; tolérance de ±3 nm sur les bornes) ;
    - pureté, stockage, licences (sources).
 2. **CI verte**, `check-dist` OK, jeu en ligne sur <https://hugohismans.github.io/aSlower/>.
 3. **Performance** (`?bench` : sur l'avenue, accélération réelle jusqu'à γ ≈ 2,5 ; sur le quartier, caméra scriptée à β imposé de 0 à 0,92, puisque la scène est trop petite pour accélérer) : médiane ≥ 55 i/s et 95e centile ≤ 20 ms. Conditions : après 2 min de chauffe, DPR ≥ 1, hors mode économie d'énergie, sur l'iPhone 14 Pro Max de l'auteur (Safari iOS, rAF à 60 Hz ; et un GSM Android moyen si possible). Sinon, on identifie le poste dominant dans `#diag` et on applique le levier correspondant avant de clore.
@@ -577,7 +587,7 @@ Un seul jalon à valider. Chaque étape est publiée sur Pages et jouable sur le
 
 | Risque | Parade |
 |---|---|
-| Appels de dessin en quartier (98 à 294 chunks visibles à 600 m) | Mesure en J1d ; super-chunks ou BatchedMesh ; brouillard plus court en lite |
+| Appels de dessin en quartier (98 à 294 chunks visibles à 600 m, c ≥ 50 ; ≈ 2,8 fois moins à c = 30) | Mesure en J1d ; super-chunks ou BatchedMesh ; brouillard plus court en lite |
 | Lisibilité des couleurs à grande vitesse | IR en plateau infini et réflectances proche IR variées dans la palette ; corps noirs ; projecteur physique p = 4 (D⁴ exact jusqu'à D = 8, BEAM_MAX = 8⁴) et adaptation de l'exposition (`adaptationExposure`) ; exposant réglable |
 | Teintes hypersensibles (4 % sur D font passer du jaune au vert) | Règles de porte calculées par la même chaîne (`perceivedColor`) ; Doppler par fragment |
 | Courbes polygonales au-delà de γ ≈ 2,5 | LOD fin pour les îlots proches (J5) ou plafond visuel |
@@ -590,17 +600,18 @@ Un seul jalon à valider. Chaque étape est publiée sur Pages et jouable sur le
 
 ## 11. Décisions de l'auteur (2026-10-11)
 
-Réponses aux neuf questions du plan. Elles priment sur toute version antérieure de ce document, qui a été mis à jour en conséquence.
+Réponses aux neuf questions du plan, puis la décision 10 (même jour). Elles priment sur toute version antérieure de ce document, qui a été mis à jour en conséquence.
 
-1. **Conduite : arcade**, plutôt que l'adhérence honnête à 10 m/s² d'abord proposée. La route fournit la force latérale, hors du budget du moteur : a = 10 m/s² ne vaut que pour la poussée et le frein. Le virage fait tourner u à |u| constant, dθ/dτ = −steer·TURN_RATE ; à l'arrêt, le cap pivote à PIVOT_RATE. Plus de cercle d'adhérence, plus de rail d'exception au niveau 6. L'échelle reste celle du §1.1 : 1 km pour atteindre γ = 2, autant pour freiner (§1.1, §3, §6).
-2. **Dilemme des horloges : choix délégué** (« je te laisse choisir la meilleure option »). Retenu : les fenêtres « pas avant », qui font du paradoxe des jumeaux la solution (§1.2). Le moteur qui consomme (optimum vers 50 m/s) n'est pas retenu : il brouillerait la règle simple « batterie = τ ».
-3. **Couleurs : le modèle le plus fidèle à la physique**, plutôt que la fidélité stricte à OpenRelativity (illisible au-delà d'environ 50 m/s). Réflectance × soleil à 5 800 K, bases infrarouge et ultraviolette, fonctions colorimétriques de Wyman et al. ; effet projecteur physique par défaut, `BEAM_EXPONENT = 4`, borné par `BEAM_MAX` (= 8⁴, D⁴ exact jusqu'à D = 8), avec adaptation de l'exposition de l'œil (§4). Le modèle d'OpenRelativity reste un préréglage de comparaison.
+1. **Conduite : arcade**, plutôt que l'adhérence honnête à a d'abord proposée. La route fournit la force latérale, hors du budget du moteur : a (= c/10 depuis la décision 10) ne vaut que pour la poussée et le frein. Le virage fait tourner u à |u| constant, dθ/dτ = −steer·TURN_RATE ; à l'arrêt, le cap pivote à PIVOT_RATE. Plus de cercle d'adhérence, plus de rail d'exception au niveau 6. L'échelle reste celle du §1.1 : L pour atteindre γ = 2, autant pour freiner (300 m à c = 30 ; §1.1, §3, §6).
+2. **Dilemme des horloges : choix délégué** (« je te laisse choisir la meilleure option »). Retenu : les fenêtres « pas avant », qui font du paradoxe des jumeaux la solution (§1.2). Le moteur qui consomme (optimum vers β = 0,5) n'est pas retenu : il brouillerait la règle simple « batterie = τ ».
+3. **Couleurs : le modèle le plus fidèle à la physique**, plutôt que la fidélité stricte à OpenRelativity (illisible au-delà d'environ β = 0,5). Réflectance × soleil à 5 800 K, bases infrarouge et ultraviolette, fonctions colorimétriques de Wyman et al. ; effet projecteur physique par défaut, `BEAM_EXPONENT = 4`, borné par `BEAM_MAX` (= 8⁴, D⁴ exact jusqu'à D = 8), avec adaptation de l'exposition de l'œil (§4). Le modèle d'OpenRelativity reste un préréglage de comparaison.
 4. **Orientation : paysage strictement imposé** sur appareil tactile : panneau « Tourne ton GSM » sans bouton « Jouer quand même », dès le J1 (§5).
 5. **Licence : MIT pour le code, CC BY 4.0 pour les contenus**, plutôt que MIT pour tout : `LICENSE` et `LICENSE-CONTENT.md` (§7).
 6. **Délais : un retard coûte seulement l'étoile « Ponctuel »**, au lieu de faire échouer le niveau. L'échec ne vient que de la batterie vide et du flash (§6) ; règles livrées au J3, flash avec le niveau 5.
 7. **Appareil de test : iPhone 14 Pro Max** (Safari iOS, DPR 3, `requestAnimationFrame` limité à 60 Hz par défaut). C'est l'appareil des mesures de performance du J1 (§4, §9).
 8. **GitHub Pages : source « GitHub Actions »**, confirmée. Publication par `.github/workflows/deploy.yml` sur <https://hugohismans.github.io/aSlower/>.
 9. **Niveau 4 : interprétation confirmée.** « Il semble ouvert » se lit « il semble praticable » (pont baissé).
+10. **2026-10-11 : c = 30 m/s, a = 3 m/s² par défaut, puis c réglable par le joueur** : entier de 10 à 100 m/s, 30 par défaut, a = c/10. Le rapport c/a = 10 s est fixe (même rythme de jeu pour tout c) ; l'unité de longueur L = c²/a = 10·c m suit le réglage (300 m par défaut au lieu de 1 000 m). Toute la partie lit ses constantes dans `physicsFor(c)` : physique injectée (`createPlayer({physics})`, c en paramètre de `relativity.js` et `retarded.js`), scènes développées pour L (longueurs de jeu en L, échelle humaine en mètres), visibilité clamp(1,2·L ; 300 ; 600) m, butée, `?bench`, HUD (mur à c, décimales, « c = 30 m/s ») ; le rendu ne dépend que de β. Réglage sur l'écran titre (préréglages 10 / 30 / 50 / 100) et au menu pause (« Changer c », qui recommence la partie), mémorisé (`aslower:v1:reglages`), `?c=n` prioritaire. TURN_RATE (1,0 rad/s), PIVOT_RATE, sous-pas (1/60 s, 1 m), pas des LOD, hauteur de l'œil, tailles des bâtiments et largeurs des rues ne changent pas. Les tests obligatoires du cahier des charges restent exécutés avec c = 100, a = 10 injectés ; ils tournent aussi à c = 30 et c = 10. Les niveaux (J3+) seront écrits en L et en β, et calibrés par le bot pour plusieurs c (au moins 10, 30 et 100).
 
 ## 12. Glossaire FR → EN
 
@@ -613,6 +624,8 @@ Le jeu, les données JSON et la documentation sont en français ; les identifian
 | écart t − τ | gap (`formatGap`) |
 | vitesse propre u = γv | `ux`, `uy` |
 | rapidité φ, plafond de rapidité | `rapidity`, `phiMax` |
+| vitesse de la lumière (réglage), unité de longueur L = c²/a | `c` (`physicsFor`, `C_DEFAULT`), `lengthUnit` |
+| réglages (stockage) | settings (`game/settings.js`, clé `reglages`) |
 | cap | `heading` (`hx`, `hy`) |
 | volant, accélérateur, frein | `steer`, `thrust`, `brake` |
 | vision classique | `classic` (coefficient k, `REL_CLASSIC`) |

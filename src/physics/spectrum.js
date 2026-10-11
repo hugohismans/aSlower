@@ -555,10 +555,11 @@ function linearSrgbToOklab(rgb) {
  * après lineColor, une raie à 562 nm a la teinte 127,7° et une raie à 510 nm 165,2°,
  * si bien qu'une raie est « vert » exactement pour λ ∈ [≈ 510 ; ≈ 562] nm (porte du N3).
  * Raie de 640 nm vue de face (perceivedColor, réglages par défaut, exposition 1) : rouge,
- * orange dès 7,1 m/s, jaune 9,3, vert 13,0 (561,8 nm), cyan 22,3 (510,3 nm), bleu 27,3,
- * violet 32,6, bleu 44,2 (sous 398 nm, où x̄ de Wyman est sous-estimé), noir dès 44,6 m/s.
+ * orange dès β = 0,071, jaune 0,093, vert 0,130 (561,8 nm), cyan 0,223 (510,3 nm), bleu
+ * 0,273, violet 0,326, bleu 0,442 (sous 398 nm, où x̄ de Wyman est sous-estimé), noir dès
+ * β = 0,446 ; à c = 30 m/s, vert de 3,9 à 6,7 m/s et noir dès 13,4 m/s.
  * Avec l'adaptation du jeu (exposure = adaptationExposure(D)) : mêmes seuils jusqu'au
- * violet (la fenêtre « vert » ne change pas), puis noir dès 40,7 m/s.
+ * violet (la fenêtre « vert » ne change pas), puis noir dès β = 0,407 (12,2 m/s à c = 30).
  */
 const HUE_RULES = Object.freeze({
   /** Clarté Oklab sous laquelle tout est « noir » (≈ 0,8 % de la luminance du blanc). */
@@ -752,7 +753,7 @@ export function sampleLutLikeGpu(lut, D, row) {
  *   d'amplitude 0,02 et de largeur 5 nm, facteur (1/shift)³ (:356-371).
  * Convention d'OpenRelativity : shift = 1/D (la raie μ est vue à μ·shift).
  * Écarts connus (non corrigés ici, c'est un préréglage) : intensité en D² au lieu de D⁴,
- * luminance qui s'effondre au-delà de ≈ 50 m/s.
+ * luminance qui s'effondre au-delà de β ≈ 0,5.
  */
 
 const OR_CMF = Object.freeze({

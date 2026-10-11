@@ -9,8 +9,12 @@
  * segments hyperboliques (voir `hyperbolicSegment`) : exact et indépendant du découpage en
  * ligne droite et en virage pur, d'ordre 2 en virage avec poussée (voir plus bas).
  *
+ * Constantes physiques : c et a sont ceux de la partie (réglage du joueur, physicsFor),
+ * injectés à la création (`createPlayer({physics: {c, a}})`) et gardés dans l'état ; par
+ * défaut, ceux du réglage par défaut (C = 30 m/s, A = 3 m/s²).
+ *
  * Modèle « voiture arcade » (choix de l'auteur) :
- * - poussée et frein (|a| ≤ A = 10 m/s², en accélération propre) le long du cap ;
+ * - poussée et frein (|accélération propre| ≤ a) le long du cap ;
  * - la route fournit la force latérale, hors du budget du moteur : le virage fait tourner
  *   u et le cap à |u| constant, au taux dθ/dτ = −steer·TURN_RATE (steer > 0 : à droite) ;
  * - quand on roule, le cap suit la direction de u ; à l'arrêt, le volant fait pivoter le cap
@@ -41,37 +45,55 @@ import { gammaFromU, hyperbolicSegment, rapidityFromU } from './relativity.js';
 
 /**
  * @typedef {{x:number, y:number, ux:number, uy:number, hx:number, hy:number,
- *            tau:number, t:number, phiMax:number}} PlayerState
+ *            tau:number, t:number, phiMax:number, c:number, a:number}} PlayerState
  * x, y : position (m) ; ux, uy : vitesse propre u = γv (m/s) ; hx, hy : cap unitaire ;
- * tau : temps propre (batterie, s) ; t : temps de la ville (s) ; phiMax : plafond de rapidité.
+ * tau : temps propre (batterie, s) ; t : temps de la ville (s) ; phiMax : plafond de rapidité ;
+ * c : vitesse de la lumière (m/s) et a : accélération propre maximale (m/s²) de la partie.
  */
 
 /** @typedef {{thrust?: number, brake?: number, steer?: number}} DriveCommand */
 
+/** Constantes physiques par défaut (réglage par défaut). */
+const DEFAULT_DRIVE_PHYSICS = Object.freeze({ c: C, a: A });
+
 /**
  * Crée l'état du joueur, à l'arrêt.
- * @param {{x?: number, y?: number, heading?: number, phiMax?: number}} [options]
- *   heading : cap en radians depuis +x vers +y (π/2 = nord).
+ * @param {{x?: number, y?: number, heading?: number, phiMax?: number,
+ *          physics?: {c: number, a: number}}} [options]
+ *   heading : cap en radians depuis +x vers +y (π/2 = nord) ; physics : constantes de la
+ *   partie (`physicsFor(c)` convient ; défaut : c = C, a = A).
  * @returns {PlayerState}
  */
-export function createPlayer({ x = 0, y = 0, heading = Math.PI / 2, phiMax = PHI_MAX_DEFAULT } = {}) {
+export function createPlayer({
+  x = 0,
+  y = 0,
+  heading = Math.PI / 2,
+  phiMax = PHI_MAX_DEFAULT,
+  physics = DEFAULT_DRIVE_PHYSICS,
+} = {}) {
   if (!(phiMax > 0 && phiMax <= PHI_MAX_LIMIT)) {
     throw new RangeError(`phiMax doit être dans ]0 ; ${PHI_MAX_LIMIT}] (reçu : ${phiMax})`);
   }
-  return { x, y, ux: 0, uy: 0, hx: Math.cos(heading), hy: Math.sin(heading), tau: 0, t: 0, phiMax };
+  const { c, a } = physics ?? DEFAULT_DRIVE_PHYSICS;
+  if (!(c > 0 && Number.isFinite(c) && a > 0 && Number.isFinite(a))) {
+    throw new RangeError(`physics : c et a positifs et finis attendus (reçu : c = ${c}, a = ${a})`);
+  }
+  return { x, y, ux: 0, uy: 0, hx: Math.cos(heading), hy: Math.sin(heading), tau: 0, t: 0, phiMax, c, a };
 }
 
 /**
  * Durée maximale d'un sous-pas : au plus SUBSTEP_MAX_DT et au plus SUBSTEP_MAX_DIST
  * parcourus. On divise par une borne supérieure de |u| sur le sous-pas : la rapidité
- * croît au plus de A·h/c, sans dépasser le plafond.
+ * croît au plus de a·h/c, sans dépasser le plafond.
  * @param {PlayerState} s
  * @param {number} phiCap
+ * @param {number} c
+ * @param {number} a
  */
-function maxSubstep(s, phiCap) {
-  const phi0 = rapidityFromU(s.ux, s.uy);
-  const phiBound = Math.min(phi0 + (A * SUBSTEP_MAX_DT) / C, Math.max(phi0, phiCap));
-  return Math.min(SUBSTEP_MAX_DT, SUBSTEP_MAX_DIST / (C * Math.sinh(phiBound)));
+function maxSubstep(s, phiCap, c, a) {
+  const phi0 = rapidityFromU(s.ux, s.uy, c);
+  const phiBound = Math.min(phi0 + (a * SUBSTEP_MAX_DT) / c, Math.max(phi0, phiCap));
+  return Math.min(SUBSTEP_MAX_DT, SUBSTEP_MAX_DIST / (c * Math.sinh(phiBound)));
 }
 
 /**
@@ -115,13 +137,14 @@ function settleHeading(s) {
  * @param {number} accel
  * @param {number} omega taux de virage dθ/dτ (rad/s)
  * @param {number} h
+ * @param {number} c
  */
-function movingPiece(s, accel, omega, h) {
+function movingPiece(s, accel, omega, h, c) {
   const half = 0.5 * omega * h;
   const cos = Math.cos(half);
   const sin = Math.sin(half);
   if (half !== 0) rotateVelocityAndHeading(s, cos, sin);
-  const seg = hyperbolicSegment(s.ux, s.uy, accel * s.hx, accel * s.hy, h);
+  const seg = hyperbolicSegment(s.ux, s.uy, accel * s.hx, accel * s.hy, h, c);
   // Facteur de corde : exact pour un arc de cercle à |u| constant (virage pur).
   const chord = half !== 0 ? sin / half : 1;
   s.x += chord * seg.dx;
@@ -157,9 +180,10 @@ function restPiece(s, steer, h) {
  * Remet la rapidité exactement à φ le long du cap (fin d'une poussée plafonnée).
  * @param {PlayerState} s
  * @param {number} phi
+ * @param {number} c
  */
-function setRapidity(s, phi) {
-  const U = C * Math.sinh(phi);
+function setRapidity(s, phi, c) {
+  const U = c * Math.sinh(phi);
   s.ux = U * s.hx;
   s.uy = U * s.hy;
 }
@@ -173,8 +197,10 @@ function setRapidity(s, phi) {
  * @param {number} steer −1..1
  * @param {number} h
  * @param {number} phiCap
+ * @param {number} c
+ * @param {number} a
  */
-function substep(s, thrust, brake, steer, h, phiCap) {
+function substep(s, thrust, brake, steer, h, phiCap, c, a) {
   const atRest = Math.hypot(s.ux, s.uy) <= REST_EPSILON;
   const omega = -steer * TURN_RATE;
 
@@ -183,38 +209,38 @@ function substep(s, thrust, brake, steer, h, phiCap) {
       restPiece(s, steer, h);
       return;
     }
-    // Temps propre d'arrêt : la rapidité baisse au taux brake·A/c.
-    const decel = brake * A;
-    const tauStop = (rapidityFromU(s.ux, s.uy) * C) / decel;
+    // Temps propre d'arrêt : la rapidité baisse au taux brake·a/c.
+    const decel = brake * a;
+    const tauStop = (rapidityFromU(s.ux, s.uy, c) * c) / decel;
     if (tauStop >= h) {
-      movingPiece(s, -decel, omega, h);
+      movingPiece(s, -decel, omega, h, c);
       return;
     }
-    movingPiece(s, -decel, omega, tauStop);
+    movingPiece(s, -decel, omega, tauStop, c);
     restPiece(s, steer, h - tauStop); // arrêt exact (u = 0), le reste du sous-pas à l'arrêt
     return;
   }
 
   if (thrust > 0) {
     // À l'arrêt, la poussée part dans la direction du cap (u = 0, le cap est conservé).
-    const accel = thrust * A;
-    const tauCap = ((phiCap - rapidityFromU(s.ux, s.uy)) * C) / accel;
+    const accel = thrust * a;
+    const tauCap = ((phiCap - rapidityFromU(s.ux, s.uy, c)) * c) / accel;
     if (tauCap >= h) {
-      movingPiece(s, accel, omega, h);
+      movingPiece(s, accel, omega, h, c);
       return;
     }
     if (tauCap > 0) {
-      movingPiece(s, accel, omega, tauCap);
-      setRapidity(s, phiCap);
+      movingPiece(s, accel, omega, tauCap, c);
+      setRapidity(s, phiCap, c);
     }
     // Plafond atteint : roue libre pour le reste du sous-pas.
-    movingPiece(s, 0, omega, h - Math.max(tauCap, 0));
+    movingPiece(s, 0, omega, h - Math.max(tauCap, 0), c);
     return;
   }
 
   // Ni poussée ni frein : roue libre, ou pivot si l'on est à l'arrêt.
   if (atRest) restPiece(s, steer, h);
-  else movingPiece(s, 0, omega, h);
+  else movingPiece(s, 0, omega, h, c);
 }
 
 /**
@@ -245,17 +271,19 @@ export function step(state, cmd, dtau) {
   const brake = clampInput(cmd?.brake, 0, 1);
   const steer = clampInput(cmd?.steer, -1, 1);
   const phiCap = Math.min(state.phiMax, PHI_MAX_LIMIT);
+  const c = state.c ?? C; // état créé sans constantes (ancien format) : réglage par défaut
+  const a = state.a ?? A;
 
   // Plafond abaissé en cours de route : la rapidité est ramenée tout de suite au plafond.
-  if (rapidityFromU(state.ux, state.uy) > phiCap) {
+  if (rapidityFromU(state.ux, state.uy, c) > phiCap) {
     settleHeading(state);
-    setRapidity(state, phiCap);
+    setRapidity(state, phiCap, c);
   }
 
   let remaining = dtau;
   while (remaining > 0) {
-    const h = Math.min(remaining, maxSubstep(state, phiCap));
-    substep(state, thrust, brake, steer, h, phiCap);
+    const h = Math.min(remaining, maxSubstep(state, phiCap, c, a));
+    substep(state, thrust, brake, steer, h, phiCap, c, a);
     remaining -= h;
   }
   return state;
@@ -263,14 +291,16 @@ export function step(state, cmd, dtau) {
 
 /**
  * Grandeurs dérivées de l'état, pour le rendu, le HUD et les règles.
+ * c : vitesse de la lumière de la partie (m/s), pour le HUD (jauge, décimales près de c).
  * @param {PlayerState} state
  * @returns {{x: number, y: number, vx: number, vy: number, speed: number, beta: number,
  *            gamma: number, rapidity: number, tau: number, t: number, ux: number,
- *            uy: number, heading: number, hx: number, hy: number}}
+ *            uy: number, heading: number, hx: number, hy: number, c: number}}
  */
 export function snapshot(state) {
   const { x, y, ux, uy, hx, hy, tau, t } = state;
-  const gamma = gammaFromU(ux, uy);
+  const c = state.c ?? C;
+  const gamma = gammaFromU(ux, uy, c);
   const speed = Math.hypot(ux, uy) / gamma;
   return {
     x,
@@ -278,9 +308,9 @@ export function snapshot(state) {
     vx: ux / gamma,
     vy: uy / gamma,
     speed,
-    beta: speed / C,
+    beta: speed / c,
     gamma,
-    rapidity: rapidityFromU(ux, uy),
+    rapidity: rapidityFromU(ux, uy, c),
     tau,
     t,
     ux,
@@ -288,6 +318,7 @@ export function snapshot(state) {
     heading: Math.atan2(hy, hx),
     hx,
     hy,
+    c,
   };
 }
 

@@ -67,9 +67,9 @@ function randomDirection(rand) {
 }
 
 /** Instantané « joueur » pour une vitesse propre (ux, uy) dans le repère du jeu. */
-function snapshotFromU(ux, uy) {
-  const v = velocityFromU(ux, uy);
-  return { vx: v.x, vy: v.y, gamma: gammaFromU(ux, uy) };
+function snapshotFromU(ux, uy, c = C) {
+  const v = velocityFromU(ux, uy, c);
+  return { vx: v.x, vy: v.y, gamma: gammaFromU(ux, uy, c), c };
 }
 
 /** Uniformes observateur lus dans REL (valeurs JS : double précision). */
@@ -198,7 +198,7 @@ describe('coords', () => {
 
 describe('uniforms.updateObserver', () => {
   it('β monde → repère Three (βx, 0, −βy), γ et γ²/(γ + 1) en double précision', () => {
-    const snap = snapshotFromU(120, -250);
+    const snap = snapshotFromU(1.2 * C, -2.5 * C);
     updateObserver(snap, 1);
     const { beta, gamma, g2 } = observer();
     expect(beta[0]).toBeCloseTo(snap.vx / C, 15);
@@ -232,7 +232,7 @@ describe('uniforms.updateObserver', () => {
   });
 
   it('exposition d’adaptation : E(e^φ_eff) suivie à chaque mise à jour, 1 à l’arrêt et en vision classique', () => {
-    const phi = Math.atanh(90 / C); // 90 m/s
+    const phi = Math.atanh(0.9); // β = 0,9 (27 m/s à c = 30)
     const snap = snapshotFromU(C * Math.sinh(phi), 0);
     updateObserver(snap, 1);
     expect(REL.uExposure.value).toBeCloseTo(adaptationExposure(Math.exp(phi)), 12);
@@ -241,6 +241,15 @@ describe('uniforms.updateObserver', () => {
     expect(REL.uExposure.value).toBe(1);
     updateObserver(snapshotFromU(0, 0), 1);
     expect(REL.uExposure.value).toBe(1);
+  });
+
+  it('β = v/c avec la vitesse de la lumière de la partie (snapshot.c), obligatoire', () => {
+    for (const c of [10, 30, 100]) {
+      updateObserver(snapshotFromU(c * Math.sinh(1), 0, c), 1);
+      expect(observer().beta[0]).toBeCloseTo(Math.tanh(1), 14);
+      expect(observer().gamma).toBeCloseTo(Math.cosh(1), 13);
+    }
+    expect(() => updateObserver({ vx: 10, vy: 0, gamma: 1.1 }, 1)).toThrow(RangeError);
   });
 
   it('setVisibility pose le brouillard et refuse des distances incohérentes', () => {
@@ -295,7 +304,7 @@ describe('rel_vertex : aberration par sommet', () => {
   });
 
   it('REL_CLASSIC et k = 0 : aucune aberration', () => {
-    updateObserver(snapshotFromU(80, 30), 0);
+    updateObserver(snapshotFromU(0.8 * C, 0.3 * C), 0);
     const rel = [12, -1.6, -40];
     expect(glslAberrate(rel, observer())).toEqual(rel);
   });
@@ -401,7 +410,7 @@ describe('LUT Doppler (dopplerLut.js) lue comme dans rel_doppler.glsl', () => {
 
 describe('chaîne de couleur des fragments (rel_doppler.glsl) = spectrum.perceivedColor', () => {
   // uExposure suit désormais l'observateur (adaptation) : on compare à l'arrêt (E = 1).
-  beforeAll(() => updateObserver({ vx: 0, vy: 0, gamma: 1 }, 1));
+  beforeAll(() => updateObserver({ vx: 0, vy: 0, gamma: 1, c: C }, 1));
   const texture = createDopplerLutTexture();
   const params = [LUT_SIZE, LUT_LOG2_RANGE, LUT_HEIGHT];
   const mirror = makeFragmentMirror(texture, params);
@@ -453,7 +462,7 @@ describe('chaîne de couleur des fragments (rel_doppler.glsl) = spectrum.perceiv
 
   it('vision classique : à k = 0 la chaîne relativiste est identique à REL_CLASSIC', () => {
     const classic = makeFragmentMirror(texture, params, { classic: true });
-    updateObserver(snapshotFromU(150, 40), 0);
+    updateObserver(snapshotFromU(1.5 * C, 0.4 * C), 0);
     const obs = observer();
     for (const rho of surfaces) {
       const D = glslDopplerFactor([3, -1, -25], obs);

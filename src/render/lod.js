@@ -69,7 +69,7 @@ export function dopplerMin(gamma, beta, maxApparentAngle = Math.PI) {
  * nearestDistance × γ(1 − β) ; si la caméra regarde dans l'axe de la vitesse
  * (conduite arcade), on peut passer l'angle du coin du champ (≈ 48° en paysage
  * 932 × 430, hFOV 90°), plus l'écart éventuel entre l'axe de la caméra et β̂.
- * Mesure (quartier de test, β = 0,917, visibilité 600 m) : ≈ 330 k triangles
+ * Mesure (quartier de test à c = 100 m/s, β = 0,917, visibilité 600 m) : ≈ 330 k triangles
  * visibles avec la borne globale, ≈ 85 k avec l'angle du coin du champ.
  * @param {number} nearestDistance distance monde (m)
  * @param {number} gamma

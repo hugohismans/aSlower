@@ -1,10 +1,20 @@
 // Tests de src/render/layout.js (développement des scènes) et de src/render/cityMesher.js
 // (îlots maillés) sur les deux scènes de développement et sur des scènes minimales.
+// Les scènes sont paramétriques : leurs longueurs de jeu suivent L = c²/a = 10·c m ; elles
+// sont développées pour c = 10, 30 (défaut) et 100 m/s.
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { blackbodyRow } from '../src/physics/constants.js';
+import { blackbodyRow, LENGTH_UNIT, physicsFor } from '../src/physics/constants.js';
 import { AO_HEIGHT, buildCity, hexToLinearRgb, ROOF_STEP } from '../src/render/cityMesher.js';
-import { expandScene, footprint, footprintsTouch, overlapArea, SCENE_SCHEMA } from '../src/render/layout.js';
+import {
+  expandScene,
+  footprint,
+  footprintsTouch,
+  overlapArea,
+  resolveSceneLengths,
+  SCENE_SCHEMA,
+  visibilityFor,
+} from '../src/render/layout.js';
 
 const readJson = (path) => JSON.parse(readFileSync(new URL(path, import.meta.url), 'utf8'));
 const palette = readJson('../src/data/palette.json');
@@ -99,19 +109,35 @@ describe('palette', () => {
   });
 });
 
-describe('expandScene : avenue de test', () => {
-  const layout = expandScene(avenue, palette);
+/** Réglages de c essayés : minimum, défaut, maximum (L = 10·c m). */
+const LIGHT_SPEEDS = [10, 30, 100];
+
+describe('visibilité par défaut : clamp(1,2·L, 300, 600), lite = 0,7 × défaut', () => {
+  it('vaut 300/210 m à c = 10, 360/252 m à c = 30, 600/420 m à c ≥ 50', () => {
+    expect(visibilityFor(100)).toEqual({ lite: 210, default: 300 });
+    expect(visibilityFor(LENGTH_UNIT)).toEqual({ lite: 252, default: 360 });
+    expect(visibilityFor(500)).toEqual({ lite: 420, default: 600 });
+    expect(visibilityFor(1000)).toEqual({ lite: 420, default: 600 });
+  });
+});
+
+describe.each(LIGHT_SPEEDS)('expandScene : avenue de test à c = %i m/s', (c) => {
+  const L = physicsFor(c).lengthUnit;
+  const layout = expandScene(avenue, palette, { lengthUnit: L });
+  /** Îlots par côté : de y = 0 jusqu'à la place (4·L − 80), îlots de 56 m tous les 80 m. */
+  const n = Math.floor(L / 20) - 1;
 
   it('est déterministe (graine) et dépend de la graine', () => {
-    expect(expandScene(avenue, palette)).toEqual(layout);
-    const other = expandScene({ ...avenue, graine: avenue.graine + 1 }, palette);
+    expect(expandScene(avenue, palette, { lengthUnit: L })).toEqual(layout);
+    const other = expandScene({ ...avenue, graine: avenue.graine + 1 }, palette, { lengthUnit: L });
     expect(other.buildings.map((b) => b.height)).not.toEqual(layout.buildings.map((b) => b.height));
   });
 
-  it('donne le départ, la visibilité et les limites', () => {
+  it('donne le départ, la visibilité et les limites (fin de carte à 4·L + 60 m)', () => {
+    expect(layout.lengthUnit).toBe(L);
     expect(layout.start).toEqual({ x: 0, y: 20, heading: Math.PI / 2 });
-    expect(layout.visibility).toEqual({ lite: 400, default: 600 });
-    expect(layout.bounds).toEqual({ xmin: -160, ymin: -100, xmax: 160, ymax: 4060 });
+    expect(layout.visibility).toEqual(visibilityFor(L));
+    expect(layout.bounds).toEqual({ xmin: -160, ymin: -100, xmax: 160, ymax: 4 * L + 60 });
     for (const b of layout.buildings) {
       const f = footprint(b);
       expect(f.x0).toBeGreaterThanOrEqual(layout.bounds.xmin);
@@ -121,22 +147,33 @@ describe('expandScene : avenue de test', () => {
     }
   });
 
-  it('borde 4 km d\'avenue d\'environ 300 bâtiments de 8 à 30 m, sans chevauchement', () => {
+  it('mesure 4·L : avenue jusqu’à 4·L − 80 m, place jusqu’à 4·L ; 1,5·L + 1,5·L + L de marge depuis le départ', () => {
+    const avenueStreet = layout.streets.find((s) => s.width === 18 && s.from.x === 0);
+    expect(avenueStreet.from.y).toBe(-40);
+    expect(avenueStreet.to.y).toBe(4 * L - 80);
+    expect(layout.streets.some((s) => s.width === 130 && s.from.y === 4 * L - 80 && s.to.y === 4 * L)).toBe(true);
+    // Poussée jusqu'à γ = 2,5 puis frein : 2 × (c²/a)(γ − 1) = 3·L ; il reste L avant la place.
+    expect(20 + 3 * L).toBeLessThanOrEqual(4 * L - 80);
+  });
+
+  it('borde l’avenue d’environ 6 bâtiments de 8 à 30 m par îlot, sans chevauchement', () => {
     const rows = layout.buildings.filter((b) => /^(ouest|est)-\d+$/.test(b.blockId));
-    expect(rows.length).toBeGreaterThanOrEqual(260);
-    expect(rows.length).toBeLessThanOrEqual(320);
+    expect(rows.length).toBeGreaterThanOrEqual(2 * n * 2.6);
+    expect(rows.length).toBeLessThanOrEqual(2 * n * 3.3);
     for (const b of rows) {
       expect(b.height).toBeGreaterThanOrEqual(8);
       expect(b.height).toBeLessThanOrEqual(30);
     }
-    expect(Math.max(...rows.map((b) => footprint(b).y1))).toBeGreaterThan(3850);
+    expect(Math.max(...rows.map((b) => footprint(b).y1))).toBe(80 * (n - 1) + 56);
+    expect(80 * (n - 1) + 56).toBeGreaterThan(4 * L - 80 - 80);
     checkNoOverlap(layout.buildings);
   });
 
   it('remplit chaque îlot de bâtiments mitoyens alignés sur l\'avenue (îlots entiers)', () => {
     const blocks = byBlock(layout.buildings);
     for (const side of ['ouest', 'est']) {
-      for (let j = 0; j < 49; j++) {
+      expect(blocks.has(`${side}-${n}`)).toBe(false);
+      for (let j = 0; j < n; j++) {
         const list = blocks.get(`${side}-${j}`);
         expect(list, `${side}-${j}`).toBeDefined();
         const boxes = list.map(footprint).sort((a, b) => a.y0 - b.y0);
@@ -162,9 +199,10 @@ describe('expandScene : avenue de test', () => {
     }
   });
 
-  it('place les lampadaires 2 700 K tous les 40 m des deux côtés, à 6 m', () => {
+  it('place les lampadaires 2 700 K tous les 40 m des deux côtés, à 6 m (échelle humaine)', () => {
     const lamps = layout.lamps.filter((l) => Math.abs(l.x) < 12);
-    expect(lamps.length).toBe(2 * 99);
+    // Avenue de −40 à 4·L − 80 m : lampadaires à 20, 60, 100… m de son début.
+    expect(lamps.length).toBe(2 * (Math.floor((4 * L - 60) / 40) + 1));
     for (const l of layout.lamps) {
       expect(l.height).toBe(6);
       expect(l.temperature).toBe(2700);
@@ -176,44 +214,58 @@ describe('expandScene : avenue de test', () => {
     for (const l of lamps) expect(Math.abs(l.x)).toBeCloseTo(10.5, 9);
   });
 
-  it('pose des panneaux IR et UV, une place et une butée au bout', () => {
+  it('pose 4 panneaux IR et 3 UV le long de l\'avenue, une place et une butée au bout', () => {
     const ir = layout.buildings.filter((b) => b.ir === 1);
     const uv = layout.buildings.filter((b) => b.uv === 1);
-    expect(ir.length).toBeGreaterThanOrEqual(2);
-    expect(uv.length).toBeGreaterThanOrEqual(2);
+    expect(ir).toHaveLength(4);
+    expect(uv).toHaveLength(3);
+    for (const p of [...ir, ...uv]) {
+      expect(p.y).toBeGreaterThanOrEqual(0);
+      expect(p.y).toBeLessThanOrEqual(4 * L - 80);
+    }
     const butee = layout.buildings.find((b) => b.blockId === 'butee');
-    expect(footprint(butee).y0).toBe(4000);
+    expect(footprint(butee).y0).toBe(4 * L);
     expect(footprint(butee).x0).toBeLessThanOrEqual(-12);
     expect(footprint(butee).x1).toBeGreaterThanOrEqual(12);
-    // La place (y ∈ [3920, 4000]) est libre de bâtiments.
+    // La place (y ∈ [4·L − 80, 4·L]) est libre de bâtiments.
     for (const b of layout.buildings) {
       const f = footprint(b);
-      expect(f.y1 <= 3920 || f.y0 >= 4000).toBe(true);
+      expect(f.y1 <= 4 * L - 80 || f.y0 >= 4 * L).toBe(true);
     }
-    expect(layout.streets.some((s) => s.from.y === 3920 && s.to.y === 4000)).toBe(true);
-    expect(layout.streets.filter((s) => s.from.y === s.to.y)).toHaveLength(49); // transversales
+    expect(layout.streets.filter((s) => s.from.y === s.to.y)).toHaveLength(n); // transversales
   });
 });
 
-describe('expandScene : quartier de test', () => {
-  const layout = expandScene(quartier, palette);
+describe.each(LIGHT_SPEEDS)('expandScene : quartier de test à c = %i m/s', (c) => {
+  const L = physicsFor(c).lengthUnit;
+  const layout = expandScene(quartier, palette, { lengthUnit: L });
+  const vis = visibilityFor(L);
+  /** Demi-côté : visibilité + 12 m, arrondi aux 80 m supérieurs ; m × m îlots. */
+  const H = Math.ceil((vis.default + 12) / 80) * 80;
+  const m = H / 40;
 
-  it('couvre ≈ 1,3 × 1,3 km avec 16 × 16 îlots, sans chevauchement', () => {
+  it('contient le disque de visibilité autour du départ : m × m îlots, sans chevauchement', () => {
+    expect(H).toBe({ 10: 320, 30: 400, 100: 640 }[c]);
     const blocks = byBlock(layout.buildings);
-    expect(blocks.size).toBe(256);
-    expect(layout.bounds.xmax - layout.bounds.xmin).toBeGreaterThanOrEqual(1300);
-    expect(layout.bounds.ymax - layout.bounds.ymin).toBeGreaterThanOrEqual(1300);
+    expect(blocks.size).toBe(m * m);
+    expect(layout.bounds).toEqual({ xmin: -H - 20, ymin: -H - 20, xmax: H + 20, ymax: H + 20 });
+    // Bâtiments jusqu'à H − 12 du centre (dernière façade) : au-delà de la visibilité.
+    expect(H - 12).toBeGreaterThanOrEqual(vis.default);
+    expect(Math.max(...layout.buildings.map((b) => footprint(b).x1))).toBe(H - 12);
+    expect(2 * H).toBeGreaterThanOrEqual(Math.max(400, 1.25 * L));
     expect(layout.start).toEqual({ x: 0, y: 0, heading: Math.PI / 2 });
-    expect(layout.visibility).toEqual({ lite: 400, default: 600 });
-    expect(layout.streets).toHaveLength(34);
+    expect(layout.visibility).toEqual(vis);
+    expect(layout.streets).toHaveLength(2 * (m + 1));
+    // Une rue nord-sud passe par x = 0 (parcours de ?bench).
+    expect(layout.streets.some((s) => s.from.x === 0 && s.to.x === 0)).toBe(true);
     checkNoOverlap(layout.buildings);
   });
 
   it('ferme chaque îlot : ses quatre côtés sont entièrement bâtis', () => {
     for (const [id, list] of byBlock(layout.buildings)) {
       const [, r, i] = id.split('-').map(Number);
-      const x0 = -628 + 80 * i;
-      const y0 = -628 + 80 * r;
+      const x0 = -H + 12 + 80 * i;
+      const y0 = -H + 12 + 80 * r;
       const x1 = x0 + 56;
       const y1 = y0 + 56;
       const boxes = list.map(footprint);
@@ -228,6 +280,39 @@ describe('expandScene : quartier de test', () => {
       expect(coveredLength(boxes.filter((f) => f.x0 === x0).map((f) => [f.y0, f.y1]))).toBe(56);
       expect(coveredLength(boxes.filter((f) => f.x1 === x1).map((f) => [f.y0, f.y1]))).toBe(56);
     }
+  });
+});
+
+describe('longueurs de jeu : expressions en L', () => {
+  it('évalue fois, de, plus, min, max, arrondis et paramètres dans l’ordre', () => {
+    const scene = {
+      parametres: { V: { fois: 1, de: 'visibilite' }, H: { fois: 1, de: 'V', plus: 12, arrondiSup: 80 } },
+      a: { fois: 4, plus: -80 },
+      b: [{ fois: 0.05, plus: -1, arrondiInf: 1 }, 7],
+      c: { fois: 1.2, min: 300, max: 600 },
+      d: { fois: 0.72, arrondiInf: 80, puisPlus: 40 },
+      e: { fois: 0.025, de: 'H' },
+      f: { nom: 'texte', de: [1, 2] },
+    };
+    expect(resolveSceneLengths(scene, 300)).toEqual({
+      a: 1120,
+      b: [14, 7],
+      c: 360,
+      d: 200,
+      e: 10,
+      f: { nom: 'texte', de: [1, 2] },
+    });
+    expect(resolveSceneLengths(scene, 310).b[0]).toBe(14); // 14,5 → arrondi inférieur
+    expect(resolveSceneLengths(scene, 1000).c).toBe(600);
+    expect(resolveSceneLengths(scene, 100).c).toBe(300);
+  });
+
+  it('refuse un paramètre inconnu, une clé inconnue, un L invalide', () => {
+    expect(() => resolveSceneLengths({ a: { fois: 1, de: 'X' } }, 300)).toThrow(/X/);
+    expect(() => resolveSceneLengths({ a: { fois: 1, fios: 2 } }, 300)).toThrow(/fios/);
+    expect(() => resolveSceneLengths({ parametres: { L: { fois: 2 } } }, 300)).toThrow(/L/);
+    expect(() => resolveSceneLengths({}, 0)).toThrow();
+    expect(() => expandScene(tinyScene({ rues: [{ de: [0, 0], a: [10, 0], largeur: 8, repeter: { nombre: { fois: 0.005 }, pas: [0, 20] } }] }), palette)).toThrow(/nombre/);
   });
 });
 
@@ -383,8 +468,13 @@ describe('cityMesher', () => {
     expect(city.chunks.reduce((s, c) => s + c.buildingCount, 0)).toBe(layout.buildings.length);
     expect(city.streets).toEqual(layout.streets);
     expect(city.start).toEqual(layout.start);
-    expect(city.visibility).toEqual({ lite: 400, default: 600 });
+    expect(city.visibility).toEqual(visibilityFor(LENGTH_UNIT));
     expect(city.bounds).toEqual(layout.bounds);
+    expect(city.lengthUnit).toBe(LENGTH_UNIT);
+    // Unité de longueur de la partie transmise à expandScene (c = 100 : avenue de 4 km).
+    const big = buildCity(avenue, palette, { lengthUnit: 1000 });
+    expect(big.bounds.ymax).toBe(4060);
+    expect(big.chunks.length).toBeGreaterThan(city.chunks.length);
 
     const em = city.emitters;
     expect(em.attributes.aEmit.itemSize).toBe(2);
@@ -449,7 +539,7 @@ describe('cityMesher', () => {
   it('maille les îlots de l\'avenue sans jonction en T, vers l\'extérieur, à tous les LOD', () => {
     const city = buildCity(avenue, palette);
     const layout = expandScene(avenue, palette);
-    const sample = ['ouest-0', 'est-0', 'ouest-17', 'est-31', 'depot', 'butee', 'panneau-ir-1', 'panneau-uv-1'];
+    const sample = ['ouest-0', 'est-0', 'ouest-7', 'est-13', 'depot', 'butee', 'panneau-ir-1', 'panneau-uv-1'];
     for (const id of sample) {
       const chunk = city.chunks.find((c) => c.id === id);
       for (const [k, step] of [1.5, 5, 15].entries()) checkChunkGeometry(chunk.lod(k), blockBoxes(layout, id), step, colors);
@@ -459,7 +549,8 @@ describe('cityMesher', () => {
   it('maille les îlots fermés du quartier (murs mitoyens, angles) sans jonction en T', () => {
     const city = buildCity(quartier, palette);
     const layout = expandScene(quartier, palette);
-    for (const id of ['quartier-0-0', 'quartier-7-8', 'quartier-15-15']) {
+    // c = 30 : 10 × 10 îlots (coin, milieu, coin opposé).
+    for (const id of ['quartier-0-0', 'quartier-4-5', 'quartier-9-9']) {
       const chunk = city.chunks.find((c) => c.id === id);
       for (const [k, step] of [1.5, 5, 15].entries()) checkChunkGeometry(chunk.lod(k), blockBoxes(layout, id), step, colors);
     }

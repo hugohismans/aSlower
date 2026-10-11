@@ -71,11 +71,16 @@ function headingGap(snapshot) {
  * @param {import('three').WebGLRenderer} renderer
  * @param {any} sceneJson scène de src/data/scenes/ (schéma « coursier-scene/1 »)
  * @param {Record<string, {srgb: string, ir?: number, uv?: number}>} palette src/data/palette.json
- * @param {{tier?: 'default' | 'lite', lodSteps?: number[]}} [options] profil de qualité
- *   (choisit la visibilité « lite » ou « defaut » de la scène) ; pas des LOD (m)
+ * @param {{tier?: 'default' | 'lite', lodSteps?: number[], physics?: {lengthUnit: number}}} [options]
+ *   profil de qualité (choisit la visibilité « lite » ou « defaut » de la scène) ; pas des LOD
+ *   (m) ; constantes physiques de la partie (physicsFor(c)) : la scène est développée pour
+ *   leur unité de longueur L (défaut : réglage par défaut)
  */
-export function createWorld(renderer, sceneJson, palette, { tier = 'default', lodSteps } = {}) {
-  const city = buildCity(sceneJson, palette, lodSteps ? { lodSteps } : undefined);
+export function createWorld(renderer, sceneJson, palette, { tier = 'default', lodSteps, physics } = {}) {
+  const city = buildCity(sceneJson, palette, {
+    ...(lodSteps ? { lodSteps } : {}),
+    ...(physics ? { lengthUnit: physics.lengthUnit } : {}),
+  });
   const steps = lodSteps ?? [...DEFAULT_LOD_STEPS];
   const coarsest = steps.length - 1;
 

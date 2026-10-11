@@ -14,6 +14,9 @@
  * second degré (RelativisticObject.cs:316-328, relativity.shader:176-182), réécrite sous une
  * forme sans annulation. Elle sert de solution exacte (mouvement uniforme) et d'amorce
  * pour le cas général, résolu par Newton sécurisé par bissection.
+ *
+ * La vitesse de la lumière c est celle de la partie (physicsFor) : paramètre facultatif
+ * (défaut : C, réglage par défaut).
  */
 import { C } from './constants.js';
 
@@ -31,16 +34,18 @@ const DERIVATIVE_STEP = 1e-4;
  * @param {number} wx
  * @param {number} wy
  * @param {number} wz
+ * @param {number} c vitesse de la lumière (m/s)
  */
-function uniformDelay(dx, dy, dz, wx, wy, wz) {
+function uniformDelay(dx, dy, dz, wx, wy, wz, c) {
+  const c2 = c * c;
   const w2 = wx * wx + wy * wy + wz * wz;
-  if (!(w2 < C * C)) throw new RangeError('Temps retardé : l’objet doit aller moins vite que la lumière');
+  if (!(w2 < c2)) throw new RangeError('Temps retardé : l’objet doit aller moins vite que la lumière');
   // Objet immobile : simple retard r/c (même calcul de r que dans retardedTime, au bit près).
-  if (w2 === 0) return Math.hypot(dx, dy, dz) / C;
+  if (w2 === 0) return Math.hypot(dx, dy, dz) / c;
   const d2 = dx * dx + dy * dy + dz * dz;
   const dw = dx * wx + dy * wy + dz * wz;
-  const root = Math.sqrt(dw * dw + (C * C - w2) * d2);
-  return dw >= 0 ? (dw + root) / (C * C - w2) : d2 / (root - dw);
+  const root = Math.sqrt(dw * dw + (c2 - w2) * d2);
+  return dw >= 0 ? (dw + root) / (c2 - w2) : d2 / (root - dw);
 }
 
 /**
@@ -50,15 +55,16 @@ function uniformDelay(dx, dy, dz, wx, wy, wz) {
  * @param {{x: number, y: number, z?: number}} p0 position de l'objet à l'instant t0
  * @param {{x: number, y: number, z?: number}} w vitesse de l'objet (m/s)
  * @param {number} t0
+ * @param {number} [c] vitesse de la lumière (m/s)
  * @returns {number} te
  */
-export function retardedTimeUniform(observer, t, p0, w, t0) {
+export function retardedTimeUniform(observer, t, p0, w, t0, c = C) {
   const wz = w.z ?? 0;
   const s = t - t0;
   const dx = observer.x - (p0.x + w.x * s);
   const dy = observer.y - (p0.y + w.y * s);
   const dz = (observer.z ?? 0) - ((p0.z ?? 0) + wz * s);
-  return t - uniformDelay(dx, dy, dz, w.x, w.y, wz);
+  return t - uniformDelay(dx, dy, dz, w.x, w.y, wz, c);
 }
 
 /**
@@ -77,13 +83,13 @@ export function retardedTimeUniform(observer, t, p0, w, t0) {
  * @param {{x: number, y: number, z?: number}} observer position de l'observateur à l'instant t
  * @param {number} t instant de réception (temps de la ville)
  * @param {(te: number) => {x: number, y: number, z?: number}} positionAt trajectoire (ville)
- * @param {{tolerance?: number, maxIterations?: number, guess?: number}} [options]
- *   tolerance en secondes sur te ; guess : te de départ.
+ * @param {{tolerance?: number, maxIterations?: number, guess?: number, c?: number}} [options]
+ *   tolerance en secondes sur te ; guess : te de départ ; c : vitesse de la lumière (m/s).
  * @returns {{te: number, iterations: number, converged: boolean}} iterations = nombre
  *   d'évaluations de G ; converged = false si maxIterations est atteint sans convergence
  *   (te n'a alors pas de sens).
  */
-export function retardedTime(observer, t, positionAt, { tolerance = 1e-5, maxIterations = 30, guess } = {}) {
+export function retardedTime(observer, t, positionAt, { tolerance = 1e-5, maxIterations = 30, guess, c = C } = {}) {
   /**
    * Position de l'objet à l'émission te = t − d et différence finie de sa vitesse.
    * @param {number} d retard (s)
@@ -112,7 +118,7 @@ export function retardedTime(observer, t, positionAt, { tolerance = 1e-5, maxIte
     const dy = observer.y - now.p.y;
     const dz = (observer.z ?? 0) - (now.p.z ?? 0);
     const w2 = now.wx * now.wx + now.wy * now.wy + now.wz * now.wz;
-    d = w2 < C * C ? uniformDelay(dx, dy, dz, now.wx, now.wy, now.wz) : Math.hypot(dx, dy, dz) / C;
+    d = w2 < c * c ? uniformDelay(dx, dy, dz, now.wx, now.wy, now.wz, c) : Math.hypot(dx, dy, dz) / c;
   }
 
   let lo = 0; // G(lo) ≤ 0
@@ -126,7 +132,7 @@ export function retardedTime(observer, t, positionAt, { tolerance = 1e-5, maxIte
     const ry = observer.y - p.y;
     const rz = (observer.z ?? 0) - (p.z ?? 0);
     const r = Math.hypot(rx, ry, rz);
-    const g = d - r / C;
+    const g = d - r / c;
     if (g === 0) {
       converged = true; // résidu nul : d est la racine
       break;
@@ -135,11 +141,11 @@ export function retardedTime(observer, t, positionAt, { tolerance = 1e-5, maxIte
     else hi = d;
 
     // G'(d) = 1 − n̂·w/c, n̂ = direction de l'objet vers l'observateur.
-    const slope = r > 0 ? 1 - (rx * wx + ry * wy + rz * wz) / (r * C) : 1;
+    const slope = r > 0 ? 1 - (rx * wx + ry * wy + rz * wz) / (r * c) : 1;
     /** @type {number} */
     let next = d - g / slope;
     if (!(slope > 0 && next >= lo && next <= hi)) {
-      next = hi < Infinity ? 0.5 * (lo + hi) : r / C;
+      next = hi < Infinity ? 0.5 * (lo + hi) : r / c;
     }
     const change = Math.abs(next - d);
     d = next;

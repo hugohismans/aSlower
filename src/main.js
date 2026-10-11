@@ -9,7 +9,13 @@
  * - ?bench : parcours de mesure automatique, sans entrée (voir createBench), avec #diag ;
  *   résultat affiché dans #diag et exposé dans window.__benchResult ;
  * - ?sansciel (avec ?diag ou ?bench) : passe ciel/sol coupée dès la première image ;
- * - ?dpr= : rapport de pixels imposé (render/quality.js).
+ * - ?dpr= : rapport de pixels imposé (render/quality.js) ;
+ * - ?c=n : vitesse de la lumière (entier de 10 à 100 m/s), prioritaire sur le réglage mémorisé
+ *   (game/settings.js) et jamais mémorisée.
+ *
+ * Vitesse de la lumière : réglage du joueur (écran titre, ou « Changer c » dans le menu pause,
+ * qui redémarre la partie). Toute la partie lit ses constantes dans physicsFor(c) : joueur,
+ * scène (longueurs en L = c²/a), butée, ?bench ; le HUD et le rendu lisent snapshot.c.
  *
  * Une image (plan §2) : commandes → butée douce → player.step (dτ ≤ 0,1 s) → vision
  * classique (k) → world.update (observateur, coupe, LOD) → caméra → world.render → HUD
@@ -19,7 +25,7 @@
  * (portrait sur écran tactile : paysage strictement imposé), perte du contexte WebGL
  * (recompilation et préchauffage à la restauration ; « Recharger » si elle tarde).
  */
-import { C, LENGTH_UNIT, PHI_MAX_DEFAULT } from './physics/constants.js';
+import { PHI_MAX_DEFAULT, physicsFor } from './physics/constants.js';
 import { createPlayer, snapshot, step } from './physics/player.js';
 import { createCamera, updateCamera } from './render/camera.js';
 import { armBootGuard, confirmBoot, createQuality } from './render/quality.js';
@@ -29,6 +35,9 @@ import { createControls } from './input/controls.js';
 import { createCredits } from './hud/credits.js';
 import { createDiag, diagModeFromUrl, readGlInfo } from './hud/diag.js';
 import { createHud } from './hud/hud.js';
+import { formatLightSpeed } from './hud/format.js';
+import { createLightSpeedControl } from './hud/lightSpeed.js';
+import { LIGHT_SPEED_PRESETS, initialLightSpeed, parseLightSpeed, saveSettings } from './game/settings.js';
 import { createLoop } from './loop.js';
 import palette from './data/palette.json';
 
@@ -58,8 +67,12 @@ const CONTEXT_RESTORE_TIMEOUT_MS = 5000;
 const BENCH_DT = 1 / 60;
 /** Avenue : poussée pleine jusqu'à ce γ, puis freinage jusqu'à l'arrêt. */
 const BENCH_AVENUE_GAMMA = 2.5;
-/** Quartier : caméra scriptée le long de la rue x = 0, β de 0 à BETA_MAX en RAMP_S, puis HOLD_S. */
-const BENCH_QUARTIER = Object.freeze({ x: 0, y: -600, betaMax: 0.92, rampS: 16, holdS: 5 });
+/**
+ * Quartier : caméra scriptée le long de la rue x = 0, β de 0 à betaMax en rampS, puis holdS ;
+ * départ à y = startL·L (L = c²/a). Parcours : (betaMax/2·rampS + betaMax·holdS)·c ≈ 1,2·L,
+ * de −0,6·L à +0,6·L, dans le quartier (demi-côté ≥ visibilité + 12 m ≥ 0,65·L).
+ */
+const BENCH_QUARTIER = Object.freeze({ x: 0, startL: -0.6, betaMax: 0.92, rampS: 16, holdS: 5 });
 
 /* ------------------------------------------------------------------------- */
 /* Butée douce : empêche de sortir de la carte, sans pénalité                 */
@@ -108,9 +121,9 @@ function exitDistance(x, y, dx, dy, limits) {
 
 /**
  * Freinage automatique quand le bord de la zone roulable approche : si la distance d'arrêt
- * au frein plein, (c²/a)(γ − 1) (exacte), atteint SOFT_STOP_RATIO de la distance au bord le
- * long de la vitesse, le frein remplace la poussée. Le moteur suffit (a = 10 m/s²) : l'arrêt
- * est doux, sans pénalité, et la physique reste exacte.
+ * au frein plein, (c²/a)(γ − 1) (exacte, avec c et a de la partie), atteint SOFT_STOP_RATIO
+ * de la distance au bord le long de la vitesse, le frein remplace la poussée. Le moteur suffit
+ * (a = c/10) : l'arrêt est doux, sans pénalité, et la physique reste exacte.
  * @param {import('./physics/player.js').PlayerState} player
  * @param {{thrust?: number, brake?: number, steer?: number}} cmd
  * @param {{xmin: number, ymin: number, xmax: number, ymax: number}} limits
@@ -119,8 +132,9 @@ function softStopCommand(player, cmd, limits) {
   const u = Math.hypot(player.ux, player.uy);
   if (u === 0) return cmd;
   const d = exitDistance(player.x, player.y, player.ux / u, player.uy / u, limits);
-  const u2 = (u * u) / (C * C);
-  const stopping = (LENGTH_UNIT * u2) / (Math.sqrt(1 + u2) + 1); // (c²/a)(γ − 1), sans annulation
+  const { c, a } = player;
+  const u2 = (u * u) / (c * c);
+  const stopping = (((c * c) / a) * u2) / (Math.sqrt(1 + u2) + 1); // (c²/a)(γ − 1), sans annulation
   if (stopping < SOFT_STOP_RATIO * d) return cmd;
   return { thrust: 0, brake: 1, steer: cmd.steer };
 }
@@ -183,7 +197,7 @@ function summary(values) {
 /**
  * Parcours de mesure, sans entrée utilisateur ; un pas fixe de BENCH_DT par image.
  * - quartier-test : caméra scriptée le long de la rue x = 0 vers le nord, β imposé de 0 à
- *   0,92 (sans physique : la scène est trop petite pour accélérer) ;
+ *   0,92 (sans physique : la scène est trop petite pour accélérer), v = β·c de la partie ;
  * - autres scènes (avenue-test) : physique réelle, poussée pleine jusqu'à γ ≈ 2,5 puis
  *   freinage jusqu'à l'arrêt.
  * @param {string} sceneId
@@ -195,8 +209,10 @@ function createBench(sceneId, player, limits) {
   let phase = 'poussee';
   let elapsed = 0;
   let done = false;
+  const { c, a } = player;
+  const lengthUnit = (c * c) / a;
   // Caméra scriptée : état propre (x, y, τ, t).
-  const cam = { x: BENCH_QUARTIER.x, y: BENCH_QUARTIER.y, tau: 0, t: 0 };
+  const cam = { x: BENCH_QUARTIER.x, y: BENCH_QUARTIER.startL * lengthUnit, tau: 0, t: 0 };
 
   const samples = { frame: [], render: [], update: [] };
   let frames = 0;
@@ -216,14 +232,14 @@ function createBench(sceneId, player, limits) {
     const { betaMax, rampS, holdS } = BENCH_QUARTIER;
     const beta = betaMax * Math.min(1, elapsed / rampS);
     const gamma = 1 / Math.sqrt(1 - beta * beta);
-    const speed = beta * C;
+    const speed = beta * c;
     cam.y += speed * BENCH_DT;
     cam.t += BENCH_DT;
     cam.tau += BENCH_DT / gamma;
     done = elapsed >= rampS + holdS - 1e-9;
     return {
       x: cam.x, y: cam.y, vx: 0, vy: speed, speed, beta, gamma, rapidity: Math.atanh(beta),
-      tau: cam.tau, t: cam.t, ux: 0, uy: gamma * speed, heading: Math.PI / 2, hx: 0, hy: 1,
+      tau: cam.tau, t: cam.t, ux: 0, uy: gamma * speed, heading: Math.PI / 2, hx: 0, hy: 1, c,
     };
   }
 
@@ -273,6 +289,8 @@ function createBench(sceneId, player, limits) {
       const round = (x, n = 3) => Math.round(x * 10 ** n) / 10 ** n;
       return {
         scene: sceneId,
+        c,
+        lengthUnit,
         parcours: scripted ? 'camera scriptee, beta 0 -> 0,92' : 'physique, poussee jusqu a gamma 2,5 puis frein',
         frames,
         durationS: round(durationS, 2),
@@ -318,7 +336,9 @@ const dom = {
   notice: $('notice'),
   noticeTitle: $('notice-title'),
   noticeText: $('notice-text'),
+  noticeContent: $('notice-content'),
   noticeActions: $('notice-actions'),
+  lightSpeed: $('light-speed'),
 };
 
 // Safari iOS ignore user-scalable=no : pas de pincement, sur toute la page (titre, pause, Crédits).
@@ -333,6 +353,18 @@ if (requestedScene && !(requestedScene in SCENES)) {
 const diagMode = diagModeFromUrl(window.location.search);
 const benchMode = diagMode === 'bench';
 
+// Vitesse de la lumière de la prochaine partie : ?c= (prioritaire), sinon le réglage mémorisé.
+const startLight = initialLightSpeed(window.location.search);
+if (startLight.message) console.warn(startLight.message);
+/** Réglage de c choisi sur l'écran titre (ou au menu pause) pour la prochaine partie. */
+let chosenC = startLight.c;
+
+/** Mémorise le réglage (pas une valeur venue de ?c= tant que le joueur n'y touche pas). */
+function chooseLightSpeed(c) {
+  chosenC = c;
+  saveSettings({ c });
+}
+
 // Garde-fou de démarrage (lecture) : à appeler une fois, avant de créer le renderer.
 const quality = createQuality();
 
@@ -343,6 +375,13 @@ const credits = createCredits(/** @type {HTMLDialogElement} */ (dom.credits));
 dom.openCredits.addEventListener('click', () => credits.open());
 const diag = diagMode ? createDiag(dom.diag) : null;
 diag?.show();
+const titleLightSpeed = createLightSpeedControl(dom.lightSpeed, {
+  value: chosenC,
+  presets: LIGHT_SPEED_PRESETS,
+  parse: parseLightSpeed,
+  onChange: chooseLightSpeed,
+});
+if (startLight.message) titleLightSpeed.setMessage(startLight.message);
 
 /** Portrait sur écran tactile : même requête que le panneau #rotate de base.css. */
 const portrait = window.matchMedia('(orientation: portrait) and (pointer: coarse)');
@@ -372,10 +411,12 @@ const loop = createLoop(frame, {
   },
 });
 
-/** Affiche le panneau générique (#notice) avec ses boutons. */
-function showNotice({ title, text, actions = [] }) {
+/** Affiche le panneau générique (#notice) avec ses boutons (et, au besoin, un contenu). */
+function showNotice({ title, text, actions = [], content = null }) {
   dom.noticeTitle.textContent = title;
   dom.noticeText.textContent = text;
+  if (content) dom.noticeContent.replaceChildren(content);
+  else dom.noticeContent.replaceChildren();
   dom.noticeActions.replaceChildren(
     ...actions.map(({ label, primary = false, onClick }) => {
       const button = document.createElement('button');
@@ -406,10 +447,52 @@ function pause() {
   if (mode !== 'playing' || benchMode) return;
   mode = 'paused';
   controls.setEnabled(false);
+  showPauseNotice();
+}
+
+function showPauseNotice() {
   showNotice({
     title: 'Pause',
-    text: 'Les deux horloges sont arrêtées. Échap ou P pour reprendre au clavier.',
-    actions: [{ label: 'Reprendre', primary: true, onClick: resume }],
+    text: `Les deux horloges sont arrêtées (${formatLightSpeed(game.physics.c)}). Échap ou P pour reprendre au clavier.`,
+    actions: [
+      { label: 'Reprendre', primary: true, onClick: resume },
+      { label: 'Changer c', onClick: showLightSpeedNotice },
+    ],
+  });
+}
+
+/** Menu pause → « Changer c » : le réglage, puis « Redémarrer » (nouvelle partie) ou retour. */
+function showLightSpeedNotice() {
+  if (mode !== 'paused') return;
+  const holder = document.createElement('div');
+  let proposed = game.physics.c;
+  const restartLabel = (c) => `Redémarrer avec c\u202f=\u202f${c}\u202fm/s`;
+  const control = createLightSpeedControl(holder, {
+    value: proposed,
+    presets: LIGHT_SPEED_PRESETS,
+    parse: parseLightSpeed,
+    onChange: (c) => {
+      proposed = c;
+      const button = dom.noticeActions.querySelector('.btn-primary');
+      if (button) button.textContent = restartLabel(c);
+    },
+  });
+  showNotice({
+    title: 'Changer c',
+    text: 'La partie recommence au départ avec la nouvelle vitesse de la lumière.',
+    content: control.element,
+    actions: [
+      {
+        label: restartLabel(proposed),
+        primary: true,
+        onClick: () => {
+          chooseLightSpeed(proposed);
+          titleLightSpeed.setValue(proposed);
+          restartGame(proposed);
+        },
+      },
+      { label: 'Annuler', onClick: showPauseNotice },
+    ],
   });
 }
 
@@ -438,37 +521,63 @@ window.screen.orientation?.addEventListener('change', updateWindowShape);
 
 /* --- Création du jeu ------------------------------------------------------- */
 
-/** Monde, caméra, joueur ; préchauffage des programmes derrière l'écran de chargement. */
-async function createGame() {
-  const sceneJson = (await SCENES[sceneId]()).default;
-  const renderer = createRenderer(dom.canvas, quality);
-  const world = createWorld(renderer, sceneJson, palette, { tier: quality.tier });
+/**
+ * Partie pour la vitesse de la lumière c : constantes physiques, monde (scène développée pour
+ * L = c²/a), caméra, joueur, butée, ?bench ; préchauffage des programmes.
+ * @param {import('three').WebGLRenderer} renderer
+ * @param {any} sceneJson
+ * @param {number} c
+ */
+async function createSession(renderer, sceneJson, c) {
+  const physics = physicsFor(c);
+  const world = createWorld(renderer, sceneJson, palette, { tier: quality.tier, physics });
   const { width, height } = viewportSize();
   const camera = createCamera({ aspect: width / height, visibility: world.visibilityFar });
   resizeRenderer(renderer, quality, camera);
 
   const limits = drivableLimits(world.streets, world.bounds, SOFT_STOP_MARGIN);
-  const player = createPlayer({ x: world.start.x, y: world.start.y, heading: world.start.heading });
+  const player = createPlayer({ x: world.start.x, y: world.start.y, heading: world.start.heading, physics });
   const bench = benchMode ? createBench(sceneId, player, limits) : null;
 
   // Première image : îlots visibles maillés (sans budget), puis compilation de tous les
   // programmes (variantes « vision classique » comprises) et deux rendus.
   const first = bench?.scripted
-    ? { ...snapshot(player), x: BENCH_QUARTIER.x, y: BENCH_QUARTIER.y, heading: Math.PI / 2 }
+    ? {
+        ...snapshot(player),
+        x: BENCH_QUARTIER.x,
+        y: BENCH_QUARTIER.startL * physics.lengthUnit,
+        heading: Math.PI / 2,
+      }
     : snapshot(player);
   world.update(first, 1, 0);
   updateCamera(camera, first);
   await world.warmup(camera);
+  return { physics, world, camera, player, limits, bench, lastSnapshot: first };
+}
 
-  const g = { renderer, world, camera, player, limits, bench, k: 1, frames: 0, environment: true, lastSnapshot: first };
+/** Informations de la partie pour #diag. */
+function sessionInfo(g) {
+  return {
+    'vitesse de la lumière': `${formatLightSpeed(g.physics.c)} (a = ${String(g.physics.a).replace('.', ',')} m/s², L = ${g.physics.lengthUnit} m)`,
+    visibilite: `${g.world.visibilityFar} m`,
+  };
+}
+
+/** Renderer, première partie et écouteurs (perte de contexte, redimensionnement, #diag). */
+async function createGame() {
+  const sceneJson = (await SCENES[sceneId]()).default;
+  const renderer = createRenderer(dom.canvas, quality);
+  const session = await createSession(renderer, sceneJson, chosenC);
+
+  const g = { renderer, sceneJson, ...session, k: 1, frames: 0, environment: true };
 
   if (diag) {
     const gl = renderer.getContext();
-    diag.setInfo({ ...readGlInfo(gl), ...displayInfo(g), profile: quality.tier, scene: sceneId });
+    diag.setInfo({ ...readGlInfo(gl), ...displayInfo(g), profile: quality.tier, scene: sceneId, ...sessionInfo(g) });
     // ?sansciel : passe ciel/sol coupée dès la première image (mesure de son coût par différence).
     const setEnvironment = (on) => {
       g.environment = on;
-      world.setEnvironmentEnabled(on);
+      g.world.setEnvironmentEnabled(on);
     };
     setEnvironment(!params.has('sansciel'));
     diag.addToggle('Passe ciel/sol (E)', g.environment, setEnvironment);
@@ -495,7 +604,7 @@ async function createGame() {
     onRestored: async () => {
       if (mode === 'error') return;
       showNotice({ title: 'Affichage interrompu', text: "Préparation de l'affichage…" });
-      await world.warmup(camera); // three a tout réinitialisé : recompilation, données renvoyées
+      await g.world.warmup(g.camera); // three a tout réinitialisé : recompilation, données renvoyées
       if (mode !== 'lost') {
         hideNotice();
         return;
@@ -515,13 +624,47 @@ async function createGame() {
   });
 
   observeViewport(() => {
-    resizeRenderer(renderer, quality, camera);
+    resizeRenderer(renderer, quality, g.camera);
     if (diag) diag.setInfo(displayInfo(g));
     // En pause, le redimensionnement a effacé le canevas : on redessine l'image figée.
-    if (mode === 'paused' || mode === 'done') world.render(camera);
+    if (mode === 'paused' || mode === 'done') g.world.render(g.camera);
   });
 
   return g;
+}
+
+/**
+ * Menu pause → « Changer c » → « Redémarrer » : nouvelle partie au départ, avec la vitesse de
+ * la lumière c (le renderer, les commandes et le HUD sont gardés ; le monde est refait, car
+ * la scène dépend de L = c²/a).
+ * @param {number} c
+ */
+async function restartGame(c) {
+  if (mode !== 'paused' || !game) return;
+  mode = 'loading';
+  showNotice({ title: 'Changer c', text: `Préparation de la ville pour ${formatLightSpeed(c)}…` });
+  await nextPaint();
+  const g = game;
+  try {
+    g.world.dispose();
+    Object.assign(g, await createSession(g.renderer, g.sceneJson, c), { k: 1 });
+    g.world.setEnvironmentEnabled(g.environment);
+  } catch (error) {
+    console.error(error);
+    mode = 'error';
+    showNotice({
+      title: "Le jeu s'est arrêté",
+      text: 'Impossible de préparer la nouvelle partie. Recharge la page pour reprendre.',
+      actions: [{ label: 'Recharger', primary: true, onClick: () => window.location.reload() }],
+    });
+    return;
+  }
+  if (diag) diag.setInfo(sessionInfo(g));
+  hud.update(g.lastSnapshot, { k: 1 });
+  hideNotice();
+  mode = 'playing';
+  controls.setEnabled(true);
+  if (portrait.matches) pause();
 }
 
 /** DPR et taille du canevas, pour #diag. */
@@ -573,6 +716,10 @@ if (diag) {
     },
     get k() {
       return game ? game.k : null;
+    },
+    /** Vitesse de la lumière de la partie en cours (ou du réglage, avant « Jouer »). */
+    get c() {
+      return game ? game.physics.c : chosenC;
     },
     snapshot: () => (game ? { ...game.lastSnapshot } : null),
     stats: () => (game ? game.world.stats() : null),

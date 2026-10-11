@@ -7,7 +7,7 @@
     <meta name="color-scheme" content="dark" />
     <meta
       name="description"
-      content="Jeu web relativiste : livre des colis dans une ville où la lumière ne va qu'à 100 m/s."
+      content="Jeu web relativiste : livre des colis dans une ville où la lumière ne va qu'à 30 m/s (vitesse réglable de 10 à 100 m/s)."
     />
     <title>Coursier de la lumière lente</title>
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
@@ -44,7 +44,9 @@
     <section id="title" class="title-screen" aria-labelledby="title-heading">
       <div class="title-card">
         <h1 id="title-heading">Coursier de la lumière lente</h1>
-        <p class="title-sub">Livre tes colis dans une ville où la lumière ne va qu'à 100&nbsp;m/s.</p>
+        <p class="title-sub">Livre tes colis dans une ville où la lumière est lente&nbsp;: à toi de choisir à quel point.</p>
+        <!-- Réglage de c (src/hud/lightSpeed.js), rempli par src/main.js -->
+        <div id="light-speed"></div>
         <div class="title-actions">
           <button type="button" id="play" class="btn btn-primary">Jouer</button>
           <button type="button" id="open-credits" class="btn">Crédits</button>
@@ -63,6 +65,7 @@
       <div class="title-card">
         <h2 id="notice-title" class="notice-title"></h2>
         <p id="notice-text" class="title-sub"></p>
+        <div id="notice-content"></div>
         <div id="notice-actions" class="title-actions"></div>
       </div>
     </section>

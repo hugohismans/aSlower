@@ -1,10 +1,12 @@
 // Tests de src/hud/format.js : horloges, écart, phrase γ (hystérésis), vitesse tronquée, jauge.
 import { describe, expect, it } from 'vitest';
-import { C, PHI_MAX_DEFAULT } from '../src/physics/constants.js';
+import { C, C_MAX, C_MIN, PHI_MAX_DEFAULT } from '../src/physics/constants.js';
 import {
   createGammaPhrase,
   formatClock,
   formatGap,
+  formatKmh,
+  formatLightSpeed,
   formatSpeed,
   gapState,
   gaugeFraction,
@@ -119,48 +121,86 @@ describe('createGammaPhrase', () => {
 });
 
 describe('formatSpeed', () => {
-  it('affiche des m/s entiers loin de c (troncature)', () => {
+  it('affiche des m/s entiers loin de c (troncature), c par défaut = 30 m/s', () => {
+    expect(C).toBe(30);
     expect(plain(formatSpeed(0))).toBe('0 m/s');
-    expect(plain(formatSpeed(76.159416))).toBe('76 m/s'); // c·tanh(1)
-    expect(plain(formatSpeed(98.99))).toBe('98 m/s');
+    expect(plain(formatSpeed(C * Math.tanh(1)))).toBe('22 m/s'); // 22,85 m/s
+    expect(plain(formatSpeed(28.99))).toBe('28 m/s');
     expect(plain(formatSpeed(-2))).toBe('0 m/s');
   });
 
-  it('ajoute des décimales près de c, jusqu’à 99,5 avec φ_max = 3', () => {
-    const vMax = C * Math.tanh(PHI_MAX_DEFAULT); // 99,5055 m/s
-    expect(plain(formatSpeed(99.3, 3))).toBe('99,3 m/s');
-    expect(plain(formatSpeed(vMax, PHI_MAX_DEFAULT))).toBe('99,5 m/s'); // tronqué, pas 99,51
-    expect(plain(formatSpeed(vMax))).toBe('99,5 m/s'); // φ_max par défaut
+  it('ajoute des décimales près de c, jusqu’à 29,8 avec φ_max = 3 (c = 30)', () => {
+    const vMax = C * Math.tanh(PHI_MAX_DEFAULT); // 29,8517 m/s
+    expect(plain(formatSpeed(29.3, 3))).toBe('29,3 m/s');
+    expect(plain(formatSpeed(vMax, PHI_MAX_DEFAULT))).toBe('29,8 m/s'); // tronqué, pas 29,9
+    expect(plain(formatSpeed(vMax))).toBe('29,8 m/s'); // φ_max par défaut
+  });
+
+  // Valeurs attendues : 0,995055·c tronqué au premier chiffre de l'écart à c (≈ 0,005·c).
+  it.each([
+    [10, '7 m/s', '9,95 m/s'], // écart 0,05 m/s : deux décimales
+    [30, '22 m/s', '29,8 m/s'],
+    [57, '43 m/s', '56,7 m/s'],
+    [100, '76 m/s', '99,5 m/s'],
+  ])('c = %i m/s : c·tanh 1 → « %s », plafond φ_max = 3 → « %s », jamais c', (c, atTanh1, atMax) => {
+    expect(plain(formatSpeed(c * Math.tanh(1), PHI_MAX_DEFAULT, c))).toBe(atTanh1);
+    expect(plain(formatSpeed(c * Math.tanh(PHI_MAX_DEFAULT), PHI_MAX_DEFAULT, c))).toBe(atMax);
+    for (const v of [0.9999 * c, 0.9999999999 * c, c, 1.2 * c]) {
+      for (const phi of [1, 2, 3, 5]) {
+        const text = plain(formatSpeed(v, phi, c));
+        const shown = Number(text.replace(' m/s', '').replace(',', '.'));
+        expect(shown, text).toBeLessThan(c);
+      }
+    }
   });
 
   it('lie le nombre de décimales à φ_max', () => {
-    // φ_max = 2,06 (γ ≈ 4) : v_max = 96,8 m/s, affichage entier.
-    expect(plain(formatSpeed(C * Math.tanh(2.06), 2.06))).toBe('96 m/s');
+    // φ_max = 2,06 (γ ≈ 4) : v_max = 0,968·c. À c = 100, écart 3,2 m/s : entier ; à c = 30,
+    // écart 0,96 m/s : une décimale.
+    expect(plain(formatSpeed(100 * Math.tanh(2.06), 2.06, 100))).toBe('96 m/s');
+    expect(plain(formatSpeed(C * Math.tanh(2.06), 2.06))).toBe('29,0 m/s');
     // Un φ_max plus grand montrerait plus de 9 (hypothétique : PHI_MAX_LIMIT = 3).
-    expect(plain(formatSpeed(99.95, 5))).toBe('99,95 m/s');
-    expect(plain(formatSpeed(99.991, 5))).toBe('99,991 m/s');
+    expect(plain(formatSpeed(99.95, 5, 100))).toBe('99,95 m/s');
+    expect(plain(formatSpeed(99.991, 5, 100))).toBe('99,991 m/s');
+    expect(plain(formatSpeed(29.995, 5))).toBe('29,995 m/s');
   });
 
-  it('n’affiche jamais 100 m/s', () => {
+  it('n’affiche jamais c (30 m/s par défaut, 100 m/s à c = 100)', () => {
+    for (const v of [29.99, 29.9999999, 30, 40]) {
+      for (const phi of [1, 2, 3]) expect(plain(formatSpeed(v, phi))).not.toMatch(/^30/);
+    }
     for (const v of [99.99, 99.9999999, 100, 120]) {
-      for (const phi of [1, 2, 3]) expect(plain(formatSpeed(v, phi))).not.toMatch(/^100/);
+      for (const phi of [1, 2, 3]) expect(plain(formatSpeed(v, phi, 100))).not.toMatch(/^100/);
     }
   });
 });
 
 describe('gaugeFraction', () => {
-  it('est linéaire en v, bornée à [0, 1], avec le mur à c', () => {
+  it('est linéaire en v, bornée à [0, 1], avec le mur à c (c par défaut)', () => {
     expect(gaugeFraction(0)).toBe(0);
-    expect(gaugeFraction(50)).toBeCloseTo(0.5, 12);
-    expect(gaugeFraction(76.159416)).toBeCloseTo(0.76159416, 12);
+    expect(gaugeFraction(15)).toBeCloseTo(0.5, 12);
+    expect(gaugeFraction(C * Math.tanh(1))).toBeCloseTo(Math.tanh(1), 12);
     expect(gaugeFraction(C)).toBe(1);
-    expect(gaugeFraction(150)).toBe(1);
+    expect(gaugeFraction(45)).toBe(1);
     expect(gaugeFraction(-5)).toBe(0);
     expect(gaugeFraction(NaN)).toBe(0);
   });
 
-  it('reste strictement sous 1 au plafond φ_max', () => {
-    expect(gaugeFraction(C * Math.tanh(PHI_MAX_DEFAULT))).toBeLessThan(1);
+  it.each([10, 30, 57, 100])('c = %i m/s : aiguille à v/c, sous 1 au plafond φ_max', (c) => {
+    expect(gaugeFraction(0.5 * c, c)).toBeCloseTo(0.5, 12);
+    expect(gaugeFraction(c * Math.tanh(1), c)).toBeCloseTo(0.76159416, 8);
+    expect(gaugeFraction(c * Math.tanh(PHI_MAX_DEFAULT), c)).toBeLessThan(1);
+    expect(gaugeFraction(c, c)).toBe(1);
+  });
+});
+
+describe('formatLightSpeed et formatKmh', () => {
+  it('écrit le réglage de c et son équivalent en km/h', () => {
+    expect(plain(formatLightSpeed(30))).toBe('c = 30 m/s');
+    expect(plain(formatLightSpeed(C_MIN))).toBe('c = 10 m/s');
+    expect(plain(formatKmh(30))).toBe('108 km/h');
+    expect(plain(formatKmh(C_MAX))).toBe('360 km/h');
+    expect(plain(formatKmh(10))).toBe('36 km/h');
   });
 });
 

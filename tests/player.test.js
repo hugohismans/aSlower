@@ -1,6 +1,20 @@
 // Tests de src/physics/player.js : intégrateur exact, modèle « voiture arcade », plafond.
+// Constantes physiques : celles du réglage par défaut (C = 30 m/s, A = 3 m/s², L = c²/a = 300 m)
+// sauf mention contraire ; les tests obligatoires du cahier des charges sont exécutés avec
+// c = 100, a = 10 injectées (createPlayer({physics})), puis avec c = 30 et c = 10.
 import { describe, expect, it } from 'vitest';
-import { A, C, MAX_FRAME_DT, PHI_MAX_DEFAULT, PHI_MAX_LIMIT, PIVOT_RATE, TURN_RATE } from '../src/physics/constants.js';
+import {
+  A,
+  C,
+  C_DEFAULT,
+  LENGTH_UNIT,
+  MAX_FRAME_DT,
+  PHI_MAX_DEFAULT,
+  PHI_MAX_LIMIT,
+  PIVOT_RATE,
+  TURN_RATE,
+  physicsFor,
+} from '../src/physics/constants.js';
 import { clampFrameDt, createPlayer, snapshot, step } from '../src/physics/player.js';
 
 /** Générateur pseudo-aléatoire à graine fixe (mulberry32) : tests reproductibles. */
@@ -37,7 +51,7 @@ function drive(state, cmd, duration, frame = 1 / 60, onFrame = () => {}) {
 /** Joueur lancé vers l'est à la rapidité φ. */
 function movingEast(phi, options = {}) {
   const s = createPlayer({ heading: 0, ...options });
-  s.ux = C * Math.sinh(phi);
+  s.ux = s.c * Math.sinh(phi);
   return s;
 }
 
@@ -51,7 +65,7 @@ const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
  *     = (C/2)·e^{iθ0}·[e^{φ0}(e^{(k+iω)T} − 1)/(k+iω) − e^{−φ0}(e^{(−k+iω)T} − 1)/(−k+iω)].
  * (k, ω) ≠ (0, 0) exigé (pour k = 0, passer un k minuscule, 1e-300).
  */
-function arc(phi0, k, theta0, omega, T) {
+function arc(phi0, k, theta0, omega, T, c = C) {
   // ∫ e^{sign·(φ0 + k s)}·e^{iωs} ds, en (partie réelle, partie imaginaire)
   const term = (sign) => {
     const re = sign * k;
@@ -64,20 +78,39 @@ function arc(phi0, k, theta0, omega, T) {
   };
   const p = term(1);
   const m = term(-1);
-  const zr = (C / 2) * (p[0] - m[0]);
-  const zi = (C / 2) * (p[1] - m[1]);
+  const zr = (c / 2) * (p[0] - m[0]);
+  const zi = (c / 2) * (p[1] - m[1]);
   return { x: zr * Math.cos(theta0) - zi * Math.sin(theta0), y: zr * Math.sin(theta0) + zi * Math.cos(theta0) };
 }
 
-// Valeurs attendues après τ = 10 s de poussée pleine depuis l'arrêt (rapidité a·τ/c = 1).
-const V_10 = 100 * Math.tanh(1); // 76,159416 m/s
-const T_10 = 10 * Math.sinh(1); // 11,752012 s
-const X_10 = 1000 * (Math.cosh(1) - 1); // 543,080635 m
+/**
+ * Valeurs attendues après τ = 10 s de poussée pleine depuis l'arrêt (rapidité a·τ/c = 1 car
+ * c/a = 10 s) : v = c·tanh 1, t = (c/a)·sinh 1, x = (c²/a)(cosh 1 − 1).
+ */
+const expected10 = ({ c, a }) => ({ v: c * Math.tanh(1), t: (c / a) * Math.sinh(1), x: ((c * c) / a) * (Math.cosh(1) - 1) });
+
+/** Constantes du cahier des charges, injectées (le jeu les obtient avec ?c=100). */
+const SPEC = Object.freeze({ c: 100, a: 10 });
+
+// Réglage par défaut (c = 30 m/s, a = 3 m/s²).
+const { v: V_10, t: T_10, x: X_10 } = expected10({ c: C, a: A });
+
+/**
+ * Jeux de constantes des tests de référence : valeurs attendues en clair (contrôle des
+ * formules) ; physics = undefined : constantes par défaut de createPlayer.
+ */
+const PHYSICS_CASES = [
+  { label: 'c = 100, a = 10 injectées (cahier des charges)', physics: SPEC, literal: { v: 76.159416, t: 11.752012, x: 543.080635 } },
+  { label: 'c = 30, a = 3 (réglage par défaut, sans injection)', physics: undefined, literal: { v: 22.847825, t: 11.752012, x: 162.924190 } },
+  { label: 'c = 10, a = 1 (physicsFor(10))', physics: physicsFor(10), literal: { v: 7.615942, t: 11.752012, x: 54.308063 } },
+];
+const constantsOf = (physics) => physics ?? { c: C, a: A };
 
 describe('createPlayer et clampFrameDt', () => {
-  it('crée un joueur à l’arrêt, cap nord par défaut', () => {
+  it('crée un joueur à l’arrêt, cap nord par défaut, constantes du réglage par défaut', () => {
+    expect([C, A, LENGTH_UNIT, C_DEFAULT]).toEqual([30, 3, 300, 30]);
     const s = createPlayer();
-    expect(s).toMatchObject({ x: 0, y: 0, ux: 0, uy: 0, tau: 0, t: 0, phiMax: PHI_MAX_DEFAULT });
+    expect(s).toMatchObject({ x: 0, y: 0, ux: 0, uy: 0, tau: 0, t: 0, phiMax: PHI_MAX_DEFAULT, c: 30, a: 3 });
     expectNear(s.hx, 0, 1e-15);
     expect(s.hy).toBe(1);
     const p = createPlayer({ x: 5, y: -3, heading: Math.PI, phiMax: 2 });
@@ -85,6 +118,15 @@ describe('createPlayer et clampFrameDt', () => {
     expect(p.y).toBe(-3);
     expect(p.hx).toBe(-1);
     expect(p.phiMax).toBe(2);
+  });
+
+  it('garde les constantes physiques injectées ; refuse des constantes invalides', () => {
+    expect(createPlayer({ physics: SPEC })).toMatchObject({ c: 100, a: 10 });
+    expect(createPlayer({ physics: physicsFor(57) })).toMatchObject({ c: 57, a: 5.7 });
+    expect(snapshot(createPlayer({ physics: physicsFor(57) })).c).toBe(57);
+    expect(() => createPlayer({ physics: { c: 0, a: 1 } })).toThrow(RangeError);
+    expect(() => createPlayer({ physics: { c: 30, a: -3 } })).toThrow(RangeError);
+    expect(() => createPlayer({ physics: { c: NaN, a: 3 } })).toThrow(RangeError);
   });
 
   it('refuse un plafond hors de ]0 ; PHI_MAX_LIMIT]', () => {
@@ -104,11 +146,13 @@ describe('createPlayer et clampFrameDt', () => {
   });
 });
 
-describe('tests obligatoires : poussée pleine pendant τ = 10 s depuis l’arrêt', () => {
-  it('les valeurs attendues sont bien celles du cahier des charges', () => {
-    expectNear(V_10, 76.159416, 1e-6);
-    expectNear(T_10, 11.752012, 1e-6);
-    expectNear(X_10, 543.080635, 1e-6);
+describe.each(PHYSICS_CASES)('tests obligatoires : poussée pleine pendant τ = 10 s depuis l’arrêt ($label)', ({ physics, literal }) => {
+  const expected = expected10(constantsOf(physics));
+
+  it('les valeurs attendues (formules) sont bien celles du cahier des charges', () => {
+    expectNear(expected.v, literal.v, 1e-6);
+    expectNear(expected.t, literal.t, 1e-6);
+    expectNear(expected.x, literal.x, 1e-6);
   });
 
   // Durées d'image aléatoires à graine fixe, la dernière tronquée : somme exactement 10 s.
@@ -135,12 +179,12 @@ describe('tests obligatoires : poussée pleine pendant τ = 10 s depuis l’arr�
 
   for (const [label, frames] of cases) {
     it(label, () => {
-      const s = createPlayer({ heading: 0 });
+      const s = createPlayer({ heading: 0, physics });
       for (const h of frames()) step(s, { thrust: 1 }, h);
       const snap = snapshot(s);
-      expectNear(snap.speed, V_10, 1e-6);
-      expectNear(s.t, T_10, 1e-6);
-      expectNear(s.x, X_10, 1e-5);
+      expectNear(snap.speed, expected.v, 1e-6);
+      expectNear(s.t, expected.t, 1e-6);
+      expectNear(s.x, expected.x, 1e-5);
       expectNear(s.tau, 10, 1e-9);
       expect(s.y).toBe(0);
     });
@@ -173,8 +217,8 @@ describe('step : entrées et cas limites', () => {
   it('commandes NaN (gyroscope sans valeur) : traitées comme absentes', () => {
     const a = movingEast(0);
     const b = movingEast(0);
-    a.ux = 50;
-    b.ux = 50;
+    a.ux = 0.5 * C;
+    b.ux = 0.5 * C;
     expect(step(a, { thrust: NaN, brake: NaN, steer: NaN }, 1)).toEqual(step(b, {}, 1));
   });
 
@@ -191,7 +235,7 @@ describe('step : entrées et cas limites', () => {
     const s = createPlayer({ heading });
     drive(s, { thrust: 1 }, 3);
     const d = Math.hypot(s.x, s.y);
-    expectNear(d, 1000 * (Math.cosh(0.3) - 1), 1e-9);
+    expectNear(d, LENGTH_UNIT * (Math.cosh((A * 3) / C) - 1), 1e-9);
     expectNear(s.x / d, Math.cos(heading), 1e-12);
     expectNear(s.y / d, Math.sin(heading), 1e-12);
     expectNear(snapshot(s).heading, heading, 1e-12);
@@ -217,7 +261,9 @@ describe('step : entrées et cas limites', () => {
   });
 });
 
-describe('frein', () => {
+describe.each(PHYSICS_CASES.slice(0, 2))('frein et aller-retour ($label)', ({ physics, literal }) => {
+  const { c, a } = constantsOf(physics);
+  const expected = expected10({ c, a });
   const frameSets = [
     ['pas de 1/60 s', 1 / 60],
     ['pas de 0,1 s', 0.1],
@@ -225,24 +271,37 @@ describe('frein', () => {
   ];
 
   for (const [label, frame] of frameSets) {
-    it(`depuis φ = 1 : arrêt à 543,080635 m, sans recul (${label})`, () => {
-      const s = movingEast(1);
+    it(`depuis φ = 1 : arrêt à (c²/a)(cosh 1 − 1) = ${literal.x} m, sans recul (${label})`, () => {
+      const s = movingEast(1, { physics });
       let previousX = 0;
       drive(s, { brake: 1 }, 12, frame, (st) => {
         expect(st.x).toBeGreaterThanOrEqual(previousX); // jamais de recul
         expect(st.ux).toBeGreaterThanOrEqual(0);
         previousX = st.x;
       });
-      expectNear(s.x, X_10, 1e-5);
+      expectNear(s.x, expected.x, 1e-5);
       expect(s.ux).toBe(0); // arrêt exact
       expect(s.uy).toBe(0);
       expect(s.hx).toBe(1); // le cap est conservé
       // Freinage : τ = 10 s pour t = 10·sinh 1, puis 2 s à l'arrêt (Δt = Δτ).
       expectNear(s.tau, 12, 1e-9);
-      expectNear(s.t, T_10 + 2, 1e-9);
+      expectNear(s.t, expected.t + 2, 1e-9);
     });
   }
 
+  it(`accélérer 10 s puis freiner 10 s : 2·(c²/a)(cosh 1 − 1) = ${(2 * literal.x).toFixed(5)} m et t = 23,504024 s`, () => {
+    const s = createPlayer({ heading: 0, physics });
+    drive(s, { thrust: 1 }, 10);
+    drive(s, { brake: 1 }, 10);
+    expectNear(s.x, 2 * expected.x, 1e-5);
+    expectNear(s.x, 2 * literal.x, 1e-5);
+    expectNear(s.t, 2 * expected.t, 1e-6);
+    expectNear(s.t, 23.504024, 1e-6);
+    expect(snapshot(s).speed).toBeLessThan(1e-9 * c);
+  });
+});
+
+describe('frein', () => {
   it('freiner à l’arrêt : on reste à l’arrêt, Δt = Δτ', () => {
     const s = createPlayer({ heading: 0 });
     drive(s, { brake: 1 }, 2);
@@ -269,7 +328,7 @@ describe('frein', () => {
     expectNear(wrap(snapshot(s).heading - (-10 * TURN_RATE - 2 * PIVOT_RATE)), 0, 1e-9);
     expectNear(s.t, 10 * Math.sinh(1) + 2, 1e-9);
     const e = arc(1, -A / C, 0, -TURN_RATE, 10);
-    expect(Math.hypot(s.x - e.x, s.y - e.y)).toBeLessThan(1e-3); // 0,23 mm mesurés
+    expect(Math.hypot(s.x - e.x, s.y - e.y)).toBeLessThan(1e-3); // 0,16 mm mesurés (0,23 mm à c = 100 m/s)
   });
 
   it('frein partiel : arrêt exact à (c²/(b·a))(cosh φ − 1)', () => {
@@ -280,16 +339,6 @@ describe('frein', () => {
     expectNear(s.t, (C / (0.5 * A)) * Math.sinh(1) + 1, 1e-9);
   });
 
-  it('accélérer 10 s puis freiner 10 s : 1 086,161270 m et t = 23,504024 s', () => {
-    const s = createPlayer({ heading: 0 });
-    drive(s, { thrust: 1 }, 10);
-    drive(s, { brake: 1 }, 10);
-    expectNear(s.x, 2 * X_10, 1e-5);
-    expectNear(s.x, 1086.16127, 1e-5);
-    expectNear(s.t, 2 * T_10, 1e-6);
-    expectNear(s.t, 23.504024, 1e-6);
-    expect(snapshot(s).speed).toBeLessThan(1e-9);
-  });
 });
 
 describe('virage (modèle arcade)', () => {
@@ -344,26 +393,29 @@ describe('virage (modèle arcade)', () => {
   it('pousser en tournant depuis l’arrêt : position exacte (forme fermée) à 1 mm', () => {
     const s = drive(createPlayer({ heading: 0 }), { thrust: 1, steer: 0.5 }, 10);
     const e = arc(0, A / C, 0, -0.5 * TURN_RATE, 10);
-    expect(Math.hypot(s.x - e.x, s.y - e.y)).toBeLessThan(1e-3); // 0,39 mm mesurés à 60 Hz
+    expect(Math.hypot(s.x - e.x, s.y - e.y)).toBeLessThan(1e-3); // 0,10 mm mesurés à 60 Hz (0,39 mm à c = 100 m/s)
   });
 });
 
-describe('paradoxe des jumeaux : aller-retour de 1 000 m', () => {
-  // Stratégie : pousser jusqu'à mi-chemin (500 m, rapidité acosh 1,5), freiner jusqu'à
-  // l'arrêt à 1 000 m (on freine 0,5 s de plus que nécessaire : l'arrêt est exact, puis on
+describe.each(PHYSICS_CASES.slice(0, 2))('paradoxe des jumeaux : aller-retour de L = c²/a ($label)', ({ physics }) => {
+  // Stratégie : pousser jusqu'à mi-chemin (L/2, rapidité acosh 1,5), freiner jusqu'à
+  // l'arrêt à L (on freine 0,5 s de plus que nécessaire : l'arrêt est exact, puis on
   // attend), demi-tour par pivot sur place (π/PIVOT_RATE secondes), puis même profil au
   // retour. Les temps passés à l'arrêt (1 s d'attente + pivot) s'ajoutent également à τ et
   // à t ; on les retire pour comparer aux valeurs du plan (τ = 38,497 s, t = 44,721 s),
-  // dont la forme fermée est τ = 4·(c/a)·acosh 1,5 et t = 4·(c/a)·sinh(acosh 1,5).
+  // dont la forme fermée est τ = 4·(c/a)·acosh 1,5 et t = 4·(c/a)·sinh(acosh 1,5) : les mêmes
+  // pour tout c, puisque c/a = 10 s (1 000 m à c = 100 m/s, 300 m à c = 30 m/s).
+  const { c, a } = constantsOf(physics);
+  const L = (c * c) / a;
   it('τ = 38,497 s et t = 44,721 s en mouvement, retour au départ', () => {
-    const s = createPlayer({ heading: 0 });
+    const s = createPlayer({ heading: 0, physics });
     const phiHalf = Math.acosh(1.5);
-    const tauHalf = (C / A) * phiHalf;
+    const tauHalf = (c / a) * phiHalf;
     const pivot = Math.PI / PIVOT_RATE;
     drive(s, { thrust: 1 }, tauHalf);
-    expectNear(s.x, 500, 1e-6);
+    expectNear(s.x, L / 2, 1e-6);
     drive(s, { brake: 1 }, tauHalf + 0.5);
-    expectNear(s.x, 1000, 1e-6);
+    expectNear(s.x, L, 1e-6);
     expect(s.ux).toBe(0);
     drive(s, { steer: 1 }, pivot);
     expectNear(s.hx, -1, 1e-12);
@@ -374,7 +426,7 @@ describe('paradoxe des jumeaux : aller-retour de 1 000 m', () => {
 
     const atRest = 2 * 0.5 + pivot;
     const tauMoving = 4 * tauHalf;
-    const tMoving = 4 * (C / A) * Math.sinh(phiHalf);
+    const tMoving = 4 * (c / a) * Math.sinh(phiHalf);
     expectNear(s.tau - atRest, tauMoving, 1e-9);
     expectNear(s.t - atRest, tMoving, 1e-9);
     expectNear(s.tau - atRest, 38.497, 1e-3);
@@ -422,7 +474,7 @@ describe('plafond de rapidité', () => {
       const s = createPlayer({ heading: 0, phiMax });
       drive(s, { thrust: 1 }, 10, frame);
       expectNear(snapshot(s).rapidity, phiMax, 1e-12);
-      expectNear(s.x, 1000 * (Math.cosh(phiMax) - 1) + 5 * C * Math.sinh(phiMax), 1e-6);
+      expectNear(s.x, LENGTH_UNIT * (Math.cosh(phiMax) - 1) + 5 * C * Math.sinh(phiMax), 1e-6);
       expectNear(s.t, 10 * Math.sinh(phiMax) + 5 * Math.cosh(phiMax), 1e-9);
     }
   });
