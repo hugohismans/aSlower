@@ -41,7 +41,8 @@ dans le joueur (`createPlayer({physics})`), la scène (`lengthUnit`), et tout le
   - `src/main.js`, `src/loop.js` : tout.
   - `localStorage` et `sessionStorage` ne sont utilisés que dans `src/storage.js`.
   - Les fichiers « purs » (`physics/**`, `render/subdivide.js`, `render/lod.js`,
-    `render/culling.js`, `render/layout.js`, `render/adaptiveDpr.js`, `hud/format.js`,
+    `render/culling.js`, `render/layout.js`, `render/decorLayout.js`, `render/decorMesher.js`,
+    `render/adaptiveDpr.js`, `hud/format.js`,
     `hud/levelFormat.js`,
     `input/tiltMath.js`, `game/conditions.js`, `game/bubbles.js`, `game/validate.js`,
     `game/level.js`, `game/rules.js`, `game/score.js`, `game/states.js`, `game/bot.js`,
@@ -213,6 +214,9 @@ exact jusqu'à D = 8), `TONEMAP_KNEE`, `ADAPTATION_REFERENCE = [0.6, 0.6, 0.6, 0
 - `position` (vec3, repère Three).
 - `color` (vec3) : réflectance r, g, b **linéaire** (palette convertie depuis sRGB).
 - `aSpec` (vec3) : (ir, uv, ombrage cuit ∈ [0, 1]).
+- `aFacade` (vec4) : (style, u, z, W) du motif de façade ; style 0 = aucun motif. Le décor
+  écrit (0, 0, 0, 0) ; tant que `meshBlock` ne fournit pas de tableau `facades`, les murs
+  reçoivent aussi des zéros (`mergeChunkMeshes`).
 - Émetteurs (lampadaires) : géométrie séparée avec `position` et `aEmit` (vec2) :
   (ligne de LUT du corps noir, intensité).
 
@@ -261,29 +265,44 @@ Tous les `ShaderMaterial` partagent `REL` par référence (jamais `clone()`).
 
 ### `render/cityMesher.js`
 ```js
-buildCity(scene, palette, {lodSteps = [1.5, 5, 15], lengthUnit = LENGTH_UNIT} = {})
+buildCity(scene, palette, {lodSteps = [1.5, 5, 15], lengthUnit = LENGTH_UNIT, decor} = {})
   // scene : JSON de src/data/scenes/*.json ; palette : src/data/palette.json ;
-  // lengthUnit : L = 10·c de la partie (longueurs de jeu de la scène, voir layout.js)
-  // → {chunks, emitters, streets, start, visibility, bounds, buildings}
-  //   chunks[i] = {id, center: {x, y, z} (jeu), radius, nearestDistance(px, py) → m,
-  //                lod(k) → THREE.BufferGeometry (créée à la demande, mise en cache),
+  // lengthUnit : L = 10·c de la partie (longueurs de jeu de la scène, voir layout.js) ;
+  // decor : réglage d'exécution du décor (expandScene ; quality.decorOptions)
+  // → {chunks, emitters, streets, start, visibility, bounds, buildings, decor}
+  //   chunks[i] = {id, center: {x, y, z} (jeu), radius, buildingCount, decorCount,
+  //                nearestDistance(px, py) → m (bâtiments ET emprises du décor),
+  //                lod(k) → THREE.BufferGeometry (créée à la demande, mise en cache : murs
+  //                  de meshBlock + décor de l'îlot au même LOD, UN SEUL BufferGeometry ;
+  //                  userData {triangles, wallTriangles, decorTriangles}),
   //                release(k) (libère la géométrie du LOD k ; lod(k) la remaille)}
+  //   un objet du décor loin de tout bâtiment forme un chunk de décor seul (id « decor:i,j »)
   //   emitters = THREE.BufferGeometry (attribut aEmit) ou null
   //   streets = [{from: {x, y}, to: {x, y}, width}] pour streetMap.js
   //   start = {x, y, heading} ; visibility = {lite, default} (m) ; bounds = {xmin, ymin, xmax, ymax}
   //   lengthUnit = L utilisé
   //   buildings = emprises développées (expandScene), pour les ombres de streetMap
+  //   decor = objets du décor (decorLayout.js)
+mergeChunkMeshes(walls, decor)     // pur : concatène deux maillages (indices décalés, aFacade
+                                   // nul là où il manque) → {…, wallTriangles, decorTriangles}
+decorStyle(palette)                // matériaux du décor en linéaire + FACE_SHADE, AO_HEIGHT,
+                                   // AO_STRENGTH (style de decorMesher.meshDecor)
 ```
 
 ### `render/layout.js` (pur)
 ```js
-expandScene(scene, palette, {lengthUnit = LENGTH_UNIT} = {})
+expandScene(scene, palette, {lengthUnit = LENGTH_UNIT, decor} = {})
                                    // développe les expressions en L puis les macros (rangées
-                                   // d'îlots) en bâtiments
+                                   // d'îlots) en bâtiments, puis place le décor
                                    // → {buildings: [{x, y, width, depth, height, color, ir, uv,
                                    //     blockId}], lamps: [{x, y, height, temperature, intensity}],
-                                   //     streets, start, visibility, bounds, lengthUnit}
+                                   //     streets, decor (decorLayout.DecorItem[]), start,
+                                   //     visibility, bounds, lengthUnit}
                                    // déterministe (générateur pseudo-aléatoire à graine).
+                                   // Clés de scène du décor : decor {actif?, densite?},
+                                   // decorExclusions [{pos, rayon} | {de, a, rayon}].
+                                   // Option decor (exécution) : false | {enabled?, density?
+                                   // (fraction gardée), small?} → sous-ensemble exact du décor
 resolveSceneLengths(scene, lengthUnit) // remplace chaque expression {fois, de?, plus?, min?, max?,
                                    // arrondiSup?, arrondiInf?, puisPlus?} par sa valeur (m) :
                                    // borne(fois·base + plus), arrondie, + puisPlus ; base = L,
@@ -294,6 +313,31 @@ visibilityFor(lengthUnit)          // → {lite, default} : défaut = clamp(1,2�
                                    // de `visibilite`
 MIN_BUILDING_HEIGHT                // 3 m : l'œil (EYE_HEIGHT) reste sous tous les toits ;
                                    // expandScene refuse un bâtiment ou une rangée plus bas
+```
+
+### `render/decorLayout.js` et `render/decorMesher.js` (purs)
+```js
+placeDecor({buildings, streets, lamps, bounds, start?}, {seed, density = 1, exclusions = []})
+  // → DecorItem[] = {kind, x, y, cap, variant, length?, radius?, awning?, blockId,
+  //    collision: {x0, y0, x1, y1} | null (boîte indulgente : tronc 0,5 m), extent (emprise au
+  //    sol, houppier compris), height, small, keep}
+  // kind ∈ platane, banc, colonne (Morris), kiosque, parasol (table de terrasse), store,
+  //   jardiniere, potelet, fontaine (DECOR_KINDS : rayons, hauteurs, boîtes)
+  // Règles : trottoirs (SIDEWALK_WIDTH = 3 m) bordant une façade (≤ FRONTAGE_DISTANCE) et
+  // places (chaussée ≥ PLACE_MIN_WIDTH = 40 m : fontaine) ; jamais sur une chaussée (bouts
+  // carrés) ni dans un bâtiment ; à ≥ CORNER_CLEARANCE_LOW (14 m, objets bas) ou
+  // CORNER_CLEARANCE_TALL (10 m) de la chaussée d'une rue qui croise ; platanes à ≥ 3,5 m des
+  // lampadaires, en quinconce ; hors des exclusions et à ≥ 6 m du départ ; sans chevauchement ;
+  // rattachés à l'îlot du bâtiment le plus proche (≤ 60 m) ou à « decor:i,j »
+decorSettings(sceneDecor, override) // → {enabled, density, keep, small}
+filterDecor(items, settings)        // sous-ensemble : keep < fraction, sans petits objets
+normalizeExclusions(list)           // disques et couloirs → segments {ax, ay, bx, by, r}
+meshDecor(items, lod, style)        // → {positions, colors, specs, facades (nuls), indices
+  // (Uint32Array), vertexCount, triangleCount} : mêmes attributs que les îlots, faces vers
+  // l'extérieur, ombrage cuit decorFaceShade(n, FACE_SHADE) × AO (+ sous-bois des houppiers) ;
+  // LOD 0 complet (grandes faces ≤ DECOR_STEP = 1,5 m), LOD 1 sans potelets ni tables,
+  // LOD 2 arbres, colonnes, kiosques, stores et fontaines simplifiés (drawnAtLod)
+DECOR_MATERIALS · decorPaletteEntries(palette) · decorFaceShade(nx, ny, nz, table)
 ```
 
 ### `render/subdivide.js`, `render/lod.js`, `render/culling.js` (purs)
@@ -312,7 +356,9 @@ isChunkVisible(chunk, camera {x, y, z}, visibilityFar) // coupe à la distance d
   de `object.userData.r`, en cm entiers ; résultat −1, 0 ou 1),
   perte et restauration du contexte, préchauffage des programmes.
 - `quality.js` : DPR (défaut min(devicePixelRatio, 2), plafond de pixels), paramètre d'URL
-  `?dpr=`, `profilePixelRatio(quality, w, h)` (DPR du profil : `?dpr=` ou DPR plafonné ; plafond
+  `?dpr=`, réglage du décor `decorOptions(search, tier)` → `quality.decor` = `{enabled,
+  density, small}` (`?decor=0` : aucun ; « lite » : `DECOR_LITE_DENSITY` = 0,6, sans petits
+  objets ; le même réglage sert au rendu et à `createLevel`), `profilePixelRatio(quality, w, h)` (DPR du profil : `?dpr=` ou DPR plafonné ; plafond
   du DPR adaptatif), `resolvePixelRatio(quality, w, h)` (le même, abaissé par
   `quality.adaptiveDpr` s'il est posé, jamais avec `?dpr=`), garde-fou de démarrage (clés `aslower:v1:gl-boot-v2` en session, `gl-crash-v2` et
   `gl-tier-v2` en local, via `storage.js` ; `?qualite=normale` les remet à zéro) : `createQuality()` lit l'état à l'ouverture ; `armBootGuard()` pose le
@@ -334,7 +380,7 @@ isChunkVisible(chunk, camera {x, y, z}, visibilityFar) // coupe à la distance d
   → CanvasTexture (plan et ombres portées des bâtiments).
 - `cockpit.js` : `createCockpit()` → Object3D attaché à la caméra (renderOrder −1).
 - `scene.js` : assemble tout pour une scène de `src/data/scenes/` ;
-  `createWorld(renderer, sceneJson, palette, {tier = 'default', lodSteps, physics} = {})` →
+  `createWorld(renderer, sceneJson, palette, {tier = 'default', lodSteps, physics, decor} = {})` →
   `{update(snapshot, k, dtReal), render(camera), stats(), dispose()}`, plus
   `scene`, `start`, `bounds`, `streets`, `buildings` (emprises au sol {x, y, width, depth, …},
   pour `game/bubbles.facadeAhead`), `visibilityFar`, `warmup(camera)` (préchauffage, variantes
@@ -618,7 +664,8 @@ validateLevel(json, {fileName?, palette, lightSpeeds = [10, 30, 100], globalBubb
   // pour chaque c (suffixe « (c = 10 m/s) » si l'erreur n'existe pas pour tous) : id = nom de
   // fichier, numéro, φmax ≤ 3, scène développable, aucune géométrie sous le sol, capteurs ≥ 12 m
   // (plage ≥ 12 m), lieux dans la carte et ATTEIGNABLES depuis le départ (grille de 1 m, portes
-  // ouvertes), références (porte → reprise), pasAvant < délai, ≥ 1 colis obligatoire…
+  // ouvertes), références (porte → reprise), pasAvant < délai, ≥ 1 colis obligatoire, aucun
+  // obstacle du décor dans une zone, sur une porte, une reprise ou le départ…
 assertValidLevel(json, options, max = 10)   // lève une Error qui liste les erreurs
 levelIdFromFileName(path) · reachabilityGrid(scene, start, radius)
 LEVEL_ID_PATTERN · ID_PATTERN · HUES · AIDS · MIN_SENSOR_DISTANCE = 12 · MIN_SENSOR_SPAN = 12
@@ -629,12 +676,18 @@ VALIDATION_LIGHT_SPEEDS = [10, 30, 100]
 ```js
 LEVEL_SCHEMA = 'coursier-niveau/1' · DEFAULT_ZONE_RADIUS = 8 · DOOR_THICKNESS = 1
 resolveLevel(json, lengthUnit)      // expressions → mètres (copie, sans parametres)
-sceneOfLevel(resolved)              // scène « coursier-scene/1 » (pour render/scene.createWorld)
-createLevel(json, physics, palette) // → LevelState (JSON supposé valide) :
+sceneOfLevel(resolved, lengthUnit?) // scène « coursier-scene/1 » (pour render/scene.createWorld),
+                                    // avec decorExclusions += levelDecorExclusions(resolved, L)
+levelDecorExclusions(resolved, L)   // zones (rayon + 4 m), portes (portée min + largeur/2),
+                                    // reprises et départ (8 m), couloirs des itinéraires du pilote
+                                    // (max(4 m, 0,014·L·β))
+decorBoxes(scene)                   // obstacles du décor : {x0, y0, x1, y1, kind: 'decor', id: sorte}
+createLevel(json, physics, palette, {decor} = {}) // → LevelState (JSON supposé valide) :
   // {id, numero, titre, json, level (résolu), physics, scene (expandScene), sceneJson, start:
   //  {x, y, heading, beta}, tauMax, phiMax, etoiles, status: 'enCours'|'reussite'|'echec',
   //  raison, fin: {t, tau} | null, tau, t, colis[], portes[], reprises[], chocs,
-  //  reprisesFaites, playerRadius, obstacles: {query(...)} (bâtiments, portes FERMÉES, bords)}
+  //  reprisesFaites, playerRadius, obstacles: {query(...)} (bâtiments, décor, portes FERMÉES,
+  //  bords)} ; decor : réglage d'exécution du décor (celui du rendu ; défaut : complet)
   // colis[i] = {id, client, nom, obligatoire, delai, etat: 'aRetirer'|'aBord'|'livre',
   //   retrait | null, livraison : {x, y, rayon, pasAvant, timer, inZone, waiting},
   //   retireA, livreA : {t, tau} | null, enRetard}

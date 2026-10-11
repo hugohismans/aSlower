@@ -26,6 +26,8 @@ import { createRandom, resolveColor } from './layout.js';
 
 /** Pas maximal des grandes faces au LOD 0 (m). */
 export const DECOR_STEP = 1.5;
+/** Rayon (m) au-delà duquel un couvercle de prisme est un éventail depuis son centre. */
+const CAP_FAN_RADIUS = 0.75;
 /** Ombrage d'une face tournée vers le bas (dessous d'un houppier, d'un parasol, d'un store). */
 export const DECOR_UNDERSIDE_SHADE = 0.5;
 /** Assombrissement du bas des houppiers (sous-bois) : facteur au bas du houppier. */
@@ -289,14 +291,18 @@ function prism(B, F, p) {
     }
     lower = upper;
   }
-  if (p.top && r1 > 0) {
-    const top = ring(1);
-    B.face(top.pts, p.topMat ?? matOf(0, segs - 1), { ref: [top.center[0], top.center[1], top.center[2] - 1], tint: p.tint });
-  }
-  if (p.bottom && r0 > 0) {
-    const bottom = ring(0);
-    B.face(bottom.pts, p.bottomMat ?? matOf(0, 0), { ref: [bottom.center[0], bottom.center[1], bottom.center[2] + 1], tint: p.tint });
-  }
+  // Couvercles : polygone, ou éventail depuis le centre au-delà de CAP_FAN_RADIUS (pas de
+  // longues diagonales).
+  const cap = (rg, name, dz) => {
+    const ref = [rg.center[0], rg.center[1], rg.center[2] + dz];
+    if (rg.r <= CAP_FAN_RADIUS) {
+      B.face(rg.pts, name, { ref, tint: p.tint });
+      return;
+    }
+    for (let i = 0; i < sides; i++) B.face([rg.center, rg.pts[i], rg.pts[(i + 1) % sides]], name, { ref, tint: p.tint });
+  };
+  if (p.top && r1 > 0) cap(ring(1), p.topMat ?? matOf(0, segs - 1), -1);
+  if (p.bottom && r0 > 0) cap(ring(0), p.bottomMat ?? matOf(0, 0), 1);
 }
 
 /**
@@ -388,7 +394,11 @@ function blob(B, F, p) {
 /* Objets                                                                     */
 /* ------------------------------------------------------------------------- */
 
-/** Platane : tronc écorce marbrée, maîtresses branches, houppier large et bosselé. */
+/**
+ * Platane : tronc écorce marbrée, maîtresses branches, houppier large et bosselé. Toutes les
+ * grandeurs (tailles, teintes) sont tirées avant le maillage, dans le même ordre à chaque LOD :
+ * un arbre garde sa silhouette et sa couleur quand son îlot change de LOD.
+ */
 function platane(B, it, lod) {
   const rand = createRandom(it.variant);
   const F = frameOf(it.x, it.y, it.cap);
@@ -397,63 +407,69 @@ function platane(B, it, lod) {
   const fork = 2.5 + 0.7 * rand();
   const lean = 0.15 + 0.2 * rand(); // vers la chaussée (b)
   const barkSeed = rand();
+  const trunkRot = rand();
+  const turn = rand() * 2 * Math.PI;
+  const branchTops = [rand(), rand(), rand()];
+  const hue = rand() * 2 - 1;
+  const light = 0.88 + 0.22 * rand();
+  const irK = 0.92 + 0.14 * rand();
+  const ra0 = 3.2 + 0.5 * rand();
+  const rb0 = 2.7 + 0.3 * rand();
+  const rzUp0 = 2.4 + 0.4 * rand();
+  const cb = lean + 0.55 + 0.3 * rand();
+  const ca = (rand() - 0.5) * 0.5;
+  const lobeSide = rand() < 0.5 ? -1 : 1;
+  const lobeShift = 0.7 + 0.4 * rand();
+
   const bark = (i, j) => BARK[Math.floor(hash01((i + 1) * 12.9898 + (j + 1) * 78.233 + barkSeed * 100) * BARK.length)];
-  prism(B, F, { z0: 0, z1: fork, r0: rt * 1.2, r1: rt * 0.85, b1: lean, sides: [5, 4, 3][lod], segs: lod === 0 ? 2 : 1, mat: bark, rot: rand() });
+  prism(B, F, { z0: 0, z1: fork, r0: rt * 1.2, r1: rt * 0.85, b1: lean, sides: [5, 4, 3][lod], segs: lod === 0 ? 2 : 1, mat: bark, rot: trunkRot });
 
   // Maîtresses branches (fourche) : visibles sous le houppier, de près.
   if (lod === 0) {
-    const count = 3;
-    const turn = rand() * 2 * Math.PI;
-    for (let k = 0; k < count; k++) {
-      const ang = turn + (2 * Math.PI * k) / count;
-      const da = Math.cos(ang) * 1.3;
-      const db = Math.sin(ang) * 0.9 + 0.5;
+    branchTops.forEach((h, k) => {
+      const ang = turn + (2 * Math.PI * k) / branchTops.length;
       prism(B, F, {
         a0: 0,
         b0: lean,
         z0: fork - 0.35,
-        a1: da,
-        b1: lean + db,
-        z1: fork + 1.6 + 0.4 * rand(),
+        a1: Math.cos(ang) * 1.3,
+        b1: lean + Math.sin(ang) * 0.9 + 0.5,
+        z1: fork + 1.6 + 0.4 * h,
         r0: rt * 0.6,
         r1: rt * 0.3,
         sides: 3,
         mat: bark,
         rot: ang,
       });
-    }
+    });
   }
 
   // Houppier : ellipsoïde large, base aplatie, décalé vers la chaussée, plus un lobe au sommet.
-  const hue = rand() * 2 - 1;
-  const light = 0.88 + 0.22 * rand();
-  const irK = 0.92 + 0.14 * rand();
   const leafTint = (f) => {
     const k = light * (0.92 + 0.16 * hash01(f * 91.7 + hue * 13));
     return [k * (1 + 0.12 * hue), k, k * (1 - 0.18 * hue), irK];
   };
   // Au LOD 2 (sans lobe), le houppier unique reprend le volume du lobe.
   const far = lod === 2 ? 1.08 : 1;
-  const ra = (3.2 + 0.5 * rand()) * size * far;
-  const rb = (2.7 + 0.3 * rand()) * size * far;
+  const ra = ra0 * size * far;
+  const rb = rb0 * size * far;
   const rzDown = 1.4 * size;
-  const rzUp = (2.4 + 0.4 * rand()) * size * (lod === 2 ? 1.3 : 1);
+  const rzUp = rzUp0 * size * (lod === 2 ? 1.3 : 1);
   const cz = fork + 0.45 + rzDown;
-  const cb = lean + 0.55 + 0.3 * rand();
-  const ca = (rand() - 0.5) * 0.5;
   const bottom = cz - rzDown;
-  const top = cz + rzUp + 1.4 * size;
+  const top = cz + rzUp0 * size + 1.4 * size;
   const shade = (pt) => CROWN_INNER_SHADE + (1 - CROWN_INNER_SHADE) * Math.min(1, Math.max(0, (pt[2] - bottom) / (top - bottom)));
   const detail = [
     { seg: 8, bands: 4 },
     { seg: 7, bands: 3 },
     { seg: 5, bands: 3 },
   ][lod];
-  blob(B, F, { a: ca, b: cb, z: cz, ra, rb, rzUp, rzDown, ...detail, rand, mat: () => 'vegetation', tint: leafTint, shade });
+  // Bosses : suites propres (leur nombre de tirages dépend du LOD).
+  const bumps = createRandom(it.variant ^ 0x5bd1e995);
+  blob(B, F, { a: ca, b: cb, z: cz, ra, rb, rzUp, rzDown, ...detail, rand: bumps, mat: () => 'vegetation', tint: leafTint, shade });
   if (lod < 2) {
-    const side = rand() < 0.5 ? -1 : 1;
     blob(B, F, {
-      a: ca + side * (0.7 + 0.4 * rand()),
+      a: ca + lobeSide * lobeShift,
       b: cb - 0.2,
       z: cz + rzUp * 0.55,
       ra: 2.1 * size,
@@ -462,7 +478,7 @@ function platane(B, it, lod) {
       rzDown: 1.0 * size,
       seg: 5,
       bands: lod === 0 ? 3 : 2,
-      rand,
+      rand: createRandom(it.variant ^ 0x27d4eb2f),
       mat: () => 'vegetation',
       tint: (f) => leafTint(f + 101),
       shade,
@@ -484,17 +500,16 @@ function colonne(B, it, lod) {
   const rand = createRandom(it.variant);
   const F = frameOf(it.x, it.y, it.cap);
   const sides = 8;
+  // Affiches tirées une fois (deux rangées de huit) : mêmes couleurs à chaque LOD.
+  const posters = Array.from({ length: 2 * sides }, () => POSTERS[Math.floor(rand() * POSTERS.length)]);
   if (lod === 2) {
-    const posters = POSTERS.map(() => POSTERS[Math.floor(rand() * POSTERS.length)]);
-    prism(B, F, { z0: 0, z1: 2.9, r0: 0.62, r1: 0.6, sides: 5, mat: (i) => posters[i % posters.length] });
+    prism(B, F, { z0: 0, z1: 2.9, r0: 0.62, r1: 0.6, sides: 5, mat: (i) => posters[i] });
     prism(B, F, { z0: 2.9, z1: 3.6, r0: 0.66, r1: 0, sides: 5, mat: 'vert-wagon', bottom: true });
     return;
   }
   prism(B, F, { z0: 0, z1: 0.3, r0: 0.7, r1: 0.7, sides, mat: 'vert-wagon', top: true });
   prism(B, F, { z0: 0.3, z1: 0.55, r0: 0.6, r1: 0.6, sides, mat: 'vert-wagon' });
   const rows = lod === 0 ? 2 : 1;
-  const posters = [];
-  for (let k = 0; k < sides * rows; k++) posters.push(POSTERS[Math.floor(rand() * POSTERS.length)]);
   prism(B, F, { z0: 0.55, z1: 2.55, r0: 0.6, r1: 0.6, sides, segs: rows, mat: (i, j) => posters[j * sides + i] });
   prism(B, F, { z0: 2.55, z1: 2.8, r0: 0.6, r1: 0.6, sides, mat: 'vert-wagon' });
   prism(B, F, { z0: 2.8, z1: 2.98, r0: 0.74, r1: 0.74, sides, mat: 'vert-wagon', top: false, bottom: true });
@@ -509,9 +524,21 @@ function kiosque(B, it, lod) {
   const step = lod === 0 ? DECOR_STEP : Infinity;
   const ha = 1.2;
   const hb = 0.8;
+  /** Toit en pavillon : rectangle (±ra, ±rb) à z0, sommet tronqué (±ta, ±tb) à z1. */
+  const roof = (ra, rb, z0, ta, tb, z1, bottom) => {
+    const ref = F(0, 0, z0);
+    const base = [F(-ra, -rb, z0), F(ra, -rb, z0), F(ra, rb, z0), F(-ra, rb, z0)];
+    const top = [F(-ta, -tb, z1), F(ta, -tb, z1), F(ta, tb, z1), F(-ta, tb, z1)];
+    for (let i = 0; i < 4; i++) {
+      const k = (i + 1) % 4;
+      B.quad([base[i], base[k], top[k], top[i]], 'zinc', { ref }, step);
+    }
+    B.quad(top, 'zinc', { ref }, step);
+    if (bottom) B.quad(base, 'vert-wagon', { ref: F(0, 0, z1) }, step);
+  };
   if (lod === 2) {
     box(B, F, -ha, ha, -hb, hb, 0, 2.4, 'vert-wagon', { top: false });
-    prism(B, F, { z0: 2.4, z1: 3, r0: 1.35 * Math.SQRT2, r1: 0, sides: 4, rot: Math.PI / 4, mat: 'zinc', bottom: true });
+    roof(ha + 0.2, hb + 0.2, 2.4, 0.3, 0.1, 3, true);
     return;
   }
   box(B, F, -ha, ha, -hb, hb, 0, 0.8, 'vert-wagon', { top: false, step });
@@ -527,11 +554,11 @@ function kiosque(B, it, lod) {
     B.face([F(a0, -hb, 0.8), F(a1, -hb, 0.8), F(a1, -hb, 2.0), F(a0, -hb, 2.0)], back[i], { ref: F(0, 0, 1.4) });
   }
   for (const [s, k] of [[-1, 0], [1, 1]]) {
-    B.face([F(s * ha, -hb, 0.8), F(s * ha, hb, 0.8), F(s * ha, hb, 2.0), F(s * ha, -hb, 2.0)], ends[k], { ref: F(0, 0, 1.4) });
+    B.quad([F(s * ha, -hb, 0.8), F(s * ha, hb, 0.8), F(s * ha, hb, 2.0), F(s * ha, -hb, 2.0)], ends[k], { ref: F(0, 0, 1.4) }, step);
   }
-  box(B, F, -ha, ha, -hb, hb, 2.0, 2.3, 'vert-wagon', { top: false });
+  box(B, F, -ha, ha, -hb, hb, 2.0, 2.3, 'vert-wagon', { top: false, step });
   box(B, F, -ha - 0.25, ha + 0.25, -hb - 0.25, hb + 0.25, 2.3, 2.45, 'vert-wagon', { bottom: true, top: false, step });
-  prism(B, F, { z0: 2.45, z1: 3.0, r0: (ha + 0.25) * Math.SQRT2, r1: 0.25, sides: 4, rot: Math.PI / 4, mat: 'zinc', top: true });
+  roof(ha + 0.25, hb + 0.25, 2.45, 0.35, 0.12, 3.0, false);
   prism(B, F, { z0: 3.0, z1: 3.3, r0: 0.12, r1: 0, sides: 4, mat: 'vert-wagon' });
 }
 
@@ -624,11 +651,12 @@ function potelet(B, it) {
   prism(B, F, { z0: 0.8, z1: 0.92, r0: 0.08, r1: 0, sides: 4, mat: 'fonte' });
 }
 
-/** Fontaine : bassin de pierre, eau, vasques superposées. */
+/** Fontaine : bassin de pierre, eau, vasques superposées (à l'échelle du bassin). */
 function fontaine(B, it, lod) {
   const F = frameOf(it.x, it.y, it.cap);
   const R = it.radius ?? 3.2;
-  const sides = lod === 2 ? 10 : 16;
+  const k = R / 3.2;
+  const sides = lod === 2 ? 10 : lod === 1 ? 16 : Math.max(16, Math.ceil((2 * Math.PI * R) / DECOR_STEP));
   const rim = 0.3;
   const zRim = 0.55;
   const zWater = 0.4;
@@ -657,12 +685,13 @@ function fontaine(B, it, lod) {
   }
   // Vasques.
   const s8 = lod === 2 ? 6 : 8;
-  prism(B, F, { z0: zWater, z1: 1.3, r0: 0.45, r1: 0.35, sides: s8, mat: 'pierre' });
-  prism(B, F, { z0: 1.3, z1: 1.6, r0: 0.35, r1: 1.25, sides: s8, mat: 'pierre', top: true, topMat: 'eau' });
+  const z = (h) => zWater + (h - zWater) * k;
+  prism(B, F, { z0: zWater, z1: z(1.3), r0: 0.45 * k, r1: 0.35 * k, sides: s8, mat: 'pierre' });
+  prism(B, F, { z0: z(1.3), z1: z(1.6), r0: 0.35 * k, r1: 1.25 * k, sides: s8, mat: 'pierre', top: true, topMat: 'eau' });
   if (lod === 2) return;
-  prism(B, F, { z0: 1.6, z1: 2.3, r0: 0.18, r1: 0.15, sides: 6, mat: 'pierre' });
-  prism(B, F, { z0: 2.3, z1: 2.5, r0: 0.15, r1: 0.65, sides: s8, mat: 'pierre', top: true, topMat: 'eau' });
-  prism(B, F, { z0: 2.5, z1: 2.95, r0: 0.1, r1: 0, sides: 6, mat: 'pierre' });
+  prism(B, F, { z0: z(1.6), z1: z(2.3), r0: 0.18 * k, r1: 0.15 * k, sides: 6, mat: 'pierre' });
+  prism(B, F, { z0: z(2.3), z1: z(2.5), r0: 0.15 * k, r1: 0.65 * k, sides: s8, mat: 'pierre', top: true, topMat: 'eau' });
+  prism(B, F, { z0: z(2.5), z1: z(2.95), r0: 0.1 * k, r1: 0, sides: 6, mat: 'pierre' });
 }
 
 /** Objets dessinés à chaque LOD (les autres sont omis). */

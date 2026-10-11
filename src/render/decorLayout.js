@@ -23,7 +23,12 @@
  *   propre ;
  * - pas sur les lampadaires : arbres à ≥ TREE_LAMP_CLEARANCE (3,5 m : la tête de la lampe, à
  *   6 m, reste hors du houppier), autres objets à ≥ 1 m ; les platanes sont en quinconce avec
- *   les lampadaires du même trottoir (à mi-distance de deux arbres) ;
+ *   les lampadaires du même trottoir (chaque lampadaire à mi-distance de deux arbres : pas des
+ *   arbres = sous-multiple du pas des lampadaires, 10 m pour des lampadaires tous les 40 m) ;
+ * - platanes sur une rue sur TREE_STREET_PROBABILITY (toujours sur la rue du départ) ;
+ *   mobilier dans les intervalles : bancs, colonnes Morris (au bout des trottoirs, près des
+ *   carrefours), kiosques (rares, rues sans arbres), potelets ; terrasses de café (parasols ou
+ *   store banne) et jardinières devant certaines façades ;
  * - hors des EXCLUSIONS : disques {pos, rayon} ou couloirs {de, a, rayon} (scène :
  *   `decorExclusions`, voir game/level.sceneOfLevel), et à ≥ START_CLEARANCE du départ ;
  * - deux objets ne se chevauchent pas (emprises au sol en disques).
@@ -61,8 +66,12 @@ export const FURNITURE_SETBACK = 1.3;
 export const TREE_STREET_PROBABILITY = 0.45;
 /** Distance maximale d'un objet de trottoir à la façade la plus proche (m). */
 export const FRONTAGE_DISTANCE = 6;
-/** Rayon de la fontaine (m) et dégagement exigé autour (bâtiments, rues, exclusions). */
+/**
+ * Rayon du bassin de la fontaine (m) : demi-largeur de la place / 12, entre FOUNTAIN_RADIUS et
+ * FOUNTAIN_RADIUS_MAX ; dégagement exigé autour (bâtiments, rues, lampadaires, exclusions).
+ */
 export const FOUNTAIN_RADIUS = 3.2;
+export const FOUNTAIN_RADIUS_MAX = 5;
 export const FOUNTAIN_CLEARANCE = 10;
 /** Rayon de rattachement à un îlot (m) et case des chunks de décor seul. */
 export const ATTACH_RADIUS = 60;
@@ -453,7 +462,7 @@ export function placeDecor(city, { seed = 0, density = 1, exclusions = [] } = {}
     return Math.atan2(-bx, by);
   }
 
-  function sidewalk(w, side, planted, spacing, rand) {
+  function sidewalk(w, side, planted, baseSpacing, rand) {
     const curb = w.hw;
     const line = curb + FURNITURE_SETBACK;
     const t0 = -w.hw;
@@ -470,6 +479,14 @@ export function placeDecor(city, { seed = 0, density = 1, exclusions = [] } = {}
       if (a >= t0 && a <= t1 && b > curb && b < curb + SIDEWALK_WIDTH) lampTs.push(a);
     }
     lampTs.sort((p, q) => p - q);
+    // Lampadaires réguliers : pas des arbres = sous-multiple de leur pas (chaque lampadaire à
+    // mi-distance de deux arbres), s'il reste dans [9 ; 12] m.
+    let spacing = baseSpacing;
+    if (lampTs.length >= 2) {
+      const pitch = lampTs[1] - lampTs[0];
+      const n = Math.max(1, Math.round(pitch / TREE_SPACING));
+      if (pitch / n >= 9 && pitch / n <= 12) spacing = pitch / n;
+    }
     const phase = lampTs.length > 0 ? lampTs[0] + spacing / 2 : rand() * spacing;
     const first = phase - Math.ceil((phase - t0) / spacing) * spacing;
 
@@ -644,7 +661,7 @@ export function placeDecor(city, { seed = 0, density = 1, exclusions = [] } = {}
    * quatre bancs autour.
    */
   function placeFountain(w, rand, keep) {
-    const R = FOUNTAIN_RADIUS;
+    const R = Math.min(Math.max(w.hw / 12, FOUNTAIN_RADIUS), FOUNTAIN_RADIUS_MAX);
     const need = R + FOUNTAIN_CLEARANCE;
     const inset = R + 2;
     const cx = w.ox + (w.ux * w.len) / 2;
@@ -673,7 +690,9 @@ export function placeDecor(city, { seed = 0, density = 1, exclusions = [] } = {}
     if (!best) return;
     const variant = Math.floor(rand() * 1e9);
     const capPlace = Math.atan2(w.uy, w.ux);
-    add('fontaine', best.x, best.y, capPlace, { variant, radius: R }, keep);
+    const fountain = add('fontaine', best.x, best.y, capPlace, { variant, radius: R }, keep, R + 0.3);
+    fountain.collision = collisionBox(best.x, best.y, capPlace, [0.85 * R, 0.85 * R]);
+    fountain.height = 3 * (R / FOUNTAIN_RADIUS);
     // Bancs autour, tournés vers la fontaine (b vers le centre).
     for (let k = 0; k < 4; k++) {
       const ang = capPlace + Math.PI / 4 + (k * Math.PI) / 2;
